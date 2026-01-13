@@ -1,18 +1,19 @@
-// src/app/api/yeying/[...path]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSideConfig } from "@/app/config/server";
 
 const config = getServerSideConfig();
-const YEYING_BACKEND_URL = config.web_dav_backend_url;
+const ROUTER_BACKEND_URL = config.router_backend_url;
 
-if (!YEYING_BACKEND_URL) {
-  throw new Error("YEYING_BACKEND_URL is not set in environment variables");
+if (!ROUTER_BACKEND_URL) {
+  throw new Error("ROUTER_BACKEND_URL is not set in environment variables");
 }
 
 // 允许的路径前缀（安全限制）
 const ALLOWED_PATHS = [
-  "/api/v1/public/common/auth/challenge",
-  "/api/v1/public/common/auth/verify",
+  "/api/v1/public/auth/challenge",
+  "/api/v1/public/auth/verify",
+  "/api/v1/public/auth/refresh",
+  "/api/v1/public/auth/logout",
 ];
 
 async function handle(
@@ -24,7 +25,7 @@ async function handle(
   const urlPath = requestUrl.pathname;
 
   // 安全校验：只允许特定接口
-  if (!ALLOWED_PATHS.some((allowed) => requestUrl.pathname.endsWith(allowed))) {
+  if (!ALLOWED_PATHS.some((allowed) => urlPath.endsWith(allowed))) {
     return NextResponse.json(
       { error: true, msg: "Forbidden API path => " + urlPath },
       { status: 403 },
@@ -32,7 +33,8 @@ async function handle(
   }
 
   // 构造目标 URL
-  const targetUrl = `${YEYING_BACKEND_URL}${urlPath}`;
+  const baseUrl = ROUTER_BACKEND_URL.replace(/\/$/, "");
+  const targetUrl = `${baseUrl}${urlPath}`;
 
   // 转发请求头（保留 Content-Type、Authorization 等）
   const headers: HeadersInit = {};
@@ -53,8 +55,6 @@ async function handle(
       headers,
       body: body || undefined,
       redirect: "manual",
-      // @ts-ignore
-      duplex: "half", // 用于流式请求（如 POST with body）
     });
 
     // 返回响应
@@ -68,9 +68,9 @@ async function handle(
       headers: responseHeaders,
     });
   } catch (error) {
-    console.error("[Yeying Proxy] Error:", error);
+    console.error("[Router Auth Proxy] Error:", error);
     return NextResponse.json(
-      { error: true, msg: "Failed to proxy request to Yeying backend" },
+      { error: true, msg: "Failed to proxy request to router backend" },
       { status: 500 },
     );
   }
@@ -83,5 +83,5 @@ export const PUT = handle;
 export const DELETE = handle;
 export const OPTIONS = handle;
 
-// 使用 Edge Runtime（与你的 webdav 代理一致）
+// 使用 Node Runtime（需要访问本地/内网 router 服务）
 export const runtime = "edge";

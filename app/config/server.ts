@@ -97,6 +97,8 @@ declare global {
 
       ENABLE_MCP?: string; // enable mcp functionality
 
+      WEBDAV_BACKEND_URL?: string;
+      ROUTER_BACKEND_URL?: string;
       YEYING_BACKEND_URL?: string;
     }
   }
@@ -114,6 +116,8 @@ const ACCESS_CODES = (function getAccessCodes(): Set<string> {
     return new Set();
   }
 })();
+
+const DEFAULT_ROUTER_BACKEND_URL = "http://127.0.0.1:3011";
 
 function getApiKey(keys?: string) {
   const apiKeyEnvVar = keys ?? "";
@@ -181,6 +185,11 @@ export const getServerSideConfig = () => {
   const allowedWebDavEndpoints = (
     process.env.WHITE_WEBDAV_ENDPOINTS ?? ""
   ).split(",");
+
+  const routerBackendUrl =
+    process.env.ROUTER_BACKEND_URL?.trim() ||
+    process.env.YEYING_BACKEND_URL?.trim() ||
+    DEFAULT_ROUTER_BACKEND_URL;
 
   return {
     baseUrl: process.env.BASE_URL,
@@ -277,5 +286,6 @@ export const getServerSideConfig = () => {
     allowedWebDavEndpoints,
     enableMcp: process.env.ENABLE_MCP === "true",
     web_dav_backend_url: process.env.WEBDAV_BACKEND_URL,
+    router_backend_url: routerBackendUrl,
   };
 };

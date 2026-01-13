@@ -30,7 +30,7 @@ import { type ClientApi, getClientApi } from "../client/api";
 import { useAccessStore } from "../store";
 import clsx from "clsx";
 import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
-import { waitForWallet } from "../plugins/wallet";
+import { initWalletListeners, waitForWallet } from "../plugins/wallet";
 import { toast } from "sonner";
 
 import { useToastStore } from "../store/toast";
@@ -39,6 +39,7 @@ const loadFunc = async () => {
   try {
     await waitForWallet();
     localStorage.setItem("hasConnectedWallet", "true");
+    await initWalletListeners();
   } catch (error) {
     console.error("钱包检测失败:", error);
     const innerHTML = `

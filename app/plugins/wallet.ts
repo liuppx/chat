@@ -1,32 +1,99 @@
-import { notifyError, notifySuccess } from "./show_window";
+import { notifyError, notifyInfo, notifySuccess } from "./show_window";
 import { getServerSideConfig } from "@/app/config/server";
+import {
+  getProvider,
+  requestAccounts,
+  getChainId as getChainIdFromSdk,
+  getBalance as getBalanceFromSdk,
+  loginWithChallenge as loginWithChallengeFromSdk,
+  onAccountsChanged,
+  onChainChanged,
+  clearAccessToken,
+  type Eip1193Provider,
+} from "@yeying-community/web3";
 
 const config = getServerSideConfig();
 console.log(`config=${JSON.stringify(config)}`);
-// 等待钱包注入
-export async function waitForWallet() {
-  return new Promise((resolve, reject) => {
-    if (typeof window.ethereum !== "undefined") {
-      resolve(window.ethereum);
+
+const providerOptions = {
+  preferYeYing: true,
+  timeoutMs: 5000,
+};
+
+let providerPromise: Promise<Eip1193Provider | null> | null = null;
+let listenersCleanup: (() => void) | null = null;
+let listenersReady = false;
+let loginInFlight = false;
+
+async function resolveProvider(): Promise<Eip1193Provider | null> {
+  if (!providerPromise) {
+    providerPromise = getProvider(providerOptions);
+  }
+  const provider = await providerPromise;
+  if (!provider) {
+    providerPromise = null;
+  }
+  return provider;
+}
+
+async function requireProvider(): Promise<Eip1193Provider> {
+  const provider = await resolveProvider();
+  if (!provider) {
+    throw new Error("❌未检测到钱包");
+  }
+  return provider;
+}
+
+export async function initWalletListeners() {
+  if (listenersReady) {
+    return listenersCleanup;
+  }
+  const provider = await resolveProvider();
+  if (!provider) {
+    return null;
+  }
+
+  const handleAccountsChanged = async (accounts: string[]) => {
+    if (!Array.isArray(accounts) || accounts.length === 0) {
+      localStorage.removeItem("currentAccount");
+      clearAccessToken({ tokenStorageKey: "authToken" });
+      notifyError("❌钱包已断开，请重新连接");
       return;
     }
 
-    let attempts = 0;
-    const maxAttempts = 50; // 5秒
+    const nextAccount = accounts[0];
+    const prevAccount = getCurrentAccount();
+    if (nextAccount !== prevAccount) {
+      localStorage.setItem("currentAccount", nextAccount);
+      clearAccessToken({ tokenStorageKey: "authToken" });
+      await loginWithChallenge(provider, nextAccount);
+    }
+  };
 
-    const interval = setInterval(() => {
-      attempts++;
+  const handleChainChanged = (chainId: string) => {
+    notifyInfo(`已切换网络: ${chainId}`);
+  };
 
-      if (typeof window.ethereum !== "undefined") {
-        console.log("钱包检测就绪");
-        clearInterval(interval);
-        resolve(window.ethereum);
-      } else if (attempts >= maxAttempts) {
-        clearInterval(interval);
-        reject(new Error("❌未检测到钱包"));
-      }
-    }, 100);
-  });
+  const offAccounts = onAccountsChanged(provider, handleAccountsChanged);
+  const offChain = onChainChanged(provider, handleChainChanged);
+
+  listenersCleanup = () => {
+    offAccounts?.();
+    offChain?.();
+    listenersCleanup = null;
+    listenersReady = false;
+  };
+  listenersReady = true;
+  return listenersCleanup;
+}
+
+// 等待钱包注入
+export async function waitForWallet() {
+  const provider = await resolveProvider();
+  if (!provider) {
+    throw new Error("❌未检测到钱包");
+  }
+  return provider;
 }
 
 // 连接钱包
@@ -36,18 +103,14 @@ export async function connectWallet() {
     return;
   }
   try {
-    if (typeof window.ethereum === "undefined") {
-      return;
-    }
     try {
-      const accounts = await window.ethereum.request({
-        method: "eth_requestAccounts",
-      });
+      const provider = await requireProvider();
+      const accounts = await requestAccounts({ provider });
       if (Array.isArray(accounts) && accounts.length > 0) {
         const currentAccount = accounts[0];
         localStorage.setItem("currentAccount", currentAccount);
         notifySuccess(`✅钱包连接成功！\n账户: ${currentAccount}`);
-        await loginWithChallenge();
+        await loginWithChallenge(provider, currentAccount);
       } else {
         notifyError("❌未获取到账户");
       }
@@ -101,12 +164,13 @@ export async function getChainId() {
     return;
   }
   try {
-    if (typeof window.ethereum === "undefined") {
+    const provider = await requireProvider();
+    const chainId = await getChainIdFromSdk(provider);
+
+    if (!chainId) {
+      notifyError("❌获取链 ID 失败");
       return;
     }
-    const chainId = (await window.ethereum.request({
-      method: "eth_chainId",
-    })) as string;
 
     const chainNames = {
       "0x1": "Ethereum Mainnet",
@@ -136,13 +200,8 @@ export async function getBalance() {
     return;
   }
   try {
-    if (typeof window.ethereum === "undefined") {
-      return;
-    }
-    const balance = (await window.ethereum.request({
-      method: "eth_getBalance",
-      params: [currentAccount, "latest"],
-    })) as string;
+    const provider = await requireProvider();
+    const balance = await getBalanceFromSdk(provider, currentAccount, "latest");
 
     // 转换为 ETH
     const ethBalance = parseInt(balance, 16) / 1e18;
@@ -154,74 +213,40 @@ export async function getBalance() {
 }
 
 // Challenge 登录
-export async function loginWithChallenge() {
+export async function loginWithChallenge(
+  provider?: Eip1193Provider,
+  address?: string,
+) {
   if (localStorage.getItem("hasConnectedWallet") === "false") {
     notifyError("❌未检测到钱包，请先安装并连接钱包");
     return;
   }
-  const currentAccount = getCurrentAccount();
-  if (!currentAccount) {
-    notifyError("❌请先连接钱包");
+  if (loginInFlight) {
     return;
   }
+  loginInFlight = true;
   try {
-    // 1. 从后端获取 Challenge
-    const body = {
-      address: currentAccount,
-    };
-    const response = await fetch("/api/v1/public/common/auth/challenge", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        accept: "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    console.log(`response=${response}`);
-
-    if (!response.ok) {
-      throw new Error(
-        `❌Failed to create post: ${
-          response.status
-        } error: ${await response.text()}`,
-      );
-    }
-    const r = await response.json();
-    const challenge = r.message;
-    if (typeof window.ethereum === "undefined") {
+    const providerInstance = provider || (await requireProvider());
+    const currentAccount = address || getCurrentAccount();
+    if (!currentAccount) {
+      notifyError("❌请先连接钱包");
       return;
     }
-    // 2. 使用钱包签名 Challenge
-    const signature = await window.ethereum.request({
-      method: "personal_sign",
-      params: [challenge, currentAccount],
-    });
-    // 3. 发送签名到后端验证
-    const body2 = {
+
+    await loginWithChallengeFromSdk({
+      provider: providerInstance,
       address: currentAccount,
-      signature: signature,
-    };
-    const verifyRes = await fetch("/api/v1/public/common/auth/verify", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        accept: "application/json",
-      },
-      body: JSON.stringify(body2),
+      baseUrl: "/api/v1/public/auth",
+      storeToken: true,
+      tokenStorageKey: "authToken",
     });
-    if (!verifyRes.ok) {
-      throw new Error("❌验证失败");
-    }
-    const r2 = await verifyRes.json();
-    const token = r2.token;
-    // 4. 保存 Token
-    localStorage.setItem("authToken", token);
     notifySuccess(`✅登录成功`);
     window.location.reload();
   } catch (error) {
     console.error("❌登录失败:", error);
     notifyError(`❌登录失败: ${error}`);
+  } finally {
+    loginInFlight = false;
   }
 }
 

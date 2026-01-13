@@ -75,7 +75,7 @@ import { ProviderType } from "../utils/cloud";
 import { TTSConfigList } from "./tts-config";
 import { RealtimeConfigList } from "./realtime-chat/realtime-config";
 
-const ROUTER_BASE_URL = "https://shengnw.win";
+const ROUTER_BASE_URL = "https://llm.yeying.pub/";
 const ROUTER_PROVIDERS = [ServiceProvider.OpenAI];
 
 function EditPromptModal(props: { id: string; onClose: () => void }) {
