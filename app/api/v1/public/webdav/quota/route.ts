@@ -6,7 +6,7 @@ const config = getServerSideConfig();
 const WEBDAV_BACKEND_URL = config.web_dav_backend_url;
 
 if (!WEBDAV_BACKEND_URL) {
-  throw new Error("YEYING_BACKEND_URL is not set in environment variables");
+  throw new Error("WEBDAV_BACKEND_URL is not set in environment variables");
 }
 
 async function handle(

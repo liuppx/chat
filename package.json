@@ -29,6 +29,7 @@
     "@svgr/webpack": "^6.5.1",
     "@vercel/analytics": "^0.1.11",
     "@vercel/speed-insights": "^1.0.2",
+    "@yeying-community/web3": "^1.0.1",
     "axios": "^1.7.5",
     "clsx": "^2.1.1",
     "element-plus": "^2.12.0",

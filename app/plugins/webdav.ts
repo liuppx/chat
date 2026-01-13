@@ -1,3 +1,5 @@
+import { authFetch } from "@yeying-community/web3";
+
 export interface WebDAVQuota {
   quota: number; // 总配额
   used: number; // 已用
@@ -5,15 +7,23 @@ export interface WebDAVQuota {
   percentage: number; // 使用百分比
   unlimited: boolean; // 是否无限
 }
+
 export async function fetchQuota(): Promise<WebDAVQuota | undefined> {
   try {
-    const response = await fetch("/api/v1/public/webdav/quota", {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: "Bearer " + localStorage.getItem("authToken"),
+    const response = await authFetch(
+      "/api/v1/public/webdav/quota",
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
       },
-    });
+      {
+        baseUrl: "/api/v1/public/auth",
+        refreshPath: "refresh",
+        tokenStorageKey: "authToken",
+      },
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP response.status:{await response.text()}`);
