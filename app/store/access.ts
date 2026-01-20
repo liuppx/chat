@@ -47,6 +47,11 @@ const ROUTER_BACKEND_HOST = (() => {
   }
 })();
 
+const getRouterBackendUrl = () =>
+  normalizeUrl(
+    getClientConfig()?.routerBackendUrl?.trim() || "https://llm.yeying.pub",
+  );
+
 const isValidUcanMeta = (): boolean => {
   try {
     if (typeof localStorage === "undefined") return false;
@@ -118,6 +123,7 @@ const DEFAULT_ACCESS_STATE = {
   // openai
   openaiUrl: DEFAULT_OPENAI_URL,
   openaiApiKey: "",
+  routerBackendUrlSnapshot: DEFAULT_OPENAI_URL,
 
   // azure
   azureUrl: "",
@@ -198,6 +204,27 @@ const DEFAULT_ACCESS_STATE = {
 
   // tts config
   edgeTTSVoiceName: "zh-CN-YunxiNeural",
+};
+
+const syncRouterBackendUrlSnapshot = (state: typeof DEFAULT_ACCESS_STATE) => {
+  const routerBackendUrl = getRouterBackendUrl();
+  const normalizedOpenAIUrl = normalizeUrl(state.openaiUrl || "");
+  const normalizedSnapshot = normalizeUrl(state.routerBackendUrlSnapshot || "");
+  const isDefaultLike =
+    normalizedOpenAIUrl === "" ||
+    normalizedOpenAIUrl === ApiPath.OpenAI ||
+    normalizedOpenAIUrl === normalizeUrl(OPENAI_BASE_URL) ||
+    normalizedOpenAIUrl === normalizeUrl(LEGACY_OPENAI_URL) ||
+    normalizedOpenAIUrl.includes("llm.yeying.pub");
+
+  if (
+    normalizedOpenAIUrl === normalizedSnapshot ||
+    (normalizedSnapshot === "" && isDefaultLike)
+  ) {
+    state.openaiUrl = routerBackendUrl;
+  }
+
+  state.routerBackendUrlSnapshot = routerBackendUrl;
 };
 
 export const useAccessStore = createPersistStore(
@@ -344,7 +371,7 @@ export const useAccessStore = createPersistStore(
   }),
   {
     name: StoreKey.Access,
-    version: 5,
+    version: 6,
     migrate(persistedState, version) {
       if (version < 2) {
         const state = persistedState as {
@@ -392,7 +419,33 @@ export const useAccessStore = createPersistStore(
         }
       }
 
+      if (version < 6) {
+        const state = persistedState as typeof DEFAULT_ACCESS_STATE;
+        state.routerBackendUrlSnapshot = "";
+      }
+
       return persistedState as any;
     },
   },
 );
+
+let hasAccessHydrationSubscription = false;
+
+if (typeof window !== "undefined" && !hasAccessHydrationSubscription) {
+  hasAccessHydrationSubscription = true;
+  const syncOnHydrate = () => {
+    useAccessStore.getState().update((state) => {
+      syncRouterBackendUrlSnapshot(state);
+    });
+  };
+
+  if (useAccessStore.getState()._hasHydrated) {
+    syncOnHydrate();
+  } else {
+    useAccessStore.subscribe((state, prevState) => {
+      if (!prevState._hasHydrated && state._hasHydrated) {
+        syncOnHydrate();
+      }
+    });
+  }
+}
