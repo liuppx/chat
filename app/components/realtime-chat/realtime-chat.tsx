@@ -47,6 +47,10 @@ export function RealtimeChat({
   const clientRef = useRef<RTClient | null>(null);
   const audioHandlerRef = useRef<AudioHandler | null>(null);
   const initRef = useRef(false);
+  const handleConnectRef = useRef<() => Promise<void>>(async () => {});
+  const toggleRecordingRef = useRef<() => Promise<void>>(async () => {});
+  const disconnectRef = useRef<() => Promise<void>>(async () => {});
+  const isRecordingRef = useRef(false);
 
   const temperature = config.realtimeConfig.temperature;
   const apiKey = config.realtimeConfig.apiKey;
@@ -257,6 +261,11 @@ export function RealtimeChat({
     }
   };
 
+  handleConnectRef.current = handleConnect;
+  toggleRecordingRef.current = toggleRecording;
+  disconnectRef.current = disconnect;
+  isRecordingRef.current = isRecording;
+
   useEffect(() => {
     // 防止重复初始化
     if (initRef.current) return;
@@ -266,8 +275,8 @@ export function RealtimeChat({
       const handler = new AudioHandler();
       await handler.initialize();
       audioHandlerRef.current = handler;
-      await handleConnect();
-      await toggleRecording();
+      await handleConnectRef.current();
+      await toggleRecordingRef.current();
     };
 
     initAudioHandler().catch((error) => {
@@ -276,11 +285,11 @@ export function RealtimeChat({
     });
 
     return () => {
-      if (isRecording) {
-        toggleRecording();
+      if (isRecordingRef.current) {
+        toggleRecordingRef.current();
       }
       audioHandlerRef.current?.close().catch(console.error);
-      disconnect();
+      disconnectRef.current();
     };
   }, []);
 

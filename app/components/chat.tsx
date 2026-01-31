@@ -509,6 +509,7 @@ export function ChatActions(props: {
   const chatStore = useChatStore();
   const pluginStore = usePluginStore();
   const session = chatStore.currentSession();
+  const { setAttachImages, setUploading } = props;
 
   // switch themes
   const theme = config.theme;
@@ -609,8 +610,8 @@ export function ChatActions(props: {
     const show = isVisionModel(currentModel);
     setShowUploadImage(show);
     if (!show) {
-      props.setAttachImages([]);
-      props.setUploading(false);
+      setAttachImages([]);
+      setUploading(false);
     }
 
     // if current model is not available
@@ -634,7 +635,7 @@ export function ChatActions(props: {
           : nextModel.name,
       );
     }
-  }, [chatStore, currentModel, models, session]);
+  }, [chatStore, currentModel, models, session, setAttachImages, setUploading]);
 
   return (
     <div className={styles["chat-input-actions"]}>
@@ -1054,16 +1055,16 @@ function ChatView() {
           (scrollRef.current.scrollTop + scrollRef.current.clientHeight),
       ) <= 1
     : false;
-  const isAttachWithTop = useMemo(() => {
+  const isAttachWithTop = (() => {
     const lastMessage = scrollRef.current?.lastElementChild as HTMLElement;
     // if scrolllRef is not ready or no message, return false
     if (!scrollRef?.current || !lastMessage) return false;
     const topDistance =
-      lastMessage!.getBoundingClientRect().top -
+      lastMessage.getBoundingClientRect().top -
       scrollRef.current.getBoundingClientRect().top;
     // leave some space for user question
     return topDistance < 100;
-  }, [scrollRef?.current?.scrollHeight]);
+  })();
 
   const isTyping = userInput !== "";
 
@@ -1838,6 +1839,7 @@ function ChatView() {
                     !(message.preview || message.content.length === 0) &&
                     !isContext;
                   const showTyping = message.preview || message.streaming;
+                  const messageImages = getMessageImages(message);
 
                   const shouldShowClearContextDivider =
                     i === clearContextIndex - 1;
@@ -2032,39 +2034,34 @@ function ChatView() {
                               parentRef={scrollRef}
                               defaultShow={i >= messages.length - 6}
                             />
-                            {getMessageImages(message).length == 1 && (
+                            {messageImages.length == 1 && (
                               <img
                                 className={styles["chat-message-item-image"]}
-                                src={getMessageImages(message)[0]}
+                                src={messageImages[0]}
                                 alt=""
                               />
                             )}
-                            {getMessageImages(message).length > 1 && (
+                            {messageImages.length > 1 && (
                               <div
                                 className={styles["chat-message-item-images"]}
                                 style={
                                   {
-                                    "--image-count":
-                                      getMessageImages(message).length,
+                                    "--image-count": messageImages.length,
                                   } as React.CSSProperties
                                 }
                               >
-                                {getMessageImages(message).map(
-                                  (image, index) => {
-                                    return (
-                                      <img
-                                        className={
-                                          styles[
-                                            "chat-message-item-image-multi"
-                                          ]
-                                        }
-                                        key={index}
-                                        src={image}
-                                        alt=""
-                                      />
-                                    );
-                                  },
-                                )}
+                                {messageImages.map((image, index) => {
+                                  return (
+                                    <img
+                                      className={
+                                        styles["chat-message-item-image-multi"]
+                                      }
+                                      key={index}
+                                      src={image}
+                                      alt=""
+                                    />
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
