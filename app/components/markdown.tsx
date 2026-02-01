@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import type { ExtraProps } from "react-markdown";
 import "katex/dist/katex.min.css";
 import RemarkMath from "remark-math";
 import RemarkBreaks from "remark-breaks";
@@ -71,7 +72,9 @@ export function Mermaid(props: { code: string }) {
   );
 }
 
-export function PreCode(props: { children: any }) {
+export function PreCode(
+  props: React.ComponentPropsWithoutRef<"pre"> & ExtraProps,
+) {
   const ref = useRef<HTMLPreElement>(null);
   const previewRef = useRef<HTMLPreviewHandler>(null);
   const [mermaidCode, setMermaidCode] = useState("");
@@ -173,7 +176,9 @@ export function PreCode(props: { children: any }) {
   );
 }
 
-function CustomCode(props: { children: any; className?: string }) {
+function CustomCode(
+  props: React.ComponentPropsWithoutRef<"code"> & ExtraProps,
+) {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
   const config = useAppConfig();
@@ -274,17 +279,19 @@ function MarkdownContentInner(props: { content: string }) {
 
   return (
     <ReactMarkdown
-      remarkPlugins={[RemarkMath, RemarkGfm, RemarkBreaks]}
-      rehypePlugins={[
-        RehypeKatex,
+      remarkPlugins={[RemarkMath, RemarkGfm, RemarkBreaks] as any}
+      rehypePlugins={
         [
-          RehypeHighlight,
-          {
-            detect: false,
-            ignoreMissing: true,
-          },
-        ],
-      ]}
+          RehypeKatex,
+          [
+            RehypeHighlight,
+            {
+              detect: false,
+              ignoreMissing: true,
+            },
+          ],
+        ] as any
+      }
       components={{
         pre: PreCode,
         code: CustomCode,
@@ -306,7 +313,7 @@ function MarkdownContentInner(props: { content: string }) {
             );
           }
           const isInternal = /^\/#/i.test(href);
-          const target = isInternal ? "_self" : aProps.target ?? "_blank";
+          const target = isInternal ? "_self" : (aProps.target ?? "_blank");
           return <a {...aProps} target={target} />;
         },
       }}

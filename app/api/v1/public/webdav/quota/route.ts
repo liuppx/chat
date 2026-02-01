@@ -9,10 +9,7 @@ if (!WEBDAV_BACKEND_URL) {
   throw new Error("WEBDAV_BACKEND_URL is not set in environment variables");
 }
 
-async function handle(
-  req: NextRequest,
-  { params }: { params: { path: string[] } },
-) {
+async function handle(req: NextRequest) {
   // 构造原始请求路径
   const requestUrl = new URL(req.url);
   const urlPath = requestUrl.pathname;

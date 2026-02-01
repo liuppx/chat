@@ -16,10 +16,7 @@ const ALLOWED_PATHS = [
   "/api/v1/public/auth/logout",
 ];
 
-async function handle(
-  req: NextRequest,
-  { params }: { params: { path: string[] } },
-) {
+async function handle(req: NextRequest) {
   console.log(
     "[Router Auth Proxy] ROUTER_BACKEND_URL=",
     ROUTER_BACKEND_URL,
