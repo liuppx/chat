@@ -33,7 +33,7 @@ async function handle(req: NextRequest) {
 export const GET = handle;
 export const POST = handle;
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const preferredRegion = [
   "arn1",
   "bom1",

@@ -25,6 +25,19 @@ import { IconButton } from "./button";
 
 import { useAppConfig } from "../store/config";
 import clsx from "clsx";
+import type { PluggableList } from "unified";
+
+const remarkPlugins: PluggableList = [RemarkMath, RemarkGfm, RemarkBreaks];
+const rehypePlugins: PluggableList = [
+  RehypeKatex,
+  [
+    RehypeHighlight,
+    {
+      detect: false,
+      ignoreMissing: true,
+    },
+  ],
+];
 
 export function Mermaid(props: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -279,19 +292,8 @@ function MarkdownContentInner(props: { content: string }) {
 
   return (
     <ReactMarkdown
-      remarkPlugins={[RemarkMath, RemarkGfm, RemarkBreaks] as any}
-      rehypePlugins={
-        [
-          RehypeKatex,
-          [
-            RehypeHighlight,
-            {
-              detect: false,
-              ignoreMissing: true,
-            },
-          ],
-        ] as any
-      }
+      remarkPlugins={remarkPlugins}
+      rehypePlugins={rehypePlugins}
       components={{
         pre: PreCode,
         code: CustomCode,

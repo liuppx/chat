@@ -380,10 +380,19 @@ export function safeLocalStorage(): {
   removeItem: (key: string) => void;
   clear: () => void;
 } {
+  if (typeof window === "undefined") {
+    return {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+      clear: () => {},
+    };
+  }
+
   let storage: Storage | null;
 
   try {
-    if (typeof window !== "undefined" && window.localStorage) {
+    if (window.localStorage) {
       storage = window.localStorage;
     } else {
       storage = null;

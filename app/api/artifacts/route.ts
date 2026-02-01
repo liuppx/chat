@@ -70,4 +70,4 @@ async function handle(req: NextRequest) {
 export const POST = handle;
 export const GET = handle;
 
-export const runtime = "edge";
+export const runtime = "nodejs";

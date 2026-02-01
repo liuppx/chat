@@ -68,4 +68,4 @@ async function handle(req: NextRequest) {
 export const GET = handle;
 
 // 使用 Edge Runtime（与你的 webdav 代理一致）
-export const runtime = "edge";
+export const runtime = "nodejs";

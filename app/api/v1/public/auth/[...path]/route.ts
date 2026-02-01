@@ -92,4 +92,4 @@ export const DELETE = handle;
 export const OPTIONS = handle;
 
 // 使用 Node Runtime（需要访问本地/内网 router 服务）
-export const runtime = "edge";
+export const runtime = "nodejs";
