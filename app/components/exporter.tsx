@@ -277,7 +277,7 @@ export function RenderExport(props: {
       return {
         id: i.toString(),
         role: role as any,
-        content: role === "user" ? v.textContent ?? "" : v.innerHTML,
+        content: role === "user" ? (v.textContent ?? "") : v.innerHTML,
         date: "",
       };
     });
@@ -501,6 +501,8 @@ export function ImagePreviewer(props: {
     }
   };
 
+  const lastMessageDate = props.messages.at(-1)?.date;
+
   return (
     <div className={styles["image-previewer"]}>
       <PreviewActions
@@ -524,7 +526,7 @@ export function ImagePreviewer(props: {
           </div>
 
           <div>
-            <div className={styles["main-title"]}>NextChat</div>
+            <div className={styles["main-title"]}>Chat</div>
             <div className={styles["sub-title"]}>
               github.com/ChatGPTNextWeb/ChatGPT-Next-Web
             </div>
@@ -549,9 +551,9 @@ export function ImagePreviewer(props: {
             </div>
             <div className={styles["chat-info-item"]}>
               {Locale.Exporter.Time}:{" "}
-              {new Date(
-                props.messages.at(-1)?.date ?? Date.now(),
-              ).toLocaleString()}
+              {lastMessageDate
+                ? new Date(lastMessageDate).toLocaleString()
+                : "-"}
             </div>
           </div>
         </div>

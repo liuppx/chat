@@ -15,7 +15,6 @@ for port in $PORTS; do
 done
 set +x
 set -x
-sudo cp ./scripts/https.conf /usr/share/nginx/nextchat.conf
-sudo nginx -c /usr/share/nginx/nextchat.conf
+sudo cp ./scripts/https.conf /usr/share/nginx/chat.conf
+sudo nginx -c /usr/share/nginx/chat.conf
 set +x
-

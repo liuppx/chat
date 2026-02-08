@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 ACTION="${1:-start}"
-PID_FILE="${ROOT_DIR}/.nextchat.pid"
+PID_FILE="${ROOT_DIR}/.chat.pid"
 LOG_FILE="${ROOT_DIR}/server.log"
 SERVER_ENTRY="${ROOT_DIR}/server.js"
 

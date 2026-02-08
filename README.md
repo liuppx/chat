@@ -1,6 +1,6 @@
 # 项目名称
 
-NextChat（chat_UCAN 定制版）
+Chat（UCAN 定制版）
 
 # 项目简介
 
