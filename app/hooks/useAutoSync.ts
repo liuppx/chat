@@ -10,13 +10,16 @@ import {
 } from "../plugins/ucan-sign-lock";
 
 export function useAutoSync() {
-  const syncStore = useSyncStore();
-  const hasHydrated = syncStore._hasHydrated;
-  const autoSyncEnabled = syncStore.autoSync;
+  const hasHydrated = useSyncStore((state) => state._hasHydrated);
+  const autoSyncEnabled = useSyncStore((state) => state.autoSync);
+  const autoSync = useSyncStore((state) => state.sync);
+  const cloudSync = useSyncStore((state) => state.cloudSync);
+  const autoSyncDebounceMs = useSyncStore((state) => state.autoSyncDebounceMs);
+  const autoSyncIntervalMs = useSyncStore((state) => state.autoSyncIntervalMs);
   const [authTick, setAuthTick] = useState(0);
-  const canSync = syncStore.cloudSync() && authTick >= 0;
-  const debounceMs = syncStore.autoSyncDebounceMs ?? 2000;
-  const intervalMs = syncStore.autoSyncIntervalMs ?? 5 * 60 * 1000;
+  const canSync = cloudSync() && authTick >= 0;
+  const debounceMs = autoSyncDebounceMs ?? 2000;
+  const intervalMs = autoSyncIntervalMs ?? 5 * 60 * 1000;
 
   const chatUpdate = useChatStore((state) => state.lastUpdateTime);
   const configUpdate = useAppConfig((state) => state.lastUpdateTime);
@@ -55,7 +58,7 @@ export function useAutoSync() {
       }
       inFlightRef.current = true;
       try {
-        await syncStore.sync({ interactive: false });
+        await autoSync({ interactive: false });
       } catch (e) {
         if (isUcanSignPendingError(e)) {
           return;
@@ -65,7 +68,7 @@ export function useAutoSync() {
         inFlightRef.current = false;
       }
     },
-    [debounceMs, enabled, syncStore],
+    [autoSync, debounceMs, enabled],
   );
 
   const scheduleSync = useCallback(

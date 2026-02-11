@@ -159,7 +159,7 @@ export const useSyncStore = createPersistStore(
         }
       }
 
-      const client = this.getClient();
+      const client = createSyncClient(provider, get());
 
       try {
         const remoteState = await client.get(config.username);
@@ -184,7 +184,7 @@ export const useSyncStore = createPersistStore(
       const latestLocalState = getLocalAppStateForSync();
       await client.set(config.username, JSON.stringify(latestLocalState));
 
-      this.markSyncTime();
+      set({ lastSyncTime: Date.now(), lastProvider: provider });
     },
 
     async check() {
@@ -196,7 +196,7 @@ export const useSyncStore = createPersistStore(
         ) {
           await refreshUcanSession();
         }
-        const client = this.getClient();
+        const client = createSyncClient(provider, get());
         return await client.check();
       } catch (e) {
         console.error("[Sync] failed to check", e);
