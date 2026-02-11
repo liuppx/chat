@@ -47,6 +47,8 @@ flowchart TB
 - **Headers**: quota proxy uses an allowlist to avoid forwarding sensitive headers.
 - **Audience**: `NEXT_PUBLIC_WEBDAV_UCAN_AUD` if set; otherwise derived as `did:web:<webdav-host>`.
 - **App capability**: defaults to `app:<appId>` (`appId` defaults to current host).
+> Note: `WEBDAV_BACKEND_PREFIX` applies only to WebDAV protocol paths (for third‑party WebDAV client compatibility).
+> Other HTTP APIs (quota / SIWE / UCAN) must not include the prefix and use the base URL directly.
 
 ## Direct WebDAV (No Proxy)
 

@@ -1,6 +1,17 @@
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { DEFAULT_INPUT_TEMPLATE } from "../constant";
 
+function splitWebdavUrl(raw: string): { baseUrl: string; prefix: string } {
+  try {
+    const url = new URL(raw);
+    const baseUrl = `${url.protocol}//${url.host}`;
+    const pathname = url.pathname.replace(/\/+$/, "");
+    return { baseUrl, prefix: pathname === "/" ? "" : pathname };
+  } catch {
+    return { baseUrl: raw.trim(), prefix: "" };
+  }
+}
+
 export const getBuildConfig = () => {
   if (typeof process === "undefined") {
     throw Error(
@@ -19,20 +30,13 @@ export const getBuildConfig = () => {
   const webdavBackendPrefixEnv = hasWebdavBackendPrefixEnv
     ? rawWebdavBackendPrefixEnv.trim()
     : "";
-  const legacyWebdavBackendUrl =
-    process.env.WEBDAV_BACKEND_URL?.trim() || "";
   let webdavBackendBaseUrl = webdavBackendBaseUrlEnv;
   let webdavBackendPrefix = webdavBackendPrefixEnv;
-  if (!webdavBackendBaseUrl && legacyWebdavBackendUrl) {
-    try {
-      const url = new URL(legacyWebdavBackendUrl);
-      webdavBackendBaseUrl = `${url.protocol}//${url.host}`;
-      const pathname = url.pathname.replace(/\/+$/, "");
-      if (!webdavBackendPrefix && pathname && pathname !== "/") {
-        webdavBackendPrefix = pathname;
-      }
-    } catch {
-      webdavBackendBaseUrl = legacyWebdavBackendUrl;
+  if (webdavBackendBaseUrl) {
+    const parsed = splitWebdavUrl(webdavBackendBaseUrl);
+    webdavBackendBaseUrl = parsed.baseUrl;
+    if (!webdavBackendPrefix && parsed.prefix) {
+      webdavBackendPrefix = parsed.prefix;
     }
   }
   if (!hasWebdavBackendPrefixEnv && !webdavBackendPrefix) {

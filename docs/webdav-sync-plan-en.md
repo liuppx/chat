@@ -44,6 +44,10 @@ flowchart TB
 - WebDAV must support CORS and `Authorization` header.
 - Good for large traffic and lower proxy load.
 
+> Note: **Only WebDAV protocol endpoints** (MKCOL/PUT/GET/PROPFIND, etc.)
+> should include `WEBDAV_BACKEND_PREFIX`, so third‑party WebDAV clients can mount correctly.
+> Other service APIs (quota, SIWE, UCAN, etc.) **must NOT** add the prefix and should use the base URL.
+
 ## UCAN Requirements
 
 - `aud` must match the backend configuration:

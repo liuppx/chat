@@ -43,6 +43,9 @@ Key environment variables:
 
 If `*_UCAN_AUD` is not set, the system derives `did:web:<host>` from the backend URL.
 
+Note: `WEBDAV_BACKEND_PREFIX` is only for WebDAV protocol paths (third‑party WebDAV client mounting).
+Quota / SIWE / UCAN HTTP APIs should not include the prefix.
+
 ## Local Storage
 
 UCAN-related local storage keys:

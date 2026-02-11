@@ -47,6 +47,8 @@ flowchart TB
 - **请求头**：配额代理使用允许头白名单，仅透传必要头部。
 - **受众 (audience)**：优先使用 `NEXT_PUBLIC_WEBDAV_UCAN_AUD`，未设置时自动推导 `did:web:<webdav-host>`。
 - **应用能力**：默认携带 `app:<appId>`（`appId` 默认当前域名）。
+> 说明：`WEBDAV_BACKEND_PREFIX` 仅用于 WebDAV 协议接口路径，便于兼容第三方 WebDAV 客户端。
+> quota / SIWE / UCAN 等 HTTP 接口不加前缀，仍走基础地址。
 
 ## WebDAV 直连（不走代理）
 

@@ -44,6 +44,10 @@ flowchart TB
 - 需要 WebDAV 服务端允许跨域与 `Authorization` 头。
 - 适合：降低代理压力、大流量场景。
 
+> 说明：**仅 WebDAV 协议接口**（MKCOL/PUT/GET/PROPFIND 等）需要拼接 `WEBDAV_BACKEND_PREFIX`，
+> 以兼容第三方 WebDAV 客户端的挂载路径。WebDAV 服务的**其他 HTTP 接口**
+> （如 quota、SIWE、UCAN 等）不应该加前缀，仍使用基础地址访问。
+
 ## UCAN 关键要求
 
 - `aud` 必须与 WebDAV 服务端配置一致：

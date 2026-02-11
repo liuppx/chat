@@ -43,6 +43,9 @@ Root UCAN 可同时用于多个后端服务，Invocation UCAN 会根据目标后
 
 若未指定 `*_UCAN_AUD`，系统会根据后端 URL 自动推导 `did:web:<host>`。
 
+提示：`WEBDAV_BACKEND_PREFIX` 只用于 WebDAV 协议接口路径（兼容第三方 WebDAV 客户端挂载），
+配额、SIWE、UCAN 等 HTTP 接口不加前缀。
+
 ## 本地存储
 
 用于 UCAN 授权的关键本地存储：

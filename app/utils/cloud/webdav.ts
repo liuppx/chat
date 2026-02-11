@@ -36,6 +36,17 @@ function normalizeBaseUrl(raw: string): string {
   return raw.trim().replace(/\/+$/, "");
 }
 
+function splitBaseUrlAndPrefix(raw: string): { baseUrl: string; prefix: string } {
+  try {
+    const url = new URL(raw);
+    const baseUrl = `${url.protocol}//${url.host}`;
+    const pathname = url.pathname.replace(/\/+$/, "");
+    return { baseUrl, prefix: pathname === "/" ? "" : pathname };
+  } catch {
+    return { baseUrl: normalizeBaseUrl(raw), prefix: "" };
+  }
+}
+
 function normalizePrefix(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed || trimmed === "/") return "";
@@ -61,7 +72,9 @@ function getEnvWebdavPrefix(): string {
 
 function resolveWebdavBaseUrl(store: SyncStore, fallbackBaseUrl = ""): string {
   const config = store.webdav;
-  if (config.baseUrl.trim()) return normalizeBaseUrl(config.baseUrl);
+  if (config.baseUrl.trim()) {
+    return splitBaseUrlAndPrefix(config.baseUrl).baseUrl;
+  }
   if (fallbackBaseUrl.trim()) return normalizeBaseUrl(fallbackBaseUrl);
   const endpoint = config.endpoint?.trim();
   if (!endpoint) return "";
@@ -82,7 +95,8 @@ function resolveWebdavPrefix(
   const storePrefix = config.prefix.trim();
   const storeBase = config.baseUrl.trim();
   if (storeBase) {
-    return normalizePrefix(storePrefix);
+    if (storePrefix) return normalizePrefix(storePrefix);
+    return splitBaseUrlAndPrefix(storeBase).prefix;
   }
   if (fallbackBaseUrl.trim()) {
     return normalizePrefix(storePrefix || fallbackPrefix);

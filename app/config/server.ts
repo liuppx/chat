@@ -99,7 +99,6 @@ declare global {
 
       WEBDAV_BACKEND_BASE_URL?: string;
       WEBDAV_BACKEND_PREFIX?: string;
-      WEBDAV_BACKEND_URL?: string;
       ROUTER_BACKEND_URL?: string;
       YEYING_BACKEND_URL?: string;
     }
@@ -133,7 +132,7 @@ function normalizePrefix(raw: string): string {
   return next === "/" ? "" : next;
 }
 
-function splitLegacyWebdavEndpoint(endpoint: string): {
+function splitWebdavUrl(endpoint: string): {
   baseUrl: string;
   prefix: string;
 } {
@@ -229,12 +228,10 @@ export const getServerSideConfig = () => {
   const webdavBackendPrefixEnv = hasWebdavBackendPrefixEnv
     ? rawWebdavBackendPrefixEnv.trim()
     : "";
-  const legacyWebdavBackendUrl =
-    process.env.WEBDAV_BACKEND_URL?.trim() || "";
   let webdavBackendBaseUrl = webdavBackendBaseUrlEnv;
   let webdavBackendPrefix = webdavBackendPrefixEnv;
-  if (!webdavBackendBaseUrl && legacyWebdavBackendUrl) {
-    const parsed = splitLegacyWebdavEndpoint(legacyWebdavBackendUrl);
+  if (webdavBackendBaseUrl) {
+    const parsed = splitWebdavUrl(webdavBackendBaseUrl);
     webdavBackendBaseUrl = parsed.baseUrl;
     if (!webdavBackendPrefix && parsed.prefix) {
       webdavBackendPrefix = parsed.prefix;
@@ -251,7 +248,7 @@ export const getServerSideConfig = () => {
     : "";
   const webdavBackendUrl = webdavBackendBaseUrl
     ? joinBasePrefix(webdavBackendBaseUrl, webdavBackendPrefix)
-    : legacyWebdavBackendUrl;
+    : "";
 
   const routerBackendUrl =
     process.env.ROUTER_BACKEND_URL?.trim() ||
