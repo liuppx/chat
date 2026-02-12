@@ -89,6 +89,15 @@ export interface DalleRequestPayload {
 }
 
 const ROUTER_HOST = "llm.yeying.pub";
+const INVOCATION_TOKEN_SKEW_MS = 5 * 1000;
+type CachedInvocationToken = {
+  key: string;
+  token: string;
+  exp: number;
+  nbf?: number;
+};
+let cachedRouterInvocationToken: CachedInvocationToken | null = null;
+
 const ROUTER_BACKEND_HOST = (() => {
   try {
     const url = getClientConfig()?.routerBackendUrl;
@@ -132,6 +141,79 @@ function isUcanMetaValid(): boolean {
   }
 }
 
+function decodeBase64Url(input: string): string | null {
+  if (!input) return null;
+  const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+  try {
+    return atob(padded);
+  } catch {
+    return null;
+  }
+}
+
+function decodeUcanPayload(token: string): {
+  exp?: number;
+  nbf?: number;
+} | null {
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  const decoded = decodeBase64Url(parts[1]);
+  if (!decoded) return null;
+  try {
+    return JSON.parse(decoded) as { exp?: number; nbf?: number };
+  } catch {
+    return null;
+  }
+}
+
+function buildCapsKey(
+  caps: Array<{
+    resource: string;
+    action: string;
+  }>,
+) {
+  return caps
+    .map((cap) => `${cap.resource}:${cap.action}`)
+    .sort()
+    .join("|");
+}
+
+function buildRouterInvocationCacheKey(
+  audience: string,
+  capabilities: Array<{
+    resource: string;
+    action: string;
+  }>,
+) {
+  if (typeof localStorage === "undefined") return "";
+  const account = localStorage.getItem("currentAccount") || "";
+  const rootCaps = localStorage.getItem("ucanRootCaps") || "";
+  return `${account}|${rootCaps}|${audience}|${buildCapsKey(capabilities)}`;
+}
+
+function getValidCachedRouterInvocationToken(
+  audience: string,
+  capabilities: Array<{
+    resource: string;
+    action: string;
+  }>,
+) {
+  const cacheKey = buildRouterInvocationCacheKey(audience, capabilities);
+  const cached = cachedRouterInvocationToken;
+  if (!cached || !cacheKey || cached.key !== cacheKey) {
+    return null;
+  }
+  const now = Date.now();
+  if (cached.nbf && now < cached.nbf) {
+    return null;
+  }
+  if (cached.exp <= now + INVOCATION_TOKEN_SKEW_MS) {
+    return null;
+  }
+  return cached.token;
+}
+
 async function getHeadersWithRouterUcan(url: string) {
   const headers = getHeaders();
   if (!isRouterUrl(url)) return headers;
@@ -140,6 +222,15 @@ async function getHeadersWithRouterUcan(url: string) {
   const audience = getRouterAudience();
   const capabilities = getRouterCapabilities();
   if (!audience || !capabilities.length) return headers;
+
+  const cachedToken = getValidCachedRouterInvocationToken(
+    audience,
+    capabilities,
+  );
+  if (cachedToken) {
+    headers["Authorization"] = `Bearer ${cachedToken}`;
+    return headers;
+  }
 
   try {
     const issuer = await getCachedUcanSession(undefined, { refresh: true });
@@ -150,6 +241,16 @@ async function getHeadersWithRouterUcan(url: string) {
       sessionId: UCAN_SESSION_ID,
       issuer,
     });
+    const payload = decodeUcanPayload(ucan);
+    const key = buildRouterInvocationCacheKey(audience, capabilities);
+    if (payload && typeof payload.exp === "number" && key) {
+      cachedRouterInvocationToken = {
+        key,
+        token: ucan,
+        exp: payload.exp,
+        nbf: payload.nbf,
+      };
+    }
     headers["Authorization"] = `Bearer ${ucan}`;
   } catch (error) {
     console.warn("[UCAN] Failed to create invocation", error);
@@ -593,8 +694,10 @@ export class ChatGPTApi implements LLMApi {
   }
 
   async models(): Promise<LLMModel[]> {
+    const listPath = this.path(OpenaiPath.ListModelPath);
+    const shouldSkipRouterFetch = isRouterUrl(listPath) && !isUcanMetaValid();
+
     const fetchFromApi = async () => {
-      const listPath = this.path(OpenaiPath.ListModelPath);
       const listHeaders = await getHeadersWithRouterUcan(listPath);
       const res = await fetch(listPath, {
         method: "GET",
@@ -602,6 +705,9 @@ export class ChatGPTApi implements LLMApi {
           ...listHeaders,
         },
       });
+      if (!res.ok) {
+        throw new Error(`[Models] failed to fetch: ${res.status}`);
+      }
 
       const resJson = (await res.json()) as OpenAIListModelResponse;
       const list = resJson.data ?? [];
@@ -611,7 +717,9 @@ export class ChatGPTApi implements LLMApi {
 
     // prefer live list; fallback to defaults if fetch fails
     let modelsFromApi: OpenAIListModelResponse["data"] | undefined;
-    if (!this.disableListModels) {
+    if (shouldSkipRouterFetch) {
+      console.info("[Models] skip router fetch before UCAN login");
+    } else if (!this.disableListModels) {
       try {
         modelsFromApi = await fetchFromApi();
       } catch (error) {

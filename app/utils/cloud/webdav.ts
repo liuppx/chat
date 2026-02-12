@@ -31,12 +31,87 @@ const BACKUP_FILENAME = "backup.json";
 const DEFAULT_FILE = `${DEFAULT_FOLDER}/${BACKUP_FILENAME}`;
 const WEBDAV_PROXY_PREFIX = "/api/webdav";
 const ensuredAppDirs = new Set<string>();
+const INVOCATION_TOKEN_SKEW_MS = 5 * 1000;
+
+type UcanPayload = {
+  exp?: number;
+  nbf?: number;
+};
+
+type CachedUcanWebDavClient = {
+  key: string;
+  client: Awaited<ReturnType<typeof initWebDavStorage>>["client"];
+  filePath: string;
+  exp: number;
+  nbf?: number;
+};
+
+let cachedUcanWebDavClient: CachedUcanWebDavClient | null = null;
+
+function decodeBase64Url(input: string): string | null {
+  if (!input) return null;
+  const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+  try {
+    return atob(padded);
+  } catch {
+    return null;
+  }
+}
+
+function decodeUcanPayload(token: string): UcanPayload | null {
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  const decoded = decodeBase64Url(parts[1]);
+  if (!decoded) return null;
+  try {
+    return JSON.parse(decoded) as UcanPayload;
+  } catch {
+    return null;
+  }
+}
+
+function buildUcanWebdavCacheKey(params: {
+  backendUrl: string;
+  webdavPrefix: string;
+  useProxy: boolean;
+  audience: string;
+  appId: string;
+  appAction: string;
+  invocationCapsKey: string;
+  rootIss: string;
+  rootExp: number;
+}) {
+  return [
+    params.backendUrl,
+    params.webdavPrefix,
+    params.useProxy ? "proxy" : "direct",
+    params.audience,
+    params.appId,
+    params.appAction,
+    params.invocationCapsKey,
+    params.rootIss,
+    params.rootExp,
+  ].join("|");
+}
+
+function getValidCachedUcanWebdavClient(cacheKey: string) {
+  const cached = cachedUcanWebDavClient;
+  if (!cached || cached.key !== cacheKey) return null;
+  const now = Date.now();
+  if (cached.nbf && now < cached.nbf) return null;
+  if (cached.exp <= now + INVOCATION_TOKEN_SKEW_MS) return null;
+  return { client: cached.client, filePath: cached.filePath };
+}
 
 function normalizeBaseUrl(raw: string): string {
   return raw.trim().replace(/\/+$/, "");
 }
 
-function splitBaseUrlAndPrefix(raw: string): { baseUrl: string; prefix: string } {
+function splitBaseUrlAndPrefix(raw: string): {
+  baseUrl: string;
+  prefix: string;
+} {
   try {
     const url = new URL(raw);
     const baseUrl = `${url.protocol}//${url.host}`;
@@ -267,23 +342,40 @@ async function getUcanWebDavClient(store: SyncStore) {
   const baseUrl = useProxy ? "" : backendUrl;
   const prefix = useProxy ? WEBDAV_PROXY_PREFIX : webdavPrefix;
   const fetcher = useProxy ? createWebdavProxyFetcher(endpoint) : undefined;
-
-  const session = await getCachedUcanSession();
-  if (!session) {
-    throw new Error("UCAN session is not available");
-  }
   const root = await getStoredUcanRoot(UCAN_SESSION_ID);
   if (!root) {
     throw new Error("UCAN root is not ready");
-  }
-  if (root.aud && root.aud !== session.did) {
-    throw new Error("UCAN root audience mismatch");
   }
   if (getUcanCapsKey(root.cap) !== getUcanRootCapsKey()) {
     throw new Error("UCAN root capability mismatch");
   }
   if (typeof root.exp === "number" && root.exp <= Date.now()) {
     throw new Error("UCAN root expired");
+  }
+  const appId = getWebdavAppId();
+  const appAction = getWebdavAppAction();
+  const invocationCaps = getWebdavCapabilities();
+  const cacheKey = buildUcanWebdavCacheKey({
+    backendUrl,
+    webdavPrefix,
+    useProxy,
+    audience,
+    appId,
+    appAction,
+    invocationCapsKey: getUcanCapsKey(invocationCaps),
+    rootIss: root.iss || "",
+    rootExp: root.exp || 0,
+  });
+  const cached = getValidCachedUcanWebdavClient(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  const session = await getCachedUcanSession();
+  if (!session) {
+    throw new Error("UCAN session is not available");
+  }
+  if (root.aud && root.aud !== session.did) {
+    throw new Error("UCAN root audience mismatch");
   }
 
   if (isUcanSignPending()) {
@@ -300,10 +392,10 @@ async function getUcanWebDavClient(store: SyncStore) {
       baseUrl,
       prefix,
       audience,
-      appId: getWebdavAppId(),
-      appAction: getWebdavAppAction(),
+      appId,
+      appAction,
       capabilities: root.cap,
-      invocationCapabilities: getWebdavCapabilities(),
+      invocationCapabilities: invocationCaps,
       sessionId: UCAN_SESSION_ID,
       session,
       root,
@@ -336,6 +428,17 @@ async function getUcanWebDavClient(store: SyncStore) {
         console.error("[WebDav UCAN] ensure app dir failed", error);
       }
     }
+  }
+
+  const payload = decodeUcanPayload(webdav.token);
+  if (payload && typeof payload.exp === "number") {
+    cachedUcanWebDavClient = {
+      key: cacheKey,
+      client: webdav.client,
+      filePath,
+      exp: payload.exp,
+      nbf: payload.nbf,
+    };
   }
 
   return { client: webdav.client, filePath };

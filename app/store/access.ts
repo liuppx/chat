@@ -235,17 +235,12 @@ export const useAccessStore = createPersistStore(
 
   (set, get) => ({
     enabledAccessControl() {
-      this.fetch();
-
       return get().needCode;
     },
     getVisionModels() {
-      this.fetch();
       return get().visionModels;
     },
     edgeVoiceName() {
-      this.fetch();
-
       return get().edgeTTSVoiceName;
     },
 
@@ -304,8 +299,6 @@ export const useAccessStore = createPersistStore(
     },
 
     isAuthorized() {
-      this.fetch();
-
       // has token or has code or disabled access control
       const routerJwtOk =
         typeof window !== "undefined" &&

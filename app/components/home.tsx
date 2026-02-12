@@ -2,7 +2,7 @@
 
 require("../polyfill");
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import styles from "./home.module.scss";
 
 import BotIcon from "../icons/bot.svg";
@@ -34,6 +34,7 @@ import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
 import {
   UCAN_AUTH_EVENT,
   initWalletListeners,
+  isUcanMetaAuthorized,
   waitForWallet,
 } from "../plugins/wallet";
 import { toast } from "sonner";
@@ -196,9 +197,9 @@ export function WindowContent(props: { children: React.ReactNode }) {
 
 function Screen() {
   const config = useAppConfig();
-  const accessStore = useAccessStore();
   const location = useLocation();
   const navigate = useNavigate();
+  const isAuthorized = useUcanAuthState();
   const isArtifact = location.pathname.includes(Path.Artifacts);
   const isHome = location.pathname === Path.Home;
   const isAuth = location.pathname === Path.Auth;
@@ -208,7 +209,6 @@ function Screen() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    let expiryTimer: number | undefined;
     const isAllowedPath = (pathname: string) =>
       pathname === Path.Auth || pathname.startsWith(Path.Artifacts);
 
@@ -220,54 +220,30 @@ function Screen() {
       return raw;
     };
 
-    const ensureAuth = () => {
-      const authorized = accessStore.isAuthorized();
-      if (!authorized && !isAllowedPath(location.pathname)) {
-        const redirect = encodeURIComponent(
-          location.pathname + location.search,
-        );
-        navigate(`${Path.Auth}?redirect=${redirect}`, { replace: true });
-        return;
-      }
-      if (authorized && location.pathname === Path.Auth) {
-        navigate(resolveRedirectTarget(), { replace: true });
-      }
-    };
+    if (!isAuthorized && !isAllowedPath(location.pathname)) {
+      const redirect = encodeURIComponent(location.pathname + location.search);
+      navigate(`${Path.Auth}?redirect=${redirect}`, { replace: true });
+      return;
+    }
 
-    const scheduleExpiryCheck = () => {
-      if (expiryTimer) {
-        window.clearTimeout(expiryTimer);
-      }
-      const expRaw = localStorage.getItem("ucanRootExp");
-      const exp = Number(expRaw);
-      if (!Number.isFinite(exp) || exp <= Date.now()) return;
-      const delay = Math.max(0, exp - Date.now());
-      expiryTimer = window.setTimeout(() => {
-        window.dispatchEvent(new Event(UCAN_AUTH_EVENT));
-      }, delay + 200);
-    };
+    if (isAuthorized && location.pathname === Path.Auth) {
+      navigate(resolveRedirectTarget(), { replace: true });
+    }
+  }, [isAuthorized, location.pathname, location.search, navigate]);
 
-    const onAuthChange = () => {
-      ensureAuth();
-      scheduleExpiryCheck();
-    };
-
-    ensureAuth();
-    scheduleExpiryCheck();
-
-    window.addEventListener(UCAN_AUTH_EVENT, onAuthChange);
-    window.addEventListener("storage", onAuthChange);
-    document.addEventListener("visibilitychange", onAuthChange);
-
+  useEffect(() => {
+    if (typeof window === "undefined" || !isAuthorized) return;
+    const expRaw = localStorage.getItem("ucanRootExp");
+    const exp = Number(expRaw);
+    if (!Number.isFinite(exp) || exp <= Date.now()) return;
+    const delay = Math.max(0, exp - Date.now());
+    const expiryTimer = window.setTimeout(() => {
+      window.dispatchEvent(new Event(UCAN_AUTH_EVENT));
+    }, delay + 200);
     return () => {
-      if (expiryTimer) {
-        window.clearTimeout(expiryTimer);
-      }
-      window.removeEventListener(UCAN_AUTH_EVENT, onAuthChange);
-      window.removeEventListener("storage", onAuthChange);
-      document.removeEventListener("visibilitychange", onAuthChange);
+      window.clearTimeout(expiryTimer);
     };
-  }, [accessStore, location.pathname, location.search, navigate]);
+  }, [isAuthorized]);
 
   const isMobileScreen = useMobileScreen();
   const shouldTightBorder =
@@ -286,10 +262,12 @@ function Screen() {
   }
   const renderContent = () => {
     if (isAuth) return <AuthPage />;
+    if (!isAuthorized) return <AuthPage />;
     if (isSd) return <Sd />;
     if (isSdNew) return <Sd />;
     return (
       <>
+        {isAuthorized ? <AuthenticatedBootstrap /> : null}
         <SideBar
           className={clsx({
             [styles["sidebar-show"]]: isHome,
@@ -325,26 +303,83 @@ function Screen() {
 }
 
 export function useLoadData() {
-  const config = useAppConfig();
-
-  const api: ClientApi = getClientApi(config.modelConfig.providerName);
+  const mergeModels = useAppConfig((state) => state.mergeModels);
+  const loadModels = useCallback(async () => {
+    const providerName = useAppConfig.getState().modelConfig.providerName;
+    const api: ClientApi = getClientApi(providerName);
+    const models = await api.llm.models();
+    mergeModels(models);
+  }, [mergeModels]);
 
   useEffect(() => {
-    (async () => {
-      const models = await api.llm.models();
-      config.mergeModels(models);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadModels().catch((error) => {
+      console.warn("[Models] initial load failed", error);
+    });
+  }, [loadModels]);
+
+  useEffect(() => {
+    const onAuthChange = () => {
+      if (!isUcanMetaAuthorized()) return;
+      loadModels().catch((error) => {
+        console.warn("[Models] reload after auth failed", error);
+      });
+    };
+    window.addEventListener(UCAN_AUTH_EVENT, onAuthChange);
+    return () => window.removeEventListener(UCAN_AUTH_EVENT, onAuthChange);
+  }, [loadModels]);
+}
+
+function useUcanAuthState() {
+  const [authorized, setAuthorized] = useState<boolean>(() =>
+    isUcanMetaAuthorized(),
+  );
+
+  useEffect(() => {
+    const refresh = () => setAuthorized(isUcanMetaAuthorized());
+    refresh();
+    window.addEventListener(UCAN_AUTH_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener(UCAN_AUTH_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, []);
+
+  return authorized;
+}
+
+function AuthenticatedBootstrap() {
+  useLoadData();
+  useAutoSync();
+
+  useEffect(() => {
+    useAccessStore.getState().fetch();
+
+    const initMcp = async () => {
+      try {
+        const enabled = await isMcpEnabled();
+        if (enabled) {
+          console.log("[MCP] initializing...");
+          await initializeMcpSystem();
+          console.log("[MCP] initialized");
+        }
+      } catch (err) {
+        console.error("[MCP] failed to initialize:", err);
+      }
+    };
+    initMcp();
+  }, []);
+
+  return null;
 }
 
 export function Home() {
   const pendingError = useToastStore((state) => state.pendingError);
   const clearError = useToastStore((state) => state.setPendingError);
   useSwitchTheme();
-  useLoadData();
   useHtmlLang();
-  useAutoSync();
 
   useEffect(() => {
     if (pendingError) {
@@ -364,22 +399,6 @@ export function Home() {
       // 清除状态，避免重复触发
       clearError(null);
     }
-    console.log("[Config] got config from build time", getClientConfig());
-    useAccessStore.getState().fetch();
-
-    const initMcp = async () => {
-      try {
-        const enabled = await isMcpEnabled();
-        if (enabled) {
-          console.log("[MCP] initializing...");
-          await initializeMcpSystem();
-          console.log("[MCP] initialized");
-        }
-      } catch (err) {
-        console.error("[MCP] failed to initialize:", err);
-      }
-    };
-    initMcp();
   }, [pendingError, clearError]);
 
   if (!useHasHydrated()) {

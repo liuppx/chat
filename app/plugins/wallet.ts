@@ -56,6 +56,24 @@ function getUcanIssuer(address: string) {
   return `did:pkh:eth:${address.toLowerCase()}`;
 }
 
+export function isUcanMetaAuthorized(): boolean {
+  try {
+    if (typeof localStorage === "undefined") return false;
+    const account = getCurrentAccount();
+    if (!account) return false;
+    const expRaw = localStorage.getItem("ucanRootExp");
+    const iss = localStorage.getItem("ucanRootIss");
+    const caps = localStorage.getItem("ucanRootCaps");
+    if (!expRaw || !iss || !caps) return false;
+    const exp = Number(expRaw);
+    if (!Number.isFinite(exp) || exp <= Date.now()) return false;
+    if (caps !== getUcanRootCapsKey()) return false;
+    return iss === getUcanIssuer(account);
+  } catch {
+    return false;
+  }
+}
+
 function isRootCapMatched(root: UcanRootProof | null) {
   if (!root) return false;
   return getUcanCapsKey(root.cap) === getUcanRootCapsKey();

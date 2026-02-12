@@ -81,6 +81,18 @@ flowchart TB
   - `ucanRootIss`
 - 每次请求按后端生成 Invocation UCAN，做到“一次授权，多后端访问”。
 
+### 有效期与更新机制
+
+- Root UCAN 默认 24 小时有效（SDK 默认）。
+- Invocation UCAN 默认 5 分钟有效，并在每次请求时重新签发。
+- 钱包 Session 由钱包侧控制 `expiresAt`，前端会在快过期时重新获取。
+
+### 为什么偶尔会要求“解锁钱包”
+
+- 钱包扩展自动锁定（长时间无操作/切后台）后，无法继续提供签名能力。
+- 会话过期时，需要重新向钱包申请 Session 或签名，钱包会要求先解锁。
+- 若 Root UCAN 已过期或账户变化，还需要重新授权，不仅仅是解锁。
+
 ## 关键配置项
 
 - `ROUTER_BACKEND_URL`: Router 后端地址（必填）

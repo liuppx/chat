@@ -81,6 +81,18 @@ When proxy is disabled, the browser will call the WebDAV server directly (no `/a
   - `ucanRootIss`
 - Each backend request creates a fresh Invocation UCAN, enabling multi-backend access after a single authorization.
 
+### Lifetime and refresh model
+
+- Root UCAN default TTL is 24 hours (SDK default).
+- Invocation UCAN default TTL is 5 minutes and is re-minted per request.
+- Wallet session lifetime is controlled by wallet-side `expiresAt`; frontend refreshes near expiry.
+
+### Why wallet unlock may be required
+
+- After auto-lock (idle/background), wallet cannot provide signing capability.
+- When session expires, Chat must request a new wallet session or signature, which requires unlock.
+- If Root UCAN expired or account changed, re-authorization is required (unlock alone is not enough).
+
 ## Key Environment Variables
 
 - `ROUTER_BACKEND_URL`: Router backend URL (required)

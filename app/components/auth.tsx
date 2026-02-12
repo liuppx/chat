@@ -12,7 +12,6 @@ import { useMobileScreen } from "@/app/utils";
 import BotIcon from "../icons/bot.svg";
 import { getClientConfig } from "../config/client";
 import { PasswordInput, showToast } from "./ui-lib";
-import LeftIcon from "@/app/icons/left.svg";
 import { safeLocalStorage } from "@/app/utils";
 import {
   trackSettingsPageGuideToCPaymentClick,
@@ -32,7 +31,6 @@ export function AuthPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const accessStore = useAccessStore();
-  const goHome = () => navigate(Path.Home);
   const redirectTarget = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const raw = params.get("redirect") || Path.Home;
@@ -91,35 +89,19 @@ export function AuthPage() {
     };
   }, []);
 
-  const ucanStatusText =
-    ucanStatus === "authorized"
-      ? "已授权"
-      : ucanStatus === "expired"
-        ? "授权已过期，请重新授权"
-        : "未授权";
   const ucanActionText =
     ucanStatus === "authorized" ? "UCAN 已授权" : "连接钱包 / 授权 UCAN";
 
   return (
     <div className={styles["auth-page"]}>
       <TopBanner></TopBanner>
-      <div className={styles["auth-header"]}>
-        <IconButton
-          icon={<LeftIcon />}
-          text={Locale.Auth.Return}
-          onClick={() => navigate(Path.Home)}
-        ></IconButton>
-      </div>
       <div className={clsx("no-dark", styles["auth-logo"])}>
         <BotIcon />
       </div>
 
-      <div className={styles["auth-title"]}>{Locale.Auth.Title}</div>
       <div className={styles["auth-tips"]}>{Locale.Auth.Tips}</div>
 
       <div className={styles["auth-wallet"]}>
-        <div className={styles["auth-wallet-title"]}>UCAN 钱包登录</div>
-        <div className={styles["auth-wallet-status"]}>{ucanStatusText}</div>
         {ucanAccount ? (
           <div className={styles["auth-wallet-account"]}>{ucanAccount}</div>
         ) : null}
@@ -202,20 +184,15 @@ export function AuthPage() {
 
 function TopBanner() {
   const [isHovered, setIsHovered] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
-  const isMobile = useMobileScreen();
-  useEffect(() => {
-    // 检查 localStorage 中是否有标记
+  const [isVisible, setIsVisible] = useState(() => {
     const bannerDismissed = storage.getItem("bannerDismissed");
-    // 如果标记不存在，存储默认值并显示横幅
     if (!bannerDismissed) {
       storage.setItem("bannerDismissed", "false");
-      setIsVisible(true); // 显示横幅
-    } else if (bannerDismissed === "true") {
-      // 如果标记为 "true"，则隐藏横幅
-      setIsVisible(false);
+      return true;
     }
-  }, []);
+    return bannerDismissed !== "true";
+  });
+  const isMobile = useMobileScreen();
 
   const handleMouseEnter = () => {
     setIsHovered(true);

@@ -60,6 +60,35 @@ UCAN-related local storage keys:
 
 When the Root UCAN expires or the wallet account changes, re-authorization is required.
 
+## UCAN Token Lifetime, Refresh, and Wallet Unlock
+
+### Token lifecycle (current implementation)
+
+- **Root UCAN**: default TTL is **24 hours** (`@yeying-community/web3-bs` default `24 * 60 * 60 * 1000`).
+- **Invocation UCAN**: default TTL is **5 minutes** (minted per request, default `5 * 60 * 1000`).
+- **Wallet UCAN Session Key**: `expiresAt` comes from the wallet; the frontend keeps a short cache and renews near expiry.
+
+### Refresh behavior after login
+
+- **Router requests**: automatically try to get/refresh the UCAN session, then mint a new Invocation UCAN.
+- **WebDAV sync**: reuses current session first; if session is unavailable, requests fail and are retried in later interactions.
+- **Root UCAN**: not renewed forever in the background; if root expires, account changes, or capabilities mismatch, re-authorization is required.
+
+### Why wallet unlock is required
+
+Seeing a wallet unlock prompt after being idle or switching pages is usually expected security behavior, not a Chat-only fault. Common causes:
+
+1. Wallet extension auto-lock policy (idle timeout, background state, etc.).
+2. UCAN session has expired and must be requested again from wallet.
+3. Wallet signing is needed (for example, rebuilding Root UCAN or issuing session-related capabilities).
+
+In short: **private key/signing capability is protected by the wallet**, and the frontend cannot bypass unlock.
+
+### Unlock-only vs re-authorize
+
+- **Unlock only**: Root UCAN is still valid, account is unchanged, and capabilities still match.
+- **Re-authorize required**: `ucanRootExp` expired, `currentAccount` does not match Root issuer, or capability set changed.
+
 ## Run & Port
 
 Dev server runs on port `3020`:

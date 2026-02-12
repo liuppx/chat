@@ -54,25 +54,9 @@
     }
   }
 
-  .auth-header {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-    padding: 10px;
-    box-sizing: border-box;
-    animation: slide-in-from-top ease 0.3s;
-  }
-
   .auth-logo {
     margin-top: 10vh;
     transform: scale(1.4);
-  }
-
-  .auth-title {
-    font-size: 24px;
-    font-weight: bold;
-    line-height: 2;
-    margin-bottom: 1vh;
   }
 
   .auth-tips {
@@ -107,16 +91,6 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-  }
-
-  .auth-wallet-title {
-    font-size: 14px;
-    font-weight: 600;
-  }
-
-  .auth-wallet-status {
-    font-size: 13px;
-    color: var(--second);
   }
 
   .auth-wallet-account {
