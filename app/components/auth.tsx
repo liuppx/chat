@@ -1,7 +1,7 @@
 import styles from "./auth.module.scss";
 import { IconButton } from "./button";
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Path, SAAS_CHAT_URL } from "../constant";
 import { useAccessStore } from "../store";
 import Locale from "../locales";
@@ -11,7 +11,7 @@ import Logo from "../icons/logo.svg";
 import { useMobileScreen } from "@/app/utils";
 import BotIcon from "../icons/bot.svg";
 import { getClientConfig } from "../config/client";
-import { PasswordInput } from "./ui-lib";
+import { PasswordInput, showToast } from "./ui-lib";
 import LeftIcon from "@/app/icons/left.svg";
 import { safeLocalStorage } from "@/app/utils";
 import {
@@ -19,18 +19,35 @@ import {
   trackAuthorizationPageButtonToCPaymentClick,
 } from "../utils/auth-settings-events";
 import clsx from "clsx";
+import {
+  UCAN_AUTH_EVENT,
+  connectWallet,
+  getCurrentAccount,
+  isValidUcanAuthorization,
+} from "../plugins/wallet";
 
 const storage = safeLocalStorage();
 
 export function AuthPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const accessStore = useAccessStore();
   const goHome = () => navigate(Path.Home);
-  const goChat = () => navigate(Path.Chat);
+  const redirectTarget = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const raw = params.get("redirect") || Path.Home;
+    if (!raw.startsWith("/")) return Path.Home;
+    if (raw === Path.Auth) return Path.Home;
+    return raw;
+  }, [location.search]);
   const goSaas = () => {
     trackAuthorizationPageButtonToCPaymentClick();
     window.location.href = SAAS_CHAT_URL;
   };
+  const [ucanStatus, setUcanStatus] = useState<
+    "checking" | "authorized" | "expired" | "unauthorized"
+  >("checking");
+  const [ucanAccount, setUcanAccount] = useState("");
 
   const resetAccessCode = () => {
     accessStore.update((access) => {
@@ -45,6 +62,43 @@ export function AuthPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshStatus = async () => {
+      const account = getCurrentAccount() || "";
+      const valid = await isValidUcanAuthorization();
+      if (cancelled) return;
+      setUcanAccount(account);
+      if (valid) {
+        setUcanStatus("authorized");
+      } else if (account) {
+        setUcanStatus("expired");
+      } else {
+        setUcanStatus("unauthorized");
+      }
+    };
+    refreshStatus();
+    const onAuthChange = () => {
+      refreshStatus();
+    };
+    window.addEventListener(UCAN_AUTH_EVENT, onAuthChange);
+    window.addEventListener("storage", onAuthChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(UCAN_AUTH_EVENT, onAuthChange);
+      window.removeEventListener("storage", onAuthChange);
+    };
+  }, []);
+
+  const ucanStatusText =
+    ucanStatus === "authorized"
+      ? "已授权"
+      : ucanStatus === "expired"
+        ? "授权已过期，请重新授权"
+        : "未授权";
+  const ucanActionText =
+    ucanStatus === "authorized" ? "UCAN 已授权" : "连接钱包 / 授权 UCAN";
 
   return (
     <div className={styles["auth-page"]}>
@@ -62,6 +116,20 @@ export function AuthPage() {
 
       <div className={styles["auth-title"]}>{Locale.Auth.Title}</div>
       <div className={styles["auth-tips"]}>{Locale.Auth.Tips}</div>
+
+      <div className={styles["auth-wallet"]}>
+        <div className={styles["auth-wallet-title"]}>UCAN 钱包登录</div>
+        <div className={styles["auth-wallet-status"]}>{ucanStatusText}</div>
+        {ucanAccount ? (
+          <div className={styles["auth-wallet-account"]}>{ucanAccount}</div>
+        ) : null}
+        <IconButton
+          text={ucanActionText}
+          type="primary"
+          onClick={() => connectWallet()}
+          disabled={ucanStatus === "authorized"}
+        />
+      </div>
 
       <PasswordInput
         style={{ marginTop: "3vh", marginBottom: "3vh" }}
@@ -113,7 +181,13 @@ export function AuthPage() {
         <IconButton
           text={Locale.Auth.Confirm}
           type="primary"
-          onClick={goChat}
+          onClick={() => {
+            if (accessStore.isAuthorized()) {
+              navigate(redirectTarget);
+              return;
+            }
+            showToast("请先完成登录");
+          }}
         />
         <IconButton
           text={Locale.Auth.SaasTips}

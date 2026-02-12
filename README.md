@@ -28,6 +28,7 @@ Chat（UCAN 定制版）
 - Router/WebDAV Integration (EN)：`docs/router-webdav-integration-en.md`
 - WebDAV 同步方案（中文）：`docs/webdav-sync-plan-cn.md`
 - WebDAV Sync Plan (EN)：`docs/webdav-sync-plan-en.md`
+- 移动端登录与双后端鉴权（中文）：`docs/mobile-login-auth-plan-cn.md`
 - 部署（中文，Vercel）：`docs/vercel-cn.md`
 - Translation Guide (EN)：`docs/translation.md`
 

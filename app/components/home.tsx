@@ -21,6 +21,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 import { SideBar } from "./sidebar";
 import { useAppConfig } from "../store/config";
@@ -30,7 +31,11 @@ import { type ClientApi, getClientApi } from "../client/api";
 import { useAccessStore } from "../store";
 import clsx from "clsx";
 import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
-import { initWalletListeners, waitForWallet } from "../plugins/wallet";
+import {
+  UCAN_AUTH_EVENT,
+  initWalletListeners,
+  waitForWallet,
+} from "../plugins/wallet";
 import { toast } from "sonner";
 
 import { useToastStore } from "../store/toast";
@@ -191,12 +196,78 @@ export function WindowContent(props: { children: React.ReactNode }) {
 
 function Screen() {
   const config = useAppConfig();
+  const accessStore = useAccessStore();
   const location = useLocation();
+  const navigate = useNavigate();
   const isArtifact = location.pathname.includes(Path.Artifacts);
   const isHome = location.pathname === Path.Home;
   const isAuth = location.pathname === Path.Auth;
   const isSd = location.pathname === Path.Sd;
   const isSdNew = location.pathname === Path.SdNew;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let expiryTimer: number | undefined;
+    const isAllowedPath = (pathname: string) =>
+      pathname === Path.Auth || pathname.startsWith(Path.Artifacts);
+
+    const resolveRedirectTarget = () => {
+      const params = new URLSearchParams(location.search);
+      const raw = params.get("redirect") || Path.Home;
+      if (!raw.startsWith("/")) return Path.Home;
+      if (raw === Path.Auth) return Path.Home;
+      return raw;
+    };
+
+    const ensureAuth = () => {
+      const authorized = accessStore.isAuthorized();
+      if (!authorized && !isAllowedPath(location.pathname)) {
+        const redirect = encodeURIComponent(
+          location.pathname + location.search,
+        );
+        navigate(`${Path.Auth}?redirect=${redirect}`, { replace: true });
+        return;
+      }
+      if (authorized && location.pathname === Path.Auth) {
+        navigate(resolveRedirectTarget(), { replace: true });
+      }
+    };
+
+    const scheduleExpiryCheck = () => {
+      if (expiryTimer) {
+        window.clearTimeout(expiryTimer);
+      }
+      const expRaw = localStorage.getItem("ucanRootExp");
+      const exp = Number(expRaw);
+      if (!Number.isFinite(exp) || exp <= Date.now()) return;
+      const delay = Math.max(0, exp - Date.now());
+      expiryTimer = window.setTimeout(() => {
+        window.dispatchEvent(new Event(UCAN_AUTH_EVENT));
+      }, delay + 200);
+    };
+
+    const onAuthChange = () => {
+      ensureAuth();
+      scheduleExpiryCheck();
+    };
+
+    ensureAuth();
+    scheduleExpiryCheck();
+
+    window.addEventListener(UCAN_AUTH_EVENT, onAuthChange);
+    window.addEventListener("storage", onAuthChange);
+    document.addEventListener("visibilitychange", onAuthChange);
+
+    return () => {
+      if (expiryTimer) {
+        window.clearTimeout(expiryTimer);
+      }
+      window.removeEventListener(UCAN_AUTH_EVENT, onAuthChange);
+      window.removeEventListener("storage", onAuthChange);
+      document.removeEventListener("visibilitychange", onAuthChange);
+    };
+  }, [accessStore, location.pathname, location.search, navigate]);
 
   const isMobileScreen = useMobileScreen();
   const shouldTightBorder =

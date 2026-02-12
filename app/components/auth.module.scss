@@ -96,4 +96,32 @@
       margin-bottom: 10px;
     }
   }
+
+  .auth-wallet {
+    margin-top: 3vh;
+    margin-bottom: 3vh;
+    padding: 16px 20px;
+    border: 1px solid var(--border-in-light);
+    border-radius: 12px;
+    min-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .auth-wallet-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .auth-wallet-status {
+    font-size: 13px;
+    color: var(--second);
+  }
+
+  .auth-wallet-account {
+    font-size: 12px;
+    color: var(--second);
+    word-break: break-all;
+  }
 }
