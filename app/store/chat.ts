@@ -490,8 +490,14 @@ export const useChatStore = createPersistStore(
           updatedAt: Date.now(),
         });
 
-        // get recent messages
-        const recentMessages = await get().getMessagesWithMemory();
+        // get recent messages; fall back to raw history if memory assembling fails
+        let recentMessages: ChatMessage[] = [];
+        try {
+          recentMessages = await get().getMessagesWithMemory();
+        } catch (error) {
+          console.error("[Chat] failed to build context messages", error);
+          recentMessages = session.messages.filter((m) => !m.isError);
+        }
         const sendMessages = recentMessages.concat(userMessage);
         const messageIndex = session.messages.length + 1;
 
