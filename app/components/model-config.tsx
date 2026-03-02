@@ -14,11 +14,14 @@ export function ModelConfigList(props: {
   updateConfig: (updater: (config: ModelConfig) => void) => void;
 }) {
   const allModels = useAllModels();
+  const hasModels = allModels.length > 0;
   const groupModels = groupBy(
     allModels.filter((v: { available: any }) => v.available),
     "provider.providerName",
   );
-  const value = `${props.modelConfig.model}@${props.modelConfig?.providerName}`;
+  const value = hasModels
+    ? `${props.modelConfig.model}@${props.modelConfig?.providerName}`
+    : "";
   const compressModelValue = `${props.modelConfig.compressModel}@${props.modelConfig?.compressProviderName}`;
 
   return (
@@ -38,6 +41,11 @@ export function ModelConfigList(props: {
             });
           }}
         >
+          {!hasModels ? (
+            <option value="" disabled>
+              {Locale.SearchChat.Page.Loading}
+            </option>
+          ) : null}
           {Object.keys(groupModels).map((providerName, index) => (
             <optgroup label={providerName} key={index}>
               {groupModels[providerName].map((v, i) => (

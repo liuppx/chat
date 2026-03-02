@@ -4,7 +4,6 @@ import {
   ApiPath,
   SILICONFLOW_BASE_URL,
   SiliconFlow,
-  DEFAULT_MODELS,
 } from "@/app/constant";
 import {
   useAccessStore,
@@ -253,7 +252,7 @@ export class SiliconflowApi implements LLMApi {
 
   async models(): Promise<LLMModel[]> {
     if (this.disableListModels) {
-      return DEFAULT_MODELS.slice();
+      return [];
     }
 
     const res = await fetch(this.path(SiliconFlow.ListModelPath), {

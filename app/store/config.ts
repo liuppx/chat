@@ -3,7 +3,6 @@ import { DalleQuality, DalleStyle, ModelSize } from "../typing";
 import { getClientConfig } from "../config/client";
 import {
   DEFAULT_INPUT_TEMPLATE,
-  DEFAULT_MODELS,
   DEFAULT_SIDEBAR_WIDTH,
   DEFAULT_TTS_ENGINE,
   DEFAULT_TTS_ENGINES,
@@ -17,7 +16,7 @@ import {
 import { createPersistStore } from "../utils/store";
 import type { Voice } from "rt-client";
 
-export type ModelType = (typeof DEFAULT_MODELS)[number]["name"];
+export type ModelType = string;
 export type TTSModelType = (typeof DEFAULT_TTS_MODELS)[number];
 export type TTSVoiceType = (typeof DEFAULT_TTS_VOICES)[number];
 export type TTSEngineType = (typeof DEFAULT_TTS_ENGINES)[number];
@@ -61,7 +60,7 @@ export const DEFAULT_CONFIG = {
   hideBuiltinMasks: false, // dont add builtin masks
 
   customModels: "",
-  models: DEFAULT_MODELS.map((m) => ({ ...m })) as any as LLMModel[],
+  models: [] as LLMModel[],
 
   modelConfig: {
     model: "gpt-5.1" as ModelType,
@@ -255,31 +254,52 @@ export const useAppConfig = createPersistStore(
           DEFAULT_CONFIG.modelConfig.compressProviderName;
       }
 
+      const ensureModels = () => {
+        if (!state.models || !Array.isArray(state.models)) {
+          state.models = [];
+        }
+      };
+
       if (version < 4.2) {
-        state.models = DEFAULT_MODELS as any as LLMModel[];
-        state.modelConfig.model = "gpt-5.1" as ModelType;
-        state.modelConfig.providerName = ServiceProvider.OpenAI;
+        ensureModels();
+        if (!state.modelConfig.model) {
+          state.modelConfig.model = DEFAULT_CONFIG.modelConfig.model;
+        }
+        if (!state.modelConfig.providerName) {
+          state.modelConfig.providerName =
+            DEFAULT_CONFIG.modelConfig.providerName;
+        }
       }
 
       if (version < 4.3) {
-        state.models = DEFAULT_MODELS as any as LLMModel[];
+        ensureModels();
       }
 
       if (version < 4.4) {
-        state.models = DEFAULT_MODELS as any as LLMModel[];
-        state.modelConfig.model = "gpt-5.1" as ModelType;
-        state.modelConfig.providerName = ServiceProvider.OpenAI;
+        ensureModels();
+        if (!state.modelConfig.model) {
+          state.modelConfig.model = DEFAULT_CONFIG.modelConfig.model;
+        }
+        if (!state.modelConfig.providerName) {
+          state.modelConfig.providerName =
+            DEFAULT_CONFIG.modelConfig.providerName;
+        }
       }
 
       if (version < 4.5) {
-        // Force reset to router model set to avoid stale cached models
-        state.models = DEFAULT_MODELS.map((m) => ({ ...m })) as any as LLMModel[];
-        state.modelConfig.model = "gpt-5.1" as ModelType;
-        state.modelConfig.providerName = ServiceProvider.OpenAI;
+        // keep existing list; router will refresh after login
+        ensureModels();
+        if (!state.modelConfig.model) {
+          state.modelConfig.model = DEFAULT_CONFIG.modelConfig.model;
+        }
+        if (!state.modelConfig.providerName) {
+          state.modelConfig.providerName =
+            DEFAULT_CONFIG.modelConfig.providerName;
+        }
       }
 
       if (version < 4.6) {
-        state.models = DEFAULT_MODELS.map((m) => ({ ...m })) as any as LLMModel[];
+        ensureModels();
       }
 
       return state as any;

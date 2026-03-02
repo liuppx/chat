@@ -65,12 +65,21 @@ function reorder<T>(list: T[], startIndex: number, endIndex: number): T[] {
   return result;
 }
 
+const EMOJI_UNIFIED_RE = /^[0-9a-f]+(-[0-9a-f]+)*$/i;
+
+function isEmojiUnified(avatar?: string) {
+  return !!avatar && EMOJI_UNIFIED_RE.test(avatar);
+}
+
 export function MaskAvatar(props: { avatar: string; model?: ModelType }) {
-  return props.avatar !== DEFAULT_MASK_AVATAR ? (
-    <Avatar avatar={props.avatar} />
-  ) : (
-    <Avatar model={props.model} />
-  );
+  const config = useAppConfig();
+  const model = props.model || config.modelConfig.model;
+  const useEmoji =
+    props.avatar &&
+    props.avatar !== DEFAULT_MASK_AVATAR &&
+    isEmojiUnified(props.avatar);
+
+  return useEmoji ? <Avatar avatar={props.avatar} /> : <Avatar model={model} />;
 }
 
 export function MaskConfig(props: {

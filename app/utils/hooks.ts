@@ -1,11 +1,25 @@
 import { useMemo } from "react";
-import { DEFAULT_MODELS } from "../constant";
+import { useAccessStore, useAppConfig } from "../store";
+import { collectModelsWithDefaultModel } from "./model";
 
 export function useAllModels() {
-  // Force router model list; downstream selection still updates providerName/model
+  const config = useAppConfig();
+  const accessStore = useAccessStore();
+
   return useMemo(() => {
-    const list = DEFAULT_MODELS.map((m) => ({ ...m })) as any;
-    console.log("[Models][useAllModels] returning", list.length, "items", list);
-    return list;
-  }, []);
+    const customModels = [config.customModels, accessStore.customModels]
+      .filter((item) => !!item && item.length > 0)
+      .join(",");
+
+    return collectModelsWithDefaultModel(
+      config.models,
+      customModels,
+      accessStore.defaultModel,
+    );
+  }, [
+    config.models,
+    config.customModels,
+    accessStore.customModels,
+    accessStore.defaultModel,
+  ]);
 }

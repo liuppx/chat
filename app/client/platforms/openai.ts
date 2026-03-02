@@ -3,7 +3,6 @@
 import {
   ApiPath,
   OPENAI_BASE_URL,
-  DEFAULT_MODELS,
   OpenaiPath,
   Azure,
   REQUEST_TIMEOUT_MS,
@@ -697,6 +696,13 @@ export class ChatGPTApi implements LLMApi {
     const listPath = this.path(OpenaiPath.ListModelPath);
     const shouldSkipRouterFetch = isRouterUrl(listPath) && !isUcanMetaValid();
 
+    if (shouldSkipRouterFetch || this.disableListModels) {
+      if (shouldSkipRouterFetch) {
+        console.info("[Models] skip router fetch before UCAN login");
+      }
+      return [];
+    }
+
     const fetchFromApi = async () => {
       const listHeaders = await getHeadersWithRouterUcan(listPath);
       const res = await fetch(listPath, {
@@ -715,16 +721,16 @@ export class ChatGPTApi implements LLMApi {
       return list;
     };
 
-    // prefer live list; fallback to defaults if fetch fails
-    let modelsFromApi: OpenAIListModelResponse["data"] | undefined;
-    if (shouldSkipRouterFetch) {
-      console.info("[Models] skip router fetch before UCAN login");
-    } else if (!this.disableListModels) {
-      try {
-        modelsFromApi = await fetchFromApi();
-      } catch (error) {
-        console.warn("[Models] falling back to defaults", error);
-      }
+    let modelsFromApi: OpenAIListModelResponse["data"] = [];
+    try {
+      modelsFromApi = await fetchFromApi();
+    } catch (error) {
+      console.warn("[Models] failed to fetch models", error);
+      return [];
+    }
+
+    if (!modelsFromApi || modelsFromApi.length === 0) {
+      return [];
     }
 
     const preferredOrder = [
@@ -746,13 +752,7 @@ export class ChatGPTApi implements LLMApi {
       "gemini-3-pro-preview": "Gemini 3 Pro Preview",
     };
 
-    // Union API result with built-in router defaults to avoid missing models
-    const source = [
-      ...(modelsFromApi && modelsFromApi.length > 0 ? modelsFromApi : []),
-      ...DEFAULT_MODELS.map((m) => ({ id: m.name })),
-    ];
-
-    const normalized = source
+    const normalized = modelsFromApi
       .map((m) => m.id)
       .filter(Boolean)
       .map((id) => mapOpenAIModelName(id));
@@ -761,9 +761,9 @@ export class ChatGPTApi implements LLMApi {
     unique.sort((a, b) => {
       const ia = preferredOrder.indexOf(a);
       const ib = preferredOrder.indexOf(b);
-      if (ia === -1 && ib === -1) return a.localeCompare(b);
-      if (ia === -1) return 1;
-      if (ib === -1) return -1;
+      if (ia == -1 && ib == -1) return a.localeCompare(b);
+      if (ia == -1) return 1;
+      if (ib == -1) return -1;
       return ia - ib;
     });
 

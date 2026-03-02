@@ -3,7 +3,6 @@
 import {
   ApiPath,
   AI302_BASE_URL,
-  DEFAULT_MODELS,
   AI302,
 } from "@/app/constant";
 import {
@@ -253,7 +252,7 @@ export class Ai302Api implements LLMApi {
 
   async models(): Promise<LLMModel[]> {
     if (this.disableListModels) {
-      return DEFAULT_MODELS.slice();
+      return [];
     }
 
     const res = await fetch(this.path(AI302.ListModelPath), {

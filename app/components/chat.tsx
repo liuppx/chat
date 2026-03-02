@@ -536,61 +536,60 @@ export function ChatActions(props: {
   const models = useMemo(() => {
     console.log(
       "[ModelSelector] allModels",
-      allModels.map(
-        (m: {
-          name: any;
-          displayName: any;
-          available: any;
-          provider: { providerName: any };
-        }) => ({
-          name: m.name,
-          displayName: m.displayName,
-          available: m.available,
-          provider: m.provider?.providerName,
-        }),
-      ),
+      allModels.map((m) => ({
+        name: m.name,
+        displayName: m.displayName,
+        available: m.available,
+        provider: m.provider?.providerName,
+      })),
     );
-    const filteredModels = allModels.filter(
-      (m: { available: any }) => m.available,
-    );
+    const filteredModels = allModels.filter((m) => m.available);
     console.log(
       "[ModelSelector] filteredModels",
-      filteredModels.map(
-        (m: {
-          name: any;
-          displayName: any;
-          available: any;
-          provider: { providerName: any };
-        }) => ({
-          name: m.name,
-          displayName: m.displayName,
-          available: m.available,
-          provider: m.provider?.providerName,
-        }),
-      ),
+      filteredModels.map((m) => ({
+        name: m.name,
+        displayName: m.displayName,
+        available: m.available,
+        provider: m.provider?.providerName,
+      })),
     );
-    const defaultModel = filteredModels.find(
-      (m: { isDefault: any }) => m.isDefault,
-    );
+    const defaultModel = filteredModels.find((m) => m.isDefault);
 
     if (defaultModel) {
-      const arr = [
-        defaultModel,
-        ...filteredModels.filter((m: any) => m !== defaultModel),
-      ];
+      const arr = [defaultModel, ...filteredModels.filter((m) => m !== defaultModel)];
       return arr;
     } else {
       return filteredModels;
     }
   }, [allModels]);
   const currentModelName = useMemo(() => {
+    if (models.length === 0) return Locale.SearchChat.Page.Loading;
     const model = models.find(
-      (m: { name: string; provider: { providerName: ServiceProvider } }) =>
+      (m) =>
         m.name == currentModel &&
         m?.provider?.providerName == currentProviderName,
     );
-    return model?.displayName ?? "";
+    return model?.displayName ?? currentModel;
   }, [models, currentModel, currentProviderName]);
+  const modelSelectorItems = useMemo(() => {
+    if (models.length === 0) {
+      return [
+        {
+          title: Locale.SearchChat.Page.Loading,
+          value: "loading",
+          disable: true,
+        },
+      ];
+    }
+    return models.map((m) => ({
+        title: `${m.displayName}${
+          m?.provider?.providerName
+            ? " (" + m?.provider?.providerName + ")"
+            : ""
+        }`,
+        value: `${m.name}@${m?.provider?.providerName}`,
+      }));
+  }, [models]);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [showPluginSelector, setShowPluginSelector] = useState(false);
   const [showUploadImage, setShowUploadImage] = useState(false);
@@ -618,14 +617,10 @@ export function ChatActions(props: {
 
     // if current model is not available
     // switch to first available model
-    const isUnavailableModel = !models.some(
-      (m: { name: string }) => m.name === currentModel,
-    );
+    const isUnavailableModel = !models.some((m) => m.name === currentModel);
     if (isUnavailableModel && models.length > 0) {
       // show next model to default model if exist
-      let nextModel =
-        models.find((model: { isDefault: any }) => model.isDefault) ||
-        models[0];
+      let nextModel = models.find((model) => model.isDefault) || models[0];
       chatStore.updateTargetSession(session, (session) => {
         session.mask.modelConfig.model = nextModel.name;
         session.mask.modelConfig.providerName = nextModel?.provider
@@ -725,20 +720,7 @@ export function ChatActions(props: {
         {showModelSelector && (
           <Selector
             defaultSelectedValue={`${currentModel}@${currentProviderName}`}
-            items={models.map(
-              (m: {
-                displayName: any;
-                provider: { providerName: string };
-                name: any;
-              }) => ({
-                title: `${m.displayName}${
-                  m?.provider?.providerName
-                    ? " (" + m?.provider?.providerName + ")"
-                    : ""
-                }`,
-                value: `${m.name}@${m?.provider?.providerName}`,
-              }),
-            )}
+            items={modelSelectorItems}
             onClose={() => setShowModelSelector(false)}
             onSelection={(s) => {
               if (s.length === 0) return;
@@ -751,7 +733,7 @@ export function ChatActions(props: {
               });
               if (providerName == "ByteDance") {
                 const selectedModel = models.find(
-                  (m: { name: string; provider: { providerName: string } }) =>
+                  (m) =>
                     m.name == model &&
                     m?.provider?.providerName == providerName,
                 );
