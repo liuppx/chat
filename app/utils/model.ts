@@ -22,6 +22,92 @@ const customProvider = (providerName: string) => ({
   sorted: CustomSeq.next(providerName),
 });
 
+const providerMap = (() => {
+  const map = new Map<string, LLMModel["provider"]>();
+  for (const model of DEFAULT_MODELS) {
+    const provider = model.provider as LLMModel["provider"];
+    map.set(provider.id.toLowerCase(), provider);
+    map.set(provider.providerName.toLowerCase(), provider);
+  }
+  return map;
+})();
+
+function normalizeProviderId(providerName?: string): string | undefined {
+  return normalizeProviderName(providerName)?.toLowerCase();
+}
+
+export function normalizeProviderName(providerName?: string): string | undefined {
+  if (!providerName) return undefined;
+  const trimmed = providerName.trim();
+  if (trimmed.length === 0) return undefined;
+  const serviceProvider = Object.values(ServiceProvider).find(
+    (p) => p.toLowerCase() === trimmed.toLowerCase(),
+  );
+  return serviceProvider ?? trimmed;
+}
+
+export function normalizeModelProvider(
+  provider: LLMModel["provider"] | string | undefined | null,
+): LLMModel["provider"] {
+  if (provider && typeof provider === "object") {
+    const providerId = String(provider.id ?? "").trim().toLowerCase();
+    const providerName = normalizeProviderName(provider.providerName);
+    const knownProvider =
+      providerMap.get(providerId) ||
+      (providerName ? providerMap.get(providerName.toLowerCase()) : undefined);
+
+    if (knownProvider) return { ...knownProvider };
+
+    const fallbackName = providerName ?? ServiceProvider.OpenAI;
+    const fallbackId =
+      normalizeProviderId(provider.id || fallbackName) ??
+      ServiceProvider.OpenAI.toLowerCase();
+
+    return {
+      id: fallbackId,
+      providerName: fallbackName,
+      providerType: provider.providerType ?? "custom",
+      sorted:
+        Number.isFinite(provider.sorted) && typeof provider.sorted === "number"
+          ? provider.sorted
+          : CustomSeq.next(fallbackName),
+    };
+  }
+
+  const name =
+    normalizeProviderName(typeof provider === "string" ? provider : undefined) ??
+    ServiceProvider.OpenAI;
+  const knownProvider = providerMap.get(name.toLowerCase());
+
+  if (knownProvider) return { ...knownProvider };
+  return customProvider(name);
+}
+
+export function normalizeModel(model: LLMModel): LLMModel {
+  const provider = normalizeModelProvider(
+    (model as LLMModel & { provider?: LLMModel["provider"] | string }).provider,
+  );
+  const key = `${model.name}@${provider.id}`;
+  const sorted =
+    Number.isFinite(model.sorted) && typeof model.sorted === "number"
+      ? model.sorted
+      : CustomSeq.next(key);
+
+  return {
+    ...model,
+    displayName: model.displayName ?? model.name,
+    available: model.available !== false,
+    provider,
+    sorted,
+  };
+}
+
+export function normalizeModels(models: readonly LLMModel[]): LLMModel[] {
+  return (models ?? [])
+    .filter((model): model is LLMModel => !!model && !!model.name)
+    .map((model) => normalizeModel(model));
+}
+
 /**
  * Sorts an array of models based on specified rules.
  *
@@ -65,9 +151,10 @@ export function collectModelTable(
   > = {};
 
   // default models
-  models.forEach((m) => {
+  normalizeModels(models).forEach((m) => {
     // using <modelName>@<providerId> as fullName
-    modelTable[`${m.name}@${m?.provider?.id}`] = {
+    const providerId = normalizeProviderId(m?.provider?.id) ?? m.provider.id;
+    modelTable[`${m.name}@${providerId}`] = {
       ...m,
       displayName: m.displayName ?? m.name, // 'provider' is copied over if it exists
     };
@@ -97,12 +184,13 @@ export function collectModelTable(
           if (
             customModelName == modelName &&
             (customProviderName === undefined ||
-              customProviderName === providerName)
+              normalizeProviderId(customProviderName) ===
+                normalizeProviderId(providerName))
           ) {
             count += 1;
             modelTable[fullName]["available"] = available;
             // swap name and displayName for bytedance
-            if (providerName === "bytedance") {
+            if (normalizeProviderId(providerName) === "bytedance") {
               [name, displayName] = [displayName, modelName];
               modelTable[fullName]["name"] = name;
             }
@@ -114,7 +202,7 @@ export function collectModelTable(
         // 2. if model not exists, create new model with available value
         if (count === 0) {
           let [customModelName, customProviderName] = getModelProvider(name);
-          const provider = customProvider(
+          const provider = normalizeModelProvider(
             customProviderName || customModelName,
           );
           // swap name and displayName for bytedance
@@ -143,8 +231,12 @@ export function collectModelTableWithDefaultModel(
   let modelTable = collectModelTable(models, customModels);
   if (defaultModel && defaultModel !== "") {
     if (defaultModel.includes("@")) {
-      if (defaultModel in modelTable) {
-        modelTable[defaultModel].isDefault = true;
+      const [modelName, providerName] = getModelProvider(defaultModel);
+      const normalizedFullName = `${modelName}@${
+        normalizeProviderId(providerName) ?? providerName
+      }`;
+      if (normalizedFullName in modelTable) {
+        modelTable[normalizedFullName].isDefault = true;
       }
     } else {
       for (const key of Object.keys(modelTable)) {
@@ -198,7 +290,9 @@ export function isModelAvailableInServer(
   modelName: string,
   providerName: string,
 ) {
-  const fullName = `${modelName}@${providerName}`;
+  const fullName = `${modelName}@${
+    normalizeProviderId(providerName) ?? providerName
+  }`;
   const modelTable = collectModelTable(DEFAULT_MODELS, customModels);
   return modelTable[fullName]?.available === false;
 }

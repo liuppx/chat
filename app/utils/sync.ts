@@ -255,8 +255,18 @@ const MergeStates: StateMerger = {
     };
     return localState;
   },
-  [StoreKey.Config]: mergeWithUpdate<AppState[StoreKey.Config]>,
-  [StoreKey.Access]: mergeWithUpdate<AppState[StoreKey.Access]>,
+  [StoreKey.Config]: (localState, remoteState) =>
+    mergeWithUpdate<AppState[StoreKey.Config]>(
+      localState,
+      remoteState,
+      StoreKey.Config,
+    ),
+  [StoreKey.Access]: (localState, remoteState) =>
+    mergeWithUpdate<AppState[StoreKey.Access]>(
+      localState,
+      remoteState,
+      StoreKey.Access,
+    ),
 };
 
 export function getLocalAppState() {
@@ -330,15 +340,48 @@ export function mergeAppState(localState: AppState, remoteState: AppState) {
 export function mergeWithUpdate<T extends { lastUpdateTime?: number }>(
   localState: T,
   remoteState: T,
+  debugName?: string,
 ) {
   const localUpdateTime = localState.lastUpdateTime ?? 0;
-  const remoteUpdateTime = localState.lastUpdateTime ?? 1;
+  const remoteUpdateTime = remoteState.lastUpdateTime ?? 0;
 
-  if (localUpdateTime < remoteUpdateTime) {
-    merge(remoteState, localState);
-    return { ...remoteState };
-  } else {
+  const useRemote = localUpdateTime < remoteUpdateTime;
+
+  if (useRemote) {
+    // Remote is newer, so apply remote on top of local.
     merge(localState, remoteState);
-    return { ...localState };
+    const merged = { ...localState };
+    if (debugName === StoreKey.Config || debugName === StoreKey.Access) {
+      const localModel = (localState as any)?.modelConfig?.model;
+      const remoteModel = (remoteState as any)?.modelConfig?.model;
+      const mergedModel = (merged as any)?.modelConfig?.model;
+      console.info("[Sync] mergeWithUpdate choose remote", {
+        key: debugName,
+        localUpdateTime,
+        remoteUpdateTime,
+        localModel,
+        remoteModel,
+        mergedModel,
+      });
+    }
+    return merged;
   }
+
+  // Local is newer or equal, so keep local values.
+  merge(remoteState, localState);
+  const merged = { ...remoteState };
+  if (debugName === StoreKey.Config || debugName === StoreKey.Access) {
+    const localModel = (localState as any)?.modelConfig?.model;
+    const remoteModel = (remoteState as any)?.modelConfig?.model;
+    const mergedModel = (merged as any)?.modelConfig?.model;
+    console.info("[Sync] mergeWithUpdate keep local", {
+      key: debugName,
+      localUpdateTime,
+      remoteUpdateTime,
+      localModel,
+      remoteModel,
+      mergedModel,
+    });
+  }
+  return merged;
 }
