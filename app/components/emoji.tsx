@@ -1,8 +1,4 @@
-import EmojiPicker, {
-  Emoji,
-  EmojiStyle,
-  Theme as EmojiTheme,
-} from "emoji-picker-react";
+import EmojiPicker, { EmojiStyle, Theme as EmojiTheme } from "emoji-picker-react";
 
 import { ModelType } from "../store";
 
@@ -21,7 +17,7 @@ import BotIconGrok from "../icons/llm-icons/grok.svg";
 import BotIconHunyuan from "../icons/llm-icons/hunyuan.svg";
 import BotIconDoubao from "../icons/llm-icons/doubao.svg";
 import BotIconChatglm from "../icons/llm-icons/chatglm.svg";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { notifyError, notifySuccess } from "../plugins/show_window";
 import styles from "./emoji.module.scss";
 import {
@@ -34,6 +30,23 @@ export function getEmojiUrl(unified: string, style: EmojiStyle) {
   // Old CDN broken, so I had to switch to this one
   // Author: https://github.com/H0llyW00dzZ
   return `https://fastly.jsdelivr.net/npm/emoji-datasource-apple/img/${style}/64/${unified}.png`;
+}
+
+function unifiedToNativeEmoji(unified?: string): string {
+  if (!unified) return "";
+
+  const codePoints = unified
+    .split("-")
+    .map((part) => Number.parseInt(part, 16))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  if (codePoints.length === 0) return "";
+
+  try {
+    return String.fromCodePoint(...codePoints);
+  } catch {
+    return "";
+  }
 }
 
 export function AvatarPicker(props: {
@@ -119,24 +132,54 @@ export function Avatar(props: {
 
     return (
       <div className="no-dark">
-        <LlmIcon className="user-avatar" width={size} height={size} />
+        <LlmIcon width={size} height={size} />
+      </div>
+    );
+  }
+
+  if (!props.avatar) {
+    return (
+      <div className="no-dark">
+        <BotIconDefault width={size} height={size} />
       </div>
     );
   }
 
   return (
     <div className="user-avatar">
-      {props.avatar && <EmojiAvatar avatar={props.avatar} />}
+      <EmojiAvatar avatar={props.avatar} />
     </div>
   );
 }
 
 export function EmojiAvatar(props: { avatar: string; size?: number }) {
+  const size = props.size ?? 18;
+  const [loadFailed, setLoadFailed] = useState(false);
+  const nativeEmoji = useMemo(
+    () => unifiedToNativeEmoji(props.avatar),
+    [props.avatar],
+  );
+
+  useEffect(() => {
+    setLoadFailed(false);
+  }, [props.avatar]);
+
+  if (loadFailed) {
+    return (
+      <span style={{ fontSize: size, lineHeight: 1 }}>
+        {nativeEmoji || "🤖"}
+      </span>
+    );
+  }
+
   return (
-    <Emoji
-      unified={props.avatar}
-      size={props.size ?? 18}
-      getEmojiUrl={getEmojiUrl}
+    <img
+      src={getEmojiUrl(props.avatar, EmojiStyle.APPLE)}
+      alt={nativeEmoji || props.avatar}
+      width={size}
+      height={size}
+      loading="lazy"
+      onError={() => setLoadFailed(true)}
     />
   );
 }

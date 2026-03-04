@@ -23,6 +23,12 @@ export type SyncClient = {
   get: (key: string) => Promise<string>;
   set: (key: string, value: string) => Promise<void>;
   check: () => Promise<boolean>;
+  uploadMedia?: (
+    mediaKey: string,
+    blob: Blob,
+    contentType?: string,
+  ) => Promise<void>;
+  downloadMedia?: (mediaKey: string) => Promise<Blob | null>;
 };
 
 export function createSyncClient<T extends ProviderType>(

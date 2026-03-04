@@ -30,8 +30,10 @@ export type WebDavClient = ReturnType<typeof createWebDavClient>;
 const DEFAULT_FOLDER = STORAGE_KEY;
 const BACKUP_FILENAME = "backup.json";
 const DEFAULT_FILE = `${DEFAULT_FOLDER}/${BACKUP_FILENAME}`;
+const MEDIA_FOLDER = `${DEFAULT_FOLDER}/media`;
 const WEBDAV_PROXY_PREFIX = "/api/webdav";
 const ensuredAppDirs = new Set<string>();
+const ensuredBasicMediaDirs = new Set<string>();
 const INVOCATION_TOKEN_SKEW_MS = 5 * 1000;
 
 type UcanPayload = {
@@ -43,6 +45,7 @@ type CachedUcanWebDavClient = {
   key: string;
   client: Awaited<ReturnType<typeof initWebDavStorage>>["client"];
   filePath: string;
+  mediaDir: string;
   exp: number;
   nbf?: number;
 };
@@ -102,7 +105,11 @@ function getValidCachedUcanWebdavClient(cacheKey: string) {
   const now = Date.now();
   if (cached.nbf && now < cached.nbf) return null;
   if (cached.exp <= now + INVOCATION_TOKEN_SKEW_MS) return null;
-  return { client: cached.client, filePath: cached.filePath };
+  return {
+    client: cached.client,
+    filePath: cached.filePath,
+    mediaDir: cached.mediaDir,
+  };
 }
 
 function normalizeBaseUrl(raw: string): string {
@@ -248,6 +255,62 @@ function createBasicWebDavClient(store: SyncStore) {
       });
 
       console.log("[WebDav] set key = ", key, res.status, res.statusText);
+    },
+
+    async ensureMediaDir() {
+      const cacheKey = `${store.useProxy ? "proxy" : "direct"}|${endpoint}`;
+      if (ensuredBasicMediaDirs.has(cacheKey)) return;
+
+      const res = await fetch(
+        this.path(MEDIA_FOLDER, proxyUrl, "MKCOL", endpoint),
+        {
+          method: store.useProxy ? "GET" : "MKCOL",
+          headers: this.headers(),
+        },
+      );
+      if (![201, 405, 409].includes(res.status)) {
+        throw new Error(`WebDav MKCOL ${MEDIA_FOLDER} failed: ${res.status}`);
+      }
+      ensuredBasicMediaDirs.add(cacheKey);
+    },
+
+    async uploadMedia(mediaKey: string, blob: Blob, contentType?: string) {
+      const path = `${MEDIA_FOLDER}/${mediaKey}`;
+      const headers: Record<string, string> = this.headers();
+      if (contentType) {
+        headers["content-type"] = contentType;
+      }
+      let res = await fetch(this.path(path, proxyUrl, "", endpoint), {
+        method: "PUT",
+        headers,
+        body: blob,
+      });
+      if ([404, 409].includes(res.status)) {
+        await this.ensureMediaDir();
+        res = await fetch(this.path(path, proxyUrl, "", endpoint), {
+          method: "PUT",
+          headers,
+          body: blob,
+        });
+      }
+      if (![200, 201, 204].includes(res.status)) {
+        throw new Error(`WebDav upload media failed: ${res.status}`);
+      }
+    },
+
+    async downloadMedia(mediaKey: string) {
+      const path = `${MEDIA_FOLDER}/${mediaKey}`;
+      const res = await fetch(this.path(path, proxyUrl, "", endpoint), {
+        method: "GET",
+        headers: this.headers(),
+      });
+      if (res.status === 404) {
+        return null;
+      }
+      if (!res.ok) {
+        throw new Error(`WebDav download media failed: ${res.status}`);
+      }
+      return await res.blob();
     },
 
     headers() {
@@ -420,6 +483,7 @@ async function getUcanWebDavClient(store: SyncStore) {
 
   const appDir = webdav.appDir?.replace(/\/+$/, "") || "";
   const filePath = `${appDir || ""}/${BACKUP_FILENAME}`;
+  const mediaDir = `${appDir || DEFAULT_FOLDER}/media`;
 
   if (appDir) {
     const key = `${baseUrl}|${prefix}|${appDir}`;
@@ -436,18 +500,32 @@ async function getUcanWebDavClient(store: SyncStore) {
     }
   }
 
+  const mediaDirKey = `${baseUrl}|${prefix}|${mediaDir}`;
+  if (!ensuredAppDirs.has(mediaDirKey)) {
+    try {
+      const res = await webdav.client.createDirectory(mediaDir);
+      if (![201, 405, 409].includes(res.status)) {
+        throw new Error(`WebDAV MKCOL ${mediaDir} failed: ${res.status}`);
+      }
+      ensuredAppDirs.add(mediaDirKey);
+    } catch (error) {
+      console.error("[WebDav UCAN] ensure media dir failed", error);
+    }
+  }
+
   const payload = decodeUcanPayload(webdav.token);
   if (payload && typeof payload.exp === "number") {
     cachedUcanWebDavClient = {
       key: cacheKey,
       client: webdav.client,
       filePath,
+      mediaDir,
       exp: payload.exp,
       nbf: payload.nbf,
     };
   }
 
-  return { client: webdav.client, filePath };
+  return { client: webdav.client, filePath, mediaDir };
 }
 
 function createUcanWebDavClient(store: SyncStore) {
@@ -478,6 +556,36 @@ function createUcanWebDavClient(store: SyncStore) {
     async set(_: string, value: string) {
       const { client, filePath } = await getUcanWebDavClient(store);
       await client.upload(filePath, value, "application/json");
+    },
+
+    async uploadMedia(mediaKey: string, blob: Blob, contentType?: string) {
+      const { client, mediaDir } = await getUcanWebDavClient(store);
+      const mediaPath = `${mediaDir}/${mediaKey}`;
+      await client.upload(
+        mediaPath,
+        blob,
+        contentType || "application/octet-stream",
+      );
+    },
+
+    async downloadMedia(mediaKey: string) {
+      const { client, mediaDir } = await getUcanWebDavClient(store);
+      const mediaPath = `${mediaDir}/${mediaKey}`;
+      try {
+        const res = await client.download(mediaPath);
+        if (res.status === 404) {
+          return null;
+        }
+        if (!res.ok) {
+          throw new Error(`WebDAV download media failed: ${res.status}`);
+        }
+        return await res.blob();
+      } catch (e) {
+        if (String(e).includes("404")) {
+          return null;
+        }
+        throw e;
+      }
     },
   };
 }

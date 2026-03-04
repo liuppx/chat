@@ -1,5 +1,5 @@
 import { ApiPath } from "@/app/constant";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { handle as openaiHandler } from "../../openai";
 import { handle as azureHandler } from "../../azure";
 import { handle as googleHandler } from "../../google";
@@ -56,8 +56,16 @@ async function handle(
       return openaiHandler(req, { params: resolvedParams });
     case ApiPath["302.AI"]:
       return ai302Handler(req, { params: resolvedParams });
-    default:
+    case "/api/proxy":
       return proxyHandler(req, { params: resolvedParams });
+    default:
+      console.warn(
+        `[Route] unknown provider "${resolvedParams.provider}", reject request`,
+      );
+      return NextResponse.json(
+        { error: `Unknown provider: ${resolvedParams.provider}` },
+        { status: 404 },
+      );
   }
 }
 

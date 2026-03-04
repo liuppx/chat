@@ -14,6 +14,10 @@ import {
   ServiceProvider,
 } from "../constant";
 import { createPersistStore } from "../utils/store";
+import {
+  normalizeModels,
+  normalizeProviderName,
+} from "../utils/model";
 import type { Voice } from "rt-client";
 
 export type ModelType = string;
@@ -172,7 +176,8 @@ export const useAppConfig = createPersistStore(
         return;
       }
 
-      const oldModels = get().models;
+      const oldModels = normalizeModels(get().models);
+      const normalizedNewModels = normalizeModels(newModels);
       const modelMap: Record<string, LLMModel> = {};
 
       for (const model of oldModels) {
@@ -180,7 +185,7 @@ export const useAppConfig = createPersistStore(
         modelMap[`${model.name}@${model?.provider?.id}`] = model;
       }
 
-      for (const model of newModels) {
+      for (const model of normalizedNewModels) {
         model.available = true;
         modelMap[`${model.name}@${model?.provider?.id}`] = model;
       }
@@ -199,15 +204,41 @@ export const useAppConfig = createPersistStore(
     merge(persistedState, currentState) {
       const state = persistedState as ChatConfig | undefined;
       if (!state) return { ...currentState };
-      const models = currentState.models.slice();
-      state.models.forEach((pModel) => {
+
+      const models = normalizeModels(currentState.models.slice());
+      normalizeModels(state.models ?? []).forEach((pModel) => {
         const idx = models.findIndex(
-          (v) => v.name === pModel.name && v.provider === pModel.provider,
+          (v) => v.name === pModel.name && v.provider?.id === pModel.provider?.id,
         );
         if (idx !== -1) models[idx] = pModel;
         else models.push(pModel);
       });
-      return { ...currentState, ...state, models: models };
+
+      const providerName =
+        normalizeProviderName(state.modelConfig?.providerName) ??
+        currentState.modelConfig.providerName;
+      const compressProviderName =
+        normalizeProviderName(state.modelConfig?.compressProviderName) ??
+        state.modelConfig?.compressProviderName;
+
+      if (state.modelConfig?.providerName !== providerName) {
+        console.info("[Config] normalized providerName in persisted config", {
+          from: state.modelConfig?.providerName,
+          to: providerName,
+        });
+      }
+
+      return {
+        ...currentState,
+        ...state,
+        models,
+        modelConfig: {
+          ...currentState.modelConfig,
+          ...state.modelConfig,
+          providerName: providerName as ServiceProvider,
+          compressProviderName: compressProviderName as any,
+        },
+      };
     },
 
     migrate(persistedState, version) {
@@ -301,6 +332,20 @@ export const useAppConfig = createPersistStore(
       if (version < 4.6) {
         ensureModels();
       }
+
+      state.models = normalizeModels(state.models ?? []);
+      state.modelConfig.providerName =
+        (normalizeProviderName(state.modelConfig.providerName) ??
+          DEFAULT_CONFIG.modelConfig.providerName) as ServiceProvider;
+      state.modelConfig.compressProviderName =
+        (normalizeProviderName(state.modelConfig.compressProviderName) ??
+          state.modelConfig.compressProviderName) as any;
+
+      console.info("[Config] migrate normalized model providers", {
+        providerName: state.modelConfig.providerName,
+        compressProviderName: state.modelConfig.compressProviderName,
+        modelCount: state.models.length,
+      });
 
       return state as any;
     },

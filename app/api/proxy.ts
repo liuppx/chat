@@ -17,9 +17,32 @@ export async function handle(
   req.nextUrl.searchParams.delete("provider");
 
   const subpath = params.path.join("/");
-  const fetchUrl = `${req.headers.get(
-    "x-base-url",
-  )}/${subpath}?${req.nextUrl.searchParams.toString()}`;
+  const rawBaseUrl = req.headers.get("x-base-url")?.trim();
+  if (!rawBaseUrl) {
+    return NextResponse.json(
+      { error: "Missing x-base-url header" },
+      { status: 400 },
+    );
+  }
+
+  let baseUrl = rawBaseUrl;
+  if (baseUrl.endsWith("/")) {
+    baseUrl = baseUrl.slice(0, -1);
+  }
+  try {
+    // validate base URL to avoid proxying to an invalid destination like "null/upload?"
+    new URL(baseUrl);
+  } catch {
+    return NextResponse.json(
+      { error: `Invalid x-base-url header: ${rawBaseUrl}` },
+      { status: 400 },
+    );
+  }
+
+  const search = req.nextUrl.searchParams.toString();
+  const fetchUrl = search
+    ? `${baseUrl}/${subpath}?${search}`
+    : `${baseUrl}/${subpath}`;
   const skipHeaders = ["connection", "host", "origin", "referer", "cookie"];
   const headers = new Headers(
     Array.from(req.headers.entries()).filter((item) => {
@@ -34,16 +57,15 @@ export async function handle(
     }),
   );
   // if dalle3 use openai api key
-    const baseUrl = req.headers.get("x-base-url");
-    if (baseUrl?.includes("api.openai.com")) {
-      if (!serverConfig.apiKey) {
-        return NextResponse.json(
-          { error: "OpenAI API key not configured" },
-          { status: 500 },
-        );
-      }
-      headers.set("Authorization", `Bearer ${serverConfig.apiKey}`);
+  if (baseUrl.includes("api.openai.com")) {
+    if (!serverConfig.apiKey) {
+      return NextResponse.json(
+        { error: "OpenAI API key not configured" },
+        { status: 500 },
+      );
     }
+    headers.set("Authorization", `Bearer ${serverConfig.apiKey}`);
+  }
 
   const controller = new AbortController();
   const fetchOptions: RequestInit = {

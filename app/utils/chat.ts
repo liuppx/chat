@@ -141,10 +141,54 @@ export function base64Image2Blob(base64Data: string, contentType: string) {
   return new Blob([byteArray], { type: contentType });
 }
 
-export function uploadImage(file: Blob): Promise<string> {
-  if (!window._SW_ENABLED) {
-    // if serviceWorker register error, using compressImage
+function blobToDataUrl(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("read file as Data URL failed"));
+    };
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("read file as Data URL failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function uploadImageFallback(file: Blob): Promise<string> {
+  if (file.type.startsWith("image/")) {
     return compressImage(file, 256 * 1024);
+  }
+  return blobToDataUrl(file);
+}
+
+function isServiceWorkerReadyForCacheUpload() {
+  const swEnabled = typeof window !== "undefined" && !!window._SW_ENABLED;
+  const swControlled =
+    typeof navigator !== "undefined" &&
+    !!navigator.serviceWorker?.controller;
+  return swEnabled && swControlled;
+}
+
+export function uploadImage(file: Blob): Promise<string> {
+  const swReady = isServiceWorkerReadyForCacheUpload();
+  console.log(
+    "[Upload] cache route state",
+    JSON.stringify({
+      swEnabled: typeof window !== "undefined" ? !!window._SW_ENABLED : false,
+      swControlled:
+        typeof navigator !== "undefined" &&
+        !!navigator.serviceWorker?.controller,
+      swReady,
+      mime: file.type || "unknown",
+    }),
+  );
+
+  if (!swReady) {
+    // ServiceWorker is not controlling current page, fallback to inline data URL.
+    return uploadImageFallback(file);
   }
   const body = new FormData();
   body.append("file", file);
@@ -161,6 +205,13 @@ export function uploadImage(file: Blob): Promise<string> {
         return res?.data;
       }
       throw Error(`upload Error: ${res?.msg}`);
+    })
+    .catch((error) => {
+      console.warn(
+        "[Upload] cache upload failed, fallback to inline data URL",
+        error,
+      );
+      return uploadImageFallback(file);
     });
 }
 

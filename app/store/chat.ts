@@ -331,15 +331,28 @@ export const useChatStore = createPersistStore(
         if (mask) {
           const config = useAppConfig.getState();
           const globalModelConfig = config.modelConfig;
+          const shouldSyncFromGlobal = mask.syncGlobalConfig !== false;
+          const nextModelConfig = shouldSyncFromGlobal
+            ? { ...globalModelConfig }
+            : {
+                ...globalModelConfig,
+                ...mask.modelConfig,
+              };
 
           session.mask = {
             ...mask,
-            modelConfig: {
-              ...globalModelConfig,
-              ...mask.modelConfig,
-            },
+            syncGlobalConfig: shouldSyncFromGlobal,
+            modelConfig: nextModelConfig,
           };
           session.topic = mask.name;
+
+          console.log("[Mask] newSession from mask", {
+            name: mask.name,
+            syncGlobalConfig: shouldSyncFromGlobal,
+            globalModel: globalModelConfig.model,
+            maskModel: mask.modelConfig?.model,
+            finalModel: nextModelConfig.model,
+          });
         }
 
         set((state) => ({

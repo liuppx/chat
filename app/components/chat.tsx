@@ -1201,7 +1201,8 @@ function ChatView() {
       });
 
       // auto sync mask config from global config
-      if (session.mask.syncGlobalConfig) {
+      const shouldSyncFromGlobal = session.mask.syncGlobalConfig !== false;
+      if (shouldSyncFromGlobal) {
         console.log("[Mask] syncing from global, name = ", session.mask.name);
         session.mask.modelConfig = { ...config.modelConfig };
       }

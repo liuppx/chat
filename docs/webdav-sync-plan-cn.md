@@ -30,6 +30,115 @@ flowchart TB
   DAVAPI --> DAV
 ```
 
+## `sync.ts` 实际同步了什么
+
+`app/store/sync.ts` 调用 `getLocalAppState()`/`getLocalAppStateForSync()`，会把以下 5 个 store 的**非函数字段**作为一份完整快照同步：
+
+1. `StoreKey.Chat`（会话、消息、统计、删除墓碑等）
+2. `StoreKey.Access`（访问配置，如 provider、OpenAI URL、API Key、Access Code 等）
+3. `StoreKey.Config`（全局设置，如默认模型、温度、主题、字体等）
+4. `StoreKey.Mask`（提示词模板/面具）
+5. `StoreKey.Prompt`（提示词库）
+
+说明：
+
+- 同步是“**整包快照** + 合并”，不是单字段增量同步。
+- `Chat` 在上传前会做过滤：剔除流式消息、剔除 `empty response`、保留 tombstone 规则。
+- `Access` 和 `Config` 同样会进入同步快照，因此多端会互相覆盖/合并这些设置。
+
+## 同步到哪里（远端落点）
+
+### WebDAV（`ProviderType.WebDAV`）
+
+#### Basic Auth
+
+- 文件名固定：`backup.json`
+- 目录固定：`chatgpt-next-web`
+- 远端文件路径：`chatgpt-next-web/backup.json`
+- 若开启代理：浏览器请求 `/api/webdav/chatgpt-next-web/backup.json?endpoint=...`
+- 若直连：浏览器直接请求 `WEBDAV_BACKEND_BASE_URL + WEBDAV_BACKEND_PREFIX + /chatgpt-next-web/backup.json`
+
+#### UCAN Auth
+
+- 仍是单文件 `backup.json`
+- 实际路径由 SDK 返回的 `appDir` 决定，通常是 `/apps/<appId>/backup.json`
+- 若 `appDir` 为空，则退化为 `/backup.json`
+- 代理模式同样走 `/api/webdav/*`，直连模式直接访问 WebDAV 服务
+
+### Upstash（`ProviderType.UpStash`）
+
+- 不是单文件，而是分片 KV：
+- `<storeKey>-chunk-count`
+- `<storeKey>-chunk-0`
+- `<storeKey>-chunk-1`
+- ...
+- `storeKey = upstash.username`，为空时使用 `STORAGE_KEY`（默认 `chatgpt-next-web`）
+
+## 自动同步序列图（实现级）
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant UI as 页面/用户操作
+  participant Auto as useAutoSync
+  participant Sync as useSyncStore.sync
+  participant Client as SyncClient(WebDAV/Upstash)
+  participant Remote as 远端存储
+  participant Merge as mergeAppState + setLocalAppState
+
+  Note over Auto: 触发源：startup/change/interval/visibility
+  UI->>Auto: 配置/会话变更（lastUpdateTime 变化）
+  Auto->>Auto: 检查条件（autoSync, hasHydrated, cloudSync, 非流式）
+  Auto->>Sync: sync({interactive:false})
+
+  Sync->>Client: get(config.username)
+  Client->>Remote: 读取远端快照
+  Remote-->>Client: remoteState(JSON 或空)
+  Client-->>Sync: remoteState
+
+  alt 远端为空
+    Sync->>Sync: getLocalAppStateForSync()
+    Sync->>Client: set(config.username, localSnapshot)
+    Client->>Remote: 写入首份快照
+    Sync-->>Auto: return
+  else 远端非空
+    Sync->>Merge: mergeAppState(local, remote)
+    Merge->>Merge: 按 store 合并冲突
+    Merge-->>Sync: mergedLocal
+    Sync->>Merge: setLocalAppState(mergedLocal)
+    Sync->>Sync: getLocalAppStateForSync()
+    Sync->>Client: set(config.username, filteredSnapshot)
+    Client->>Remote: 回写最新快照
+    Sync-->>Auto: lastSyncTime 更新
+  end
+```
+
+## 合并规则（关键）
+
+1. `Chat`：自定义合并
+   - 先合并 `deletedSessions/deletedMessages` tombstone（TTL 30 天）
+   - 再按会话/消息级规则合并
+   - 同一消息以 `updatedAt`（或 `date`）较新者为准
+
+2. `Config` / `Access`：`lastUpdateTime` 决策
+   - 谁更新更晚，谁覆盖
+   - 属于“最后写入胜出”（LWW）
+
+3. `Mask` / `Prompt`：按对象 key 合并
+   - 以本地优先覆盖同名项（remote 先铺，local 再覆盖）
+
+## 手动操作与自动同步的关系
+
+1. `Check`（检查可用性）：只做连通性校验，不改本地状态
+2. `Export`（导出）：仅导出本地快照到文件
+3. `Import`（导入）：把本地文件与当前本地状态合并后写回本地，不走远端
+4. `Sync`（同步）：才会读远端、合并本地、再写远端
+
+## 安全提示
+
+- `Access` store 会被同步（可能包含 API Key、Access Code 等敏感配置）。
+- 建议仅在可信的私有 WebDAV/Upstash 环境开启自动同步。
+
 ## 两种模式
 
 ### 1) 代理模式（可选）

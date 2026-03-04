@@ -34,6 +34,7 @@ async function handle(
   }
   const folder = STORAGE_KEY;
   const fileName = `${folder}/backup.json`;
+  const mediaFolder = `${folder}/media`;
 
   const requestUrl = new URL(req.url);
   let endpoint = requestUrl.searchParams.get("endpoint");
@@ -71,6 +72,11 @@ async function handle(
   }
 
   const endpointPath = resolvedParams.path.join("/");
+  const normalizedEndpointPath = endpointPath
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
+  const isBackupPath = normalizedEndpointPath === fileName;
+  const isMediaFilePath = normalizedEndpointPath.startsWith(`${mediaFolder}/`);
   const targetPath = `${endpoint}${endpointPath}`;
 
   // only allow MKCOL, GET, PUT
@@ -90,8 +96,11 @@ async function handle(
     );
   }
 
-  // for MKCOL request, only allow request ${folder}
-  if (proxy_method === "MKCOL" && !targetPath.endsWith(folder)) {
+  // for MKCOL request, only allow request `${folder}` and `${mediaFolder}`
+  if (
+    proxy_method === "MKCOL" &&
+    ![folder, mediaFolder].includes(normalizedEndpointPath)
+  ) {
     return NextResponse.json(
       {
         error: true,
@@ -103,8 +112,8 @@ async function handle(
     );
   }
 
-  // for GET request, only allow request ending with fileName
-  if (proxy_method === "GET" && !targetPath.endsWith(fileName)) {
+  // for GET request, only allow backup.json and media files
+  if (proxy_method === "GET" && !isBackupPath && !isMediaFilePath) {
     return NextResponse.json(
       {
         error: true,
@@ -116,8 +125,8 @@ async function handle(
     );
   }
 
-  //   for PUT request, only allow request ending with fileName
-  if (proxy_method === "PUT" && !targetPath.endsWith(fileName)) {
+  // for PUT request, only allow backup.json and media files
+  if (proxy_method === "PUT" && !isBackupPath && !isMediaFilePath) {
     return NextResponse.json(
       {
         error: true,

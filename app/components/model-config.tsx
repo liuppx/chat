@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from "react";
 import { ServiceProvider } from "@/app/constant";
 import { ModalConfigValidator, ModelConfig } from "../store";
 
@@ -7,7 +8,7 @@ import { ListItem, Select } from "./ui-lib";
 import { useAllModels } from "../utils/hooks";
 import { groupBy } from "lodash-es";
 import styles from "./model-config.module.scss";
-import { getModelProvider } from "../utils/model";
+import { getModelProvider, normalizeProviderName } from "../utils/model";
 
 export function ModelConfigList(props: {
   modelConfig: ModelConfig;
@@ -15,13 +16,73 @@ export function ModelConfigList(props: {
 }) {
   const allModels = useAllModels();
   const hasModels = allModels.length > 0;
-  const groupModels = groupBy(
-    allModels.filter((v: { available: any }) => v.available),
-    "provider.providerName",
+  const availableModels = useMemo(
+    () => allModels.filter((v: { available: any }) => v.available),
+    [allModels],
+  );
+  const groupModels = useMemo(
+    () => groupBy(availableModels, "provider.providerName"),
+    [availableModels],
+  );
+
+  const configuredProviderName =
+    normalizeProviderName(props.modelConfig?.providerName) ??
+    props.modelConfig?.providerName;
+  const configuredValue = hasModels
+    ? `${props.modelConfig.model}@${configuredProviderName}`
+    : "";
+  const exactMatch = availableModels.some(
+    (m) => `${m.name}@${m.provider?.providerName}` === configuredValue,
+  );
+  const fallbackMatch = availableModels.find(
+    (m) => m.name === props.modelConfig.model,
   );
   const value = hasModels
-    ? `${props.modelConfig.model}@${props.modelConfig?.providerName}`
+    ? exactMatch
+      ? configuredValue
+      : fallbackMatch
+        ? `${fallbackMatch.name}@${fallbackMatch.provider?.providerName}`
+        : availableModels[0]
+          ? `${availableModels[0].name}@${availableModels[0].provider?.providerName}`
+          : ""
     : "";
+
+  useEffect(() => {
+    if (!hasModels || exactMatch) return;
+    console.warn("[ModelConfig] value mismatch, fallback option selected", {
+      configuredModel: props.modelConfig.model,
+      configuredProviderName: props.modelConfig.providerName,
+      configuredValue,
+      resolvedValue: value,
+      availableModelCount: availableModels.length,
+      fallbackByModel: fallbackMatch?.name ?? null,
+      fallbackProvider: fallbackMatch?.provider?.providerName ?? null,
+    });
+  }, [
+    hasModels,
+    exactMatch,
+    configuredValue,
+    value,
+    availableModels.length,
+    fallbackMatch?.name,
+    fallbackMatch?.provider?.providerName,
+    props.modelConfig.model,
+    props.modelConfig.providerName,
+  ]);
+
+  useEffect(() => {
+    console.debug("[ModelConfig] current config", {
+      model: props.modelConfig.model,
+      providerName: props.modelConfig.providerName,
+      selectValue: value,
+      hasExactMatch: exactMatch,
+    });
+  }, [
+    props.modelConfig.model,
+    props.modelConfig.providerName,
+    value,
+    exactMatch,
+  ]);
   const compressModelValue = `${props.modelConfig.compressModel}@${props.modelConfig?.compressProviderName}`;
 
   return (
@@ -49,7 +110,10 @@ export function ModelConfigList(props: {
           {Object.keys(groupModels).map((providerName, index) => (
             <optgroup label={providerName} key={index}>
               {groupModels[providerName].map((v, i) => (
-                <option value={`${v.name}@${v.provider?.providerName}`} key={i}>
+                <option
+                  value={`${v.name}@${v.provider?.providerName ?? ServiceProvider.OpenAI}`}
+                  key={i}
+                >
                   {v.displayName}
                 </option>
               ))}
@@ -270,7 +334,10 @@ export function ModelConfigList(props: {
           {allModels
             .filter((v: { available: any }) => v.available)
             .map((v: any, i: number) => (
-              <option value={`${v.name}@${v.provider?.providerName}`} key={i}>
+              <option
+                value={`${v.name}@${v.provider?.providerName ?? ServiceProvider.OpenAI}`}
+                key={i}
+              >
                 {v.displayName}({v.provider?.providerName})
               </option>
             ))}

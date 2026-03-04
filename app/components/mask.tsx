@@ -233,7 +233,7 @@ export function MaskConfig(props: {
             <input
               aria-label={Locale.Mask.Config.Sync.Title}
               type="checkbox"
-              checked={props.mask.syncGlobalConfig}
+              checked={props.mask.syncGlobalConfig !== false}
               onChange={async (e) => {
                 const checked = e.currentTarget.checked;
                 if (
