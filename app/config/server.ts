@@ -155,16 +155,7 @@ function getApiKey(keys?: string) {
   const apiKeyEnvVar = keys ?? "";
   const apiKeys = apiKeyEnvVar.split(",").map((v) => v.trim());
   const randomIndex = Math.floor(Math.random() * apiKeys.length);
-  const apiKey = apiKeys[randomIndex];
-  if (apiKey) {
-    console.log(
-      `[Server Config] using ${randomIndex + 1} of ${
-        apiKeys.length
-      } api key - ${apiKey}`,
-    );
-  }
-
-  return apiKey;
+  return apiKeys[randomIndex];
 }
 
 export const getServerSideConfig = () => {
