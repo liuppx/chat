@@ -56,6 +56,7 @@ import {
 } from "@hello-pangea/dnd";
 import { getMessageTextContent } from "../utils";
 import clsx from "clsx";
+import { Markdown } from "./markdown";
 
 // drag and drop helper function
 function reorder<T>(list: T[], startIndex: number, endIndex: number): T[] {
@@ -91,6 +92,13 @@ export function MaskConfig(props: {
 }) {
   const [showPicker, setShowPicker] = useState(false);
 
+  const readonlyContextMarkdown = props.mask.context
+    .map((message, index) => {
+      const content = getMessageTextContent(message).trim();
+      return `### ${index + 1}. ${message.role}\n\n${content || "_empty_"}`;
+    })
+    .join("\n\n");
+
   const updateConfig = (updater: (config: ModelConfig) => void) => {
     if (props.readonly) return;
 
@@ -112,14 +120,49 @@ export function MaskConfig(props: {
 
   return (
     <>
-      <ContextPrompts
-        context={props.mask.context}
-        updateContext={(updater) => {
-          const context = props.mask.context.slice();
-          updater(context);
-          props.updateMask((mask) => (mask.context = context));
-        }}
-      />
+      {props.readonly ? (
+        <List>
+          {props.mask.category && (
+            <ListItem
+              title="Category"
+              subTitle={props.mask.category}
+              vertical
+            />
+          )}
+          {props.mask.description && (
+            <ListItem title="Description" vertical>
+              <div className={styles["mask-readonly-section"]}>
+                <Markdown content={props.mask.description} />
+              </div>
+            </ListItem>
+          )}
+          {!!props.mask.starters?.length && (
+            <ListItem title="Recommended Starters" vertical>
+              <div className={styles["mask-readonly-section"]}>
+                <Markdown
+                  content={props.mask.starters
+                    .map((starter) => `- ${starter}`)
+                    .join("\n")}
+                />
+              </div>
+            </ListItem>
+          )}
+          <ListItem title="Preset Context" vertical>
+            <div className={styles["mask-readonly-section"]}>
+              <Markdown content={readonlyContextMarkdown} />
+            </div>
+          </ListItem>
+        </List>
+      ) : (
+        <ContextPrompts
+          context={props.mask.context}
+          updateContext={(updater) => {
+            const context = props.mask.context.slice();
+            updater(context);
+            props.updateMask((mask) => (mask.context = context));
+          }}
+        />
+      )}
 
       <List>
         <ListItem title={Locale.Mask.Config.Avatar}>

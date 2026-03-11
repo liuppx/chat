@@ -4,9 +4,11 @@
   height: 100%;
   width: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: flex-start;
   flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
 
   .mask-header {
     display: flex;
@@ -19,7 +21,8 @@
 
   .mask-cards {
     display: flex;
-    margin-top: 5vh;
+    align-self: center;
+    margin-top: 24px;
     margin-bottom: 20px;
     animation: slide-in ease 0.3s;
 
@@ -42,6 +45,7 @@
   }
 
   .title {
+    text-align: center;
     font-size: 32px;
     font-weight: bolder;
     margin-bottom: 1vh;
@@ -49,18 +53,21 @@
   }
 
   .sub-title {
+    text-align: center;
     animation: slide-in ease 0.4s;
   }
 
   .featured-title {
-    margin-top: 4vh;
+    width: min(1100px, calc(100% - 40px));
+    margin: 28px auto 0;
     font-size: 18px;
     font-weight: 700;
     animation: slide-in ease 0.45s;
   }
 
   .featured-subtitle {
-    margin-top: 8px;
+    width: min(1100px, calc(100% - 40px));
+    margin: 8px auto 0;
     font-size: 13px;
     color: var(--black);
     opacity: 0.7;
@@ -68,7 +75,7 @@
   }
 
   .actions {
-    margin-top: 5vh;
+    margin-top: 28px;
     margin-bottom: 2vh;
     animation: slide-in ease 0.45s;
     display: flex;
@@ -81,9 +88,9 @@
   }
 
   .masks {
-    flex-grow: 1;
+    flex-grow: 0;
     width: 100%;
-    overflow: auto;
+    overflow: visible;
     padding: 20px 20px 40px;
     animation: slide-in ease 0.5s;
   }
@@ -91,9 +98,12 @@
   .featured-masks {
     width: min(1100px, calc(100% - 40px));
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
     margin-top: 18px;
+    margin-left: auto;
+    margin-right: auto;
+    flex-shrink: 0;
   }
 
   .mask-group {
@@ -113,22 +123,23 @@
     flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 10px;
+    align-items: stretch;
   }
 
   .mask {
     display: flex;
     align-items: flex-start;
-    padding: 12px 14px;
+    padding: 14px 16px;
     border: var(--border-in-light);
     box-shadow: var(--card-shadow);
     background-color: var(--white);
     border-radius: 12px;
-    transform: scale(1);
+    box-sizing: border-box;
     cursor: pointer;
     transition: all ease 0.25s;
+    overflow: hidden;
 
     &:hover {
-      transform: translateY(-3px);
       border-color: var(--primary);
     }
 
@@ -165,13 +176,33 @@
   }
 
   .mask-detailed {
-    min-height: 168px;
+    min-height: 180px;
     width: 100%;
   }
 
   @media screen and (max-width: 600px) {
+    .mask-cards {
+      margin-top: 16px;
+      margin-bottom: 16px;
+    }
+
+    .title {
+      font-size: 26px;
+      padding: 0 12px;
+    }
+
+    .sub-title {
+      padding: 0 12px;
+    }
+
+    .featured-title,
+    .featured-subtitle {
+      width: calc(100% - 24px);
+    }
+
     .featured-masks {
       width: calc(100% - 24px);
+      grid-template-columns: 1fr;
     }
 
     .masks {

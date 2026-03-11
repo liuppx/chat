@@ -30,6 +30,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -62,6 +63,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -94,6 +96,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -126,6 +129,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -158,6 +162,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -190,6 +195,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -222,6 +228,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -254,6 +261,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -286,6 +294,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -318,6 +327,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -350,6 +360,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -382,6 +393,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         }
     ],
@@ -416,6 +428,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -448,6 +461,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -480,6 +494,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -512,6 +527,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -544,6 +560,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -576,6 +593,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -608,6 +626,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -640,6 +659,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -672,6 +692,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -704,6 +725,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -736,6 +758,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -768,6 +791,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         }
     ],
@@ -802,6 +826,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -834,6 +859,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -866,6 +892,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -898,6 +925,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -930,6 +958,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -962,6 +991,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -994,6 +1024,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -1026,6 +1057,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -1058,6 +1090,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -1090,6 +1123,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -1122,6 +1156,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         },
         {
@@ -1154,6 +1189,7 @@
                 "compressMessageLengthThreshold": 2000
             },
             "builtin": true,
+            "hideContext": true,
             "syncGlobalConfig": true
         }
     ]

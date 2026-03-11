@@ -29,6 +29,7 @@ export function createBuiltinMask(input: BuiltinMaskInput): BuiltinMask {
   return {
     ...input,
     builtin: true,
+    hideContext: true,
     syncGlobalConfig: true,
     modelConfig: {
       ...DEFAULT_MODEL_CONFIG,

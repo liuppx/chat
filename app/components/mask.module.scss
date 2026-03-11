@@ -141,3 +141,12 @@
     }
   }
 }
+
+.mask-readonly-section {
+  width: 100%;
+  border: var(--border-in-light);
+  border-radius: 12px;
+  background: var(--white);
+  padding: 12px 14px;
+  box-sizing: border-box;
+}
