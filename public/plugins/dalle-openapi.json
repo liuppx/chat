@@ -1,0 +1,60 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DALL-E 3",
+    "description": "Generate images from text prompts.",
+    "version": "v1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.openai.com"
+    }
+  ],
+  "paths": {
+    "/v1/images/generations": {
+      "post": {
+        "operationId": "Dalle3",
+        "description": "Generate images from text prompts.",
+        "deprecated": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "description": "A text description of the desired image."
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "Model name. Defaults to `dall-e-3`."
+                  },
+                  "size": {
+                    "type": "string",
+                    "description": "Image size. e.g. `1024x1024`."
+                  },
+                  "quality": {
+                    "type": "string",
+                    "description": "Image quality. e.g. `standard` or `hd`."
+                  },
+                  "style": {
+                    "type": "string",
+                    "description": "Image style. e.g. `vivid` or `natural`."
+                  }
+                },
+                "required": [
+                  "prompt"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  }
+}
