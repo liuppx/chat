@@ -795,6 +795,9 @@ const en: LocaleType = {
     Skip: "Just Start",
     Title: "Pick a Mask",
     SubTitle: "Chat with the Soul behind the Mask",
+    FeaturedTitle: "Recommended Masks",
+    FeaturedSubTitle:
+      "Pick a working mode first, then start from the example prompts for more stable results.",
     More: "Find More",
     NotShow: "Never Show Again",
     ConfirmNoShow: "Confirm to disable？You can enable it in settings later.",

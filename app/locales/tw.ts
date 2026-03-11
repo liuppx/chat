@@ -517,6 +517,8 @@ const tw = {
     ConfirmNoShow: "確認停用？停用後可以隨時在設定中重新啟用。",
     Title: "挑選一個角色範本",
     SubTitle: "現在開始，與角色範本背後的靈魂思維碰撞",
+    FeaturedTitle: "推薦面具",
+    FeaturedSubTitle: "先選一個工作模式，再按示例開場提問，效果通常會更穩定。",
     More: "搜尋更多",
   },
   URLCommand: {

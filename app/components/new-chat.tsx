@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from "react";
-import { Path, SlotID } from "../constant";
+import { Path } from "../constant";
 import { IconButton } from "./button";
 import { EmojiAvatar } from "./emoji";
 import styles from "./new-chat.module.scss";
@@ -18,68 +17,44 @@ import { showConfirm } from "./ui-lib";
 import { BUILTIN_MASK_STORE } from "../masks";
 import clsx from "clsx";
 
-function MaskItem(props: { mask: Mask; onClick?: () => void }) {
+function MaskItem(props: {
+  mask: Mask;
+  onClick?: () => void;
+  detailed?: boolean;
+}) {
   return (
-    <div className={styles["mask"]} onClick={props.onClick}>
+    <div
+      className={clsx(
+        styles["mask"],
+        props.detailed && styles["mask-detailed"],
+      )}
+      onClick={props.onClick}
+    >
       <MaskAvatar
         avatar={props.mask.avatar}
         model={props.mask.modelConfig.model}
       />
-      <div className={clsx(styles["mask-name"], "one-line")}>
-        {props.mask.name}
+      <div className={styles["mask-texts"]}>
+        <div className={clsx(styles["mask-name"], "one-line")}>
+          {props.mask.name}
+        </div>
+        {props.detailed && props.mask.description && (
+          <div className={styles["mask-desc"]}>{props.mask.description}</div>
+        )}
+        {props.detailed &&
+          props.mask.starters &&
+          props.mask.starters.length > 0 && (
+            <div className={styles["mask-starters"]}>
+              {props.mask.starters.slice(0, 2).map((starter) => (
+                <div key={starter} className={styles["mask-starter"]}>
+                  {starter}
+                </div>
+              ))}
+            </div>
+          )}
       </div>
     </div>
   );
-}
-
-function chunkArray<T>(array: T[], size: number = 10): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-  return chunks;
-}
-
-function useMaskGroup(masks: Mask[]) {
-  const [groups, setGroups] = useState<Mask[][]>([]);
-
-  useEffect(() => {
-    const computeGroup = () => {
-      const appBody = document.getElementById(SlotID.AppBody);
-      if (!appBody || masks.length === 0) return;
-
-      const rect = appBody.getBoundingClientRect();
-      const maxWidth = rect.width;
-      const maxHeight = rect.height * 0.6;
-      const maskItemWidth = 120;
-      const maskItemHeight = 50;
-
-      const randomMask = () => masks[Math.floor(Math.random() * masks.length)];
-      let maskIndex = 0;
-      const nextMask = () => masks[maskIndex++ % masks.length];
-
-      const rows = Math.ceil(maxHeight / maskItemHeight);
-      const cols = Math.ceil(maxWidth / maskItemWidth);
-
-      const newGroups = new Array(rows)
-        .fill(0)
-        .map((_, _i) =>
-          new Array(cols)
-            .fill(0)
-            .map((_, j) => (j < 1 || j > cols - 2 ? randomMask() : nextMask())),
-        );
-
-      setGroups(newGroups);
-    };
-
-    computeGroup();
-
-    window.addEventListener("resize", computeGroup);
-    return () => window.removeEventListener("resize", computeGroup);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return groups;
 }
 
 export function NewChat() {
@@ -87,13 +62,19 @@ export function NewChat() {
   const maskStore = useMaskStore();
 
   const masks = maskStore.getAll();
-  const splitMasks = chunkArray(masks);
-  const groups = useMaskGroup(masks);
+  const featuredMasks = masks.slice(0, 6);
+  const groupedMasks = masks.reduce(
+    (groups, mask) => {
+      const category = mask.category || "Other";
+      groups[category] ??= [];
+      groups[category].push(mask);
+      return groups;
+    },
+    {} as Record<string, Mask[]>,
+  );
 
   const navigate = useNavigate();
   const config = useAppConfig();
-
-  const maskRef = useRef<HTMLDivElement>(null);
 
   const { state } = useLocation();
 
@@ -115,12 +96,6 @@ export function NewChat() {
     },
   });
 
-  useEffect(() => {
-    if (maskRef.current) {
-      maskRef.current.scrollLeft =
-        (maskRef.current.scrollWidth - maskRef.current.clientWidth) / 2;
-    }
-  }, [groups]);
   return (
     <div className={styles["new-chat"]}>
       <div className={styles["mask-header"]}>
@@ -177,16 +152,37 @@ export function NewChat() {
         />
       </div>
 
-      <div className={styles["masks"]} ref={maskRef}>
-        {splitMasks.map((masks, i) => (
-          <div key={i} className={styles["mask-row"]}>
-            {masks.map((mask, index) => (
-              <MaskItem
-                key={index}
-                mask={mask}
-                onClick={() => startChat(mask)}
-              />
-            ))}
+      <div className={styles["featured-title"]}>
+        {Locale.NewChat.FeaturedTitle}
+      </div>
+      <div className={styles["featured-subtitle"]}>
+        {Locale.NewChat.FeaturedSubTitle}
+      </div>
+
+      <div className={styles["featured-masks"]}>
+        {featuredMasks.map((mask) => (
+          <MaskItem
+            key={mask.id}
+            mask={mask}
+            detailed
+            onClick={() => startChat(mask)}
+          />
+        ))}
+      </div>
+
+      <div className={styles["masks"]}>
+        {Object.entries(groupedMasks).map(([category, categoryMasks]) => (
+          <div key={category} className={styles["mask-group"]}>
+            <div className={styles["mask-group-title"]}>{category}</div>
+            <div className={styles["mask-row"]}>
+              {categoryMasks.map((mask) => (
+                <MaskItem
+                  key={mask.id}
+                  mask={mask}
+                  onClick={() => startChat(mask)}
+                />
+              ))}
+            </div>
           </div>
         ))}
       </div>

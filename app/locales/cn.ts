@@ -786,6 +786,9 @@ const cn = {
     ConfirmNoShow: "确认禁用？禁用后可以随时在设置中重新启用。",
     Title: "挑选一个面具",
     SubTitle: "现在开始，与面具背后的灵魂思维碰撞",
+    FeaturedTitle: "推荐面具",
+    FeaturedSubTitle:
+      "先选一个工作模式，再按示例开场提问，效果通常会明显更稳定。",
     More: "查看全部",
   },
 
