@@ -3,15 +3,12 @@ import type { UcanCapability } from "@yeying-community/web3-bs";
 
 export const UCAN_SESSION_ID = "default";
 
-const DEFAULT_UCAN_RESOURCE = "profile";
-const DEFAULT_UCAN_ACTION = "read";
+const APP_UCAN_RESOURCE_PREFIX = "app:";
+const DEFAULT_APP_ID = "localhost";
+const ROUTER_UCAN_ACTION = "invoke";
 const DEFAULT_WEBDAV_RESOURCE = "";
 const DEFAULT_WEBDAV_ACTION = "";
 const DEFAULT_WEBDAV_APP_ACTION = "write";
-
-const DEFAULT_CAPABILITIES: UcanCapability[] = [
-  { resource: DEFAULT_UCAN_RESOURCE, action: DEFAULT_UCAN_ACTION },
-];
 
 function buildCapsKey(caps: UcanCapability[]): string {
   return (caps || [])
@@ -50,8 +47,35 @@ function getBackendUrl(kind: "router" | "webdav"): string | null {
   return config.webdavBackendBaseUrl ?? null;
 }
 
+function getBackendHost(kind: "router" | "webdav"): string | null {
+  const backendUrl = getBackendUrl(kind);
+  if (!backendUrl) return null;
+  try {
+    const host = new URL(backendUrl).host.trim();
+    return host || null;
+  } catch {
+    return null;
+  }
+}
+
 function sanitizeAppId(appId: string): string {
   return appId.trim().replace(/[^a-zA-Z0-9._-]/g, "-");
+}
+
+function getAppCapabilityResource(appId?: string | null): string {
+  const normalized = appId ? sanitizeAppId(appId) : "";
+  if (normalized) {
+    return `${APP_UCAN_RESOURCE_PREFIX}${normalized}`;
+  }
+  return `${APP_UCAN_RESOURCE_PREFIX}${DEFAULT_APP_ID}`;
+}
+
+function getWebdavCapabilityResource(): string {
+  return getAppCapabilityResource(getWebdavAppId());
+}
+
+function getRouterCapabilityResource(): string {
+  return getAppCapabilityResource(getWebdavAppId());
 }
 
 export function getWebdavAppId(): string {
@@ -69,15 +93,18 @@ export function getWebdavCapabilities(): UcanCapability[] {
       { resource: DEFAULT_WEBDAV_RESOURCE, action: DEFAULT_WEBDAV_ACTION },
     ];
   }
-  const appId = getWebdavAppId();
-  if (appId) {
-    return [{ resource: `app:${appId}`, action: getWebdavAppAction() }];
-  }
-  return DEFAULT_CAPABILITIES;
+  return [
+    { resource: getWebdavCapabilityResource(), action: getWebdavAppAction() },
+  ];
 }
 
 export function getRouterCapabilities(): UcanCapability[] {
-  return DEFAULT_CAPABILITIES;
+  return [
+    {
+      resource: getRouterCapabilityResource(),
+      action: ROUTER_UCAN_ACTION,
+    },
+  ];
 }
 
 export function getUcanRootCapabilities(): UcanCapability[] {
@@ -102,4 +129,31 @@ export function getWebdavAudience(backendUrl?: string | null): string | null {
 
 export function getRouterAudience(): string | null {
   return toDidWeb(getBackendUrl("router"));
+}
+
+export function getRouterServiceHost(): string | null {
+  return getBackendHost("router");
+}
+
+export function getWebdavServiceHost(): string | null {
+  return getBackendHost("webdav");
+}
+
+export function buildUcanRootStatement(options: {
+  audience: string;
+  capabilities: UcanCapability[];
+  notBeforeMs?: number;
+}): string {
+  const payload: Record<string, unknown> = {
+    aud: options.audience,
+    cap: options.capabilities,
+    service_hosts: {
+      router: getRouterServiceHost(),
+      webdav: getWebdavServiceHost(),
+    },
+  };
+  if (typeof options.notBeforeMs === "number") {
+    payload.nbf = options.notBeforeMs;
+  }
+  return `UCAN-AUTH ${JSON.stringify(payload)}`;
 }

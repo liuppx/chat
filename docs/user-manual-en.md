@@ -1,89 +1,8 @@
 # User Manual
 
-This document introduces the current system architecture, authorization flow, and core features.
+> The unified explanation for login, wallet, UCAN, and mobile-auth behavior has been moved to [User Login](./user-login-en.md). Read that first if you need the full authorization model.
 
-## System Overview
-
-This system is built with Next.js (frontend) and integrates YeYing Wallet with the `@yeying-community/web3-bs` SDK. Authentication has been migrated from SIWE to UCAN, enabling a single wallet authorization to access multiple backends (Router and WebDAV).
-
-Core components:
-
-- Frontend: Next.js (this project)
-- Wallet: YeYing Wallet (EIP-1193)
-- Auth: UCAN (Root + Invocation)
-- Backends: Router (OpenAI-compatible), WebDAV (storage)
-
-## Authorization Flow (UCAN)
-
-1. After connecting the wallet, the frontend requests a UCAN session key from the wallet.
-2. A Root UCAN is created using a SIWE-based wallet signature and stored locally.
-3. For each request, an Invocation UCAN is generated and sent as `Authorization: Bearer <UCAN>`.
-
-The Root UCAN can be reused across multiple backends, while Invocation UCANs are minted per backend with the proper `audience` and `capabilities`.
-
-## Multi-backend Login
-
-With a single authorization, the system can access:
-
-- Router: OpenAI-compatible APIs (models, chat, usage, etc.)
-- WebDAV: storage and quota endpoints
-
-Invocation UCANs are generated per target backend and attached automatically.
-
-## Configuration
-
-Key environment variables:
-
-- `WEBDAV_BACKEND_BASE_URL`: WebDAV base URL (no path)
-- `WEBDAV_BACKEND_PREFIX`: path prefix (default `/dav`, optional to change)
-- `ROUTER_BACKEND_URL`: default Router backend URL (used as frontend default)
-- Shared UCAN caps: fixed to `profile/read`
-
-Note: `WEBDAV_BACKEND_PREFIX` is only for WebDAV protocol paths (third‑party WebDAV client mounting).
-Quota / SIWE / UCAN HTTP APIs should not include the prefix.
-
-## Local Storage
-
-UCAN-related local storage keys:
-
-- `localStorage`
-  - `currentAccount`: current wallet address
-  - `ucanRootExp`: Root UCAN expiration (ms)
-  - `ucanRootIss`: Root UCAN issuer
-- `IndexedDB`
-  - DB: `yeying-web3`
-  - Store: `ucan-sessions` (Root UCAN + session metadata)
-
-When the Root UCAN expires or the wallet account changes, re-authorization is required.
-
-## UCAN Token Lifetime, Refresh, and Wallet Unlock
-
-### Token lifecycle (current implementation)
-
-- **Root UCAN**: default TTL is **24 hours** (`@yeying-community/web3-bs` default `24 * 60 * 60 * 1000`).
-- **Invocation UCAN**: default TTL is **5 minutes** (minted per request, default `5 * 60 * 1000`).
-- **Wallet UCAN Session Key**: `expiresAt` comes from the wallet; the frontend keeps a short cache and renews near expiry.
-
-### Refresh behavior after login
-
-- **Router requests**: automatically try to get/refresh the UCAN session, then mint a new Invocation UCAN.
-- **WebDAV sync**: reuses current session first; if session is unavailable, requests fail and are retried in later interactions.
-- **Root UCAN**: not renewed forever in the background; if root expires, account changes, or capabilities mismatch, re-authorization is required.
-
-### Why wallet unlock is required
-
-Seeing a wallet unlock prompt after being idle or switching pages is usually expected security behavior, not a Chat-only fault. Common causes:
-
-1. Wallet extension auto-lock policy (idle timeout, background state, etc.).
-2. UCAN session has expired and must be requested again from wallet.
-3. Wallet signing is needed (for example, rebuilding Root UCAN or issuing session-related capabilities).
-
-In short: **private key/signing capability is protected by the wallet**, and the frontend cannot bypass unlock.
-
-### Unlock-only vs re-authorize
-
-- **Unlock only**: Root UCAN is still valid, account is unchanged, and capabilities still match.
-- **Re-authorize required**: `ucanRootExp` expired, `currentAccount` does not match Root issuer, or capability set changed.
+This document focuses on daily product usage such as masks, chats, model settings, and history summary behavior. It does not repeat the full login background.
 
 ## Run & Port
 
@@ -99,3 +18,74 @@ Production:
 npm run build
 npm run start
 ```
+
+## Masks
+
+### What is a mask?
+
+A mask is a reusable preset that combines:
+
+- prompt context
+- model settings
+- conversation behavior settings
+
+In practice, masks are used to create a more task-specific starting point for a chat.
+
+### How do I add a built-in mask?
+
+At the moment, built-in masks are still maintained in source code. Edit the files under `app/masks/` for the target language.
+
+A practical workflow is:
+
+1. Configure a mask in the app.
+2. Export it as JSON from the mask editor.
+3. Convert that JSON into the project TypeScript format.
+4. Add it to the corresponding language file.
+
+## Chat
+
+### What do the buttons above the input box do?
+
+- Chat settings: settings for the current chat only
+- Theme switch: toggle auto / dark / light
+- Quick commands: built-in prompt shortcuts; can also be searched by typing `/`
+- All masks: open the mask list page
+- Clear context: insert a clear marker so messages above it are excluded from the next model request
+- Model settings: change the model for the current chat only
+
+Changing the model here does not change the global default model.
+
+### How do chat settings relate to global settings?
+
+There are two entry points:
+
+1. the global settings page
+2. the in-chat settings panel
+
+New chats start by following global settings. Once the user manually changes in-chat settings, that chat can diverge from the global defaults.
+
+If the user enables the "use global settings" option again, the chat returns to following global configuration.
+
+### What is included in a model request?
+
+When the user sends a message, the request can include:
+
+1. system-level prompt
+2. history summary
+3. mask prompts
+4. recent chat messages
+5. the current user input
+
+## History Summary
+
+History summary is the long-conversation compression mechanism.
+
+When the conversation gets long enough, the app summarizes older unsummarized messages into a shorter summary. This keeps longer context at lower token cost, but it is a lossy compression step.
+
+### When should I turn history summary off?
+
+Turn it off for one-shot tasks where compression can hurt quality, such as:
+
+- translation
+- exact information extraction
+- short independent prompts

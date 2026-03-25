@@ -1,89 +1,9 @@
 # 用户手册
 
-本文档用于介绍当前系统的整体架构、授权机制以及核心功能。
+> 登录/授权/钱包/UCAN 的统一说明已收口到 [用户登录](./用户登陆.md)。若你要先理解当前机制，请优先阅读该文档。
 
-## 系统概览
 
-本系统基于 Next.js（前端）构建，并集成 YeYing 钱包与 `@yeying-community/web3-bs` SDK。鉴权从 SIWE 切换为 UCAN，支持一次授权后同时访问多个后端服务（如 Router 与 WebDAV）。
-
-核心组成：
-
-- 前端：Next.js（本项目）
-- 钱包：YeYing Wallet（EIP-1193）
-- 鉴权：UCAN（Root + Invocation）
-- 后端：Router（OpenAI-compatible）、WebDAV（存储服务）
-
-## 鉴权流程（UCAN）
-
-1. 连接钱包后，前端请求钱包生成 UCAN Session Key。
-2. 使用钱包签名生成 Root UCAN（基于 SIWE 签名），并存入本地。
-3. 发起请求时，生成 Invocation UCAN 并写入 `Authorization: Bearer <UCAN>`。
-
-Root UCAN 可同时用于多个后端服务，Invocation UCAN 会根据目标后端的 `audience` 与 `capabilities` 生成。
-
-## 多后端登录与调用
-
-一次授权后，可同时访问：
-
-- Router：OpenAI-compatible 接口（模型、聊天、用量等）
-- WebDAV：文件/配额相关接口
-
-前端会为不同后端生成不同的 Invocation UCAN，并自动携带授权头。
-
-## 配置项
-
-主要环境变量：
-
-- `WEBDAV_BACKEND_BASE_URL`：WebDAV 后端基础地址（不含路径）
-- `WEBDAV_BACKEND_PREFIX`：WebDAV 路径前缀（默认 `/dav`，可选修改）
-- `ROUTER_BACKEND_URL`：Router 默认后端地址（用于前端默认值）
-- 通用 UCAN 能力：固定为 `profile/read`
-
-提示：`WEBDAV_BACKEND_PREFIX` 只用于 WebDAV 协议接口路径（兼容第三方 WebDAV 客户端挂载），
-配额、SIWE、UCAN 等 HTTP 接口不加前缀。
-
-## 本地存储
-
-用于 UCAN 授权的关键本地存储：
-
-- `localStorage`
-  - `currentAccount`：当前钱包地址
-  - `ucanRootExp`：Root UCAN 过期时间（毫秒）
-  - `ucanRootIss`：Root UCAN Issuer
-- `IndexedDB`
-  - DB: `yeying-web3`
-  - Store: `ucan-sessions`（Root UCAN 与 Session 信息）
-
-当 Root UCAN 过期或账户变化时，需要重新授权。
-
-## UCAN Token 有效期、刷新与钱包解锁
-
-### Token 生命周期（当前实现）
-
-- **Root UCAN**：默认有效期为 **24 小时**（`@yeying-community/web3-bs` 默认值 `24 * 60 * 60 * 1000`）。
-- **Invocation UCAN**：默认有效期为 **5 分钟**（每次请求按后端实时生成，默认值 `5 * 60 * 1000`）。
-- **钱包 UCAN Session Key**：由钱包返回 `expiresAt`；前端会做短期缓存，并在接近过期时重新获取。
-
-### 刷新策略（登录成功后）
-
-- **Router 请求**：会自动尝试获取/刷新 UCAN Session，然后生成新的 Invocation UCAN 并发起请求。
-- **WebDAV 同步**：优先复用当前会话；会话不可用时，请求会失败并在后续交互中重试。
-- **Root UCAN**：不会无感无限续期；当 Root 过期、账户切换或能力不匹配时，必须重新授权。
-
-### 为什么会提示“解锁钱包”
-
-出现“切到钱包页面后提示解锁”通常是正常安全行为，不是 Chat 单点故障，常见原因：
-
-1. 钱包插件有自动锁定策略（长时间无操作、浏览器切后台等）。
-2. 当前 UCAN Session 已过期，需要向钱包重新申请会话。
-3. 需要钱包参与签名流程（例如重建 Root UCAN 或签发新的会话相关能力）。
-
-本质上：**私钥/签名能力在钱包侧受保护**，前端无法绕过“解锁”步骤。
-
-### 什么时候只解锁，什么时候要重新授权
-
-- **只需解锁钱包**：Root UCAN 仍在有效期内、账户未变、能力未变；解锁后可继续自动签发 Invocation UCAN。
-- **需要重新连接/授权**：`ucanRootExp` 已过期，或 `currentAccount` 与 Root Issuer 不一致，或能力发生变化。
+本文档聚焦 Chat 的使用层能力，例如面具、对话、模型设置、历史摘要与日常使用说明，不重复展开登录机制。
 
 ## 运行与端口
 

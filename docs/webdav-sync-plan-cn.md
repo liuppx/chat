@@ -1,10 +1,12 @@
 # WebDAV 同步方案（UCAN）
 
+> 登录/授权/钱包/UCAN 的统一说明已收口到 [用户登录](./用户登陆.md)。若你要先理解 Root / Session / Invocation、钱包解锁或统一登录边界，请优先阅读该文档。
+
 本文档说明当前 WebDAV 同步方案的流程、直连/代理模式差异、冲突处理策略与待办事项。
 
 ## 目标
 
-- 支持 UCAN 授权的一次登录多后端访问。
+- 复用现有 UCAN 授权链路进行 WebDAV 同步。
 - 支持 WebDAV 同步（拉取/上传/检查可用性）。
 - 支持代理模式与浏览器直连模式。
 - 防止“删除后被远端复活”。
@@ -73,6 +75,21 @@ flowchart TB
 - `<storeKey>-chunk-1`
 - ...
 - `storeKey = upstash.username`，为空时使用 `STORAGE_KEY`（默认 `chatgpt-next-web`）
+
+## 与登录文档的边界
+
+本文档只保留同步实现本身：
+
+- `sync.ts` 同步哪些 store、如何合并、何时回写远端
+- WebDAV 代理与直连的差异
+- UCAN 在同步请求中的 `aud`、`capability`、路径要求
+
+以下通用内容不在本文重复展开，请统一参考 [用户登录](./用户登陆.md)：
+
+- 钱包登录整体流程
+- Root / Session / Invocation 的定义和生命周期
+- 本地 IndexedDB / localStorage / 内存缓存分别存什么
+- 为什么会提示“解锁钱包”，什么时候必须重新授权
 
 ## 自动同步序列图（实现级）
 

@@ -1,5 +1,8 @@
 # 移动端登录与双后端鉴权问题分析与方案
 
+> 登录/授权/钱包/UCAN 的统一说明已收口到 [用户登录](./用户登陆.md)。若你要先理解当前机制，请优先阅读该文档。
+
+
 ## 问题描述
 
 PC 端可通过钱包签名生成 UCAN，一次授权后同时访问 Router 和 WebDAV。  
@@ -12,17 +15,16 @@ PC 端可通过钱包签名生成 UCAN，一次授权后同时访问 Router 和 
 
 ## 现状机制（结论先行）
 
-当前 Router 与 WebDAV 是两个独立服务，默认不共享用户名/密码。
+当前移动端问题不是“没有登录入口”，而是“没有一套天然统一的用户名/密码鉴权体系”。
 
-- Router：支持 UCAN（钱包）或 Access Code / API Key（由前端配置或后端策略决定）。
-- WebDAV：支持 UCAN（钱包）或 Basic Auth（用户名/密码）。
+结论：
 
-因此：
+- Router 和 WebDAV 仍是两套后端、两套凭证边界。
+- 用户名/密码只天然适用于 WebDAV Basic Auth。
+- Router 仍需 Access Code / API Key 或 UCAN。
+- 如果要做到“同一套用户名/密码同时登录 Router + WebDAV”，必须引入统一认证服务或代理层。
 
-- 用户名/密码登录仅适用于 WebDAV Basic Auth（用于聊天记录同步）。
-- Router 仍需 Access Code / API Key 或 UCAN（用于模型请求）。
-
-如果要实现“单一用户名/密码同时登录 Router + WebDAV”，必须引入统一认证服务/SSO，当前默认没有。
+登录与 UCAN 的通用概念说明，统一见 [用户登录](./用户登陆.md)。
 
 ## 为什么会困惑
 

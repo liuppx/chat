@@ -20,11 +20,14 @@ import {
 } from "@yeying-community/web3-bs";
 import {
   UCAN_SESSION_ID,
+  buildUcanRootStatement,
+  getRouterServiceHost,
   getUcanCapsKey,
   getUcanRootCapabilities,
   getUcanRootCapsKey,
+  getWebdavServiceHost,
 } from "./ucan";
-import { clearCachedUcanSession } from "./ucan-session";
+import { clearCachedUcanSession, getCachedUcanSession } from "./ucan-session";
 
 const providerOptions = {
   preferYeYing: true,
@@ -86,9 +89,61 @@ export function isUcanMetaAuthorized(): boolean {
   }
 }
 
+function extractUcanStatementPayload(message?: string | null) {
+  if (!message || typeof message !== "string") return null;
+  const marker = "UCAN-AUTH";
+  const index = message.indexOf(marker);
+  if (index < 0) return null;
+  const jsonStart = message.indexOf("{", index + marker.length);
+  const jsonEnd = message.lastIndexOf("}");
+  if (jsonStart < 0 || jsonEnd < jsonStart) return null;
+  const raw = message.slice(jsonStart, jsonEnd + 1).trim();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function hasExpectedServiceHosts(root: UcanRootProof | null) {
+  if (!root?.siwe?.message) return false;
+  const statementPayload = extractUcanStatementPayload(root.siwe.message);
+  if (!statementPayload) return false;
+  const hosts =
+    statementPayload.service_hosts &&
+    typeof statementPayload.service_hosts === "object" &&
+    !Array.isArray(statementPayload.service_hosts)
+      ? (statementPayload.service_hosts as Record<string, unknown>)
+      : null;
+  if (!hosts) return false;
+  const routerHost =
+    typeof hosts.router === "string" ? hosts.router.trim() : "";
+  const webdavHost =
+    typeof hosts.webdav === "string" ? hosts.webdav.trim() : "";
+  if (!routerHost || !webdavHost) return false;
+
+  const expectedRouterHost = getRouterServiceHost();
+  const expectedWebdavHost = getWebdavServiceHost();
+  if (expectedRouterHost && routerHost !== expectedRouterHost) {
+    return false;
+  }
+  if (expectedWebdavHost && webdavHost !== expectedWebdavHost) {
+    return false;
+  }
+  return true;
+}
+
 function isRootCapMatched(root: UcanRootProof | null) {
   if (!root) return false;
-  return getUcanCapsKey(root.cap) === getUcanRootCapsKey();
+  return (
+    getUcanCapsKey(root.cap) === getUcanRootCapsKey() &&
+    hasExpectedServiceHosts(root)
+  );
 }
 
 function storeUcanMeta(root: UcanRootProof) {
@@ -401,11 +456,24 @@ export async function loginWithUcan(
       return;
     }
 
+    const rootCapabilities = getUcanRootCapabilities();
+    const session = await getCachedUcanSession(providerInstance, {
+      refresh: true,
+    });
+    if (!session) {
+      throw new Error("UCAN session is not available");
+    }
+    const rootStatement = buildUcanRootStatement({
+      audience: session.did,
+      capabilities: rootCapabilities,
+    });
     const root = await createRootUcan({
       provider: providerInstance,
       address: currentAccount,
       sessionId: UCAN_SESSION_ID,
-      capabilities: getUcanRootCapabilities(),
+      session,
+      capabilities: rootCapabilities,
+      statement: rootStatement,
     });
     storeUcanMeta(root);
     localStorage.removeItem("authToken");

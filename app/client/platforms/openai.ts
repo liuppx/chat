@@ -232,7 +232,9 @@ async function getHeadersWithRouterUcan(url: string) {
   }
 
   try {
-    const issuer = await getCachedUcanSession(undefined, { refresh: true });
+    // Do not proactively wake the wallet on request paths.
+    // If a valid UCAN session has already been stored locally, use it.
+    const issuer = await getCachedUcanSession();
     if (!issuer) return headers;
     const ucan = await createInvocationUcan({
       audience,

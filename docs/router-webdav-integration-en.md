@@ -1,5 +1,7 @@
 # Router and WebDAV Integration
 
+> The unified explanation for login, wallet, UCAN, and mobile-auth behavior has been moved to [User Login](./user-login-en.md). Read that first if you need the full authorization model.
+
 This document explains how the current Chat integrates Router and WebDAV using UCAN, including request flow and key configuration points.
 
 ## Goals
@@ -68,26 +70,20 @@ When proxy is disabled, the browser will call the WebDAV server directly (no `/a
 - Direct mode exposes the WebDAV origin publicly.
 - `127.0.0.1` is only reachable from the local machine, not remote browsers.
 
-## UCAN Session and Local Storage
+## Boundary with the Login Document
 
-- Root UCAN and session are stored in IndexedDB: `yeying-web3 / ucan-sessions`.
-- Key cached fields in `localStorage`:
-  - `currentAccount`
-  - `ucanRootExp`
-  - `ucanRootIss`
-- Each backend request creates a fresh Invocation UCAN, enabling multi-backend access after a single authorization.
+This document only keeps Router / WebDAV integration details:
 
-### Lifetime and refresh model
+- how Router requests mint and attach Invocation UCAN
+- when WebDAV goes direct vs `/api/webdav/*` proxy
+- audience, app capability, proxy boundary, and CORS requirements
 
-- Root UCAN default TTL is 24 hours (SDK default).
-- Invocation UCAN default TTL is 5 minutes and is re-minted per request.
-- Wallet session lifetime is controlled by wallet-side `expiresAt`; frontend refreshes near expiry.
+The following cross-cutting topics are intentionally kept in [User Login](./user-login-en.md):
 
-### Why wallet unlock may be required
-
-- After auto-lock (idle/background), wallet cannot provide signing capability.
-- When session expires, Chat must request a new wallet session or signature, which requires unlock.
-- If Root UCAN expired or account changed, re-authorization is required (unlock alone is not enough).
+- Root / Session / Invocation concepts
+- local storage layout and wallet-side state
+- why wallet unlock prompts appear
+- when unlock is enough vs full re-authorization
 
 ## Key Environment Variables
 

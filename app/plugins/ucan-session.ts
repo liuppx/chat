@@ -27,6 +27,19 @@ function isSessionFresh(session: UcanSessionKey | null) {
   return Date.now() - cachedAt < SESSION_CACHE_MS;
 }
 
+async function loadStoredUcanSession(): Promise<UcanSessionKey | null> {
+  try {
+    const session = await getUcanSession(UCAN_SESSION_ID);
+    if (!session) return null;
+    cachedSession = session;
+    cachedAt = Date.now();
+    return session;
+  } catch (error) {
+    console.warn("❌读取本地 UCAN session 失败:", error);
+    return null;
+  }
+}
+
 export async function getCachedUcanSession(
   provider?: Eip1193Provider,
   options?: { refresh?: boolean },
@@ -34,6 +47,12 @@ export async function getCachedUcanSession(
   if (isSessionFresh(cachedSession)) {
     return cachedSession;
   }
+
+  const storedSession = await loadStoredUcanSession();
+  if (isSessionFresh(storedSession)) {
+    return storedSession;
+  }
+
   const shouldRefresh = options?.refresh ?? Boolean(provider);
   if (!shouldRefresh) {
     return null;

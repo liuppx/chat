@@ -1,5 +1,8 @@
 # Router 与 WebDAV 集成说明
 
+> 登录/授权/钱包/UCAN 的统一说明已收口到 [用户登录](./用户登陆.md)。若你要先理解当前机制，请优先阅读该文档。
+
+
 本文档说明当前 Chat 如何通过 UCAN 同时集成 Router 与 WebDAV，以及关键调用链路与配置点。
 
 ## 集成目标
@@ -68,26 +71,20 @@ flowchart TB
 - 直连会暴露 WebDAV 地址，安全与风控要求更高。
 - 本地地址（如 `127.0.0.1`）只对本机有效，远端浏览器无法访问。
 
-## UCAN 会话与本地存储
+## 与登录文档的边界
 
-- Root UCAN 与 Session 保存在 IndexedDB：`yeying-web3 / ucan-sessions`。
-- 关键状态缓存于 `localStorage`：
-  - `currentAccount`
-  - `ucanRootExp`
-  - `ucanRootIss`
-- 每次请求按后端生成 Invocation UCAN，做到“一次授权，多后端访问”。
+本文档只保留 Router / WebDAV 集成实现本身：
 
-### 有效期与更新机制
+- Router 如何生成并附带 Invocation UCAN
+- WebDAV 是直连还是走 `/api/webdav/*` 代理
+- `audience` / `capabilities` / 代理边界 / CORS 约束
 
-- Root UCAN 默认 24 小时有效（SDK 默认）。
-- Invocation UCAN 默认 5 分钟有效，并在每次请求时重新签发。
-- 钱包 Session 由钱包侧控制 `expiresAt`，前端会在快过期时重新获取。
+以下通用内容不在本文重复展开，请统一参考 [用户登录](./用户登陆.md)：
 
-### 为什么偶尔会要求“解锁钱包”
-
-- 钱包扩展自动锁定（长时间无操作/切后台）后，无法继续提供签名能力。
-- 会话过期时，需要重新向钱包申请 Session 或签名，钱包会要求先解锁。
-- 若 Root UCAN 已过期或账户变化，还需要重新授权，不仅仅是解锁。
+- Root / Session / Invocation 的概念
+- UCAN 的本地存储位置
+- 为什么会提示“解锁钱包”
+- 什么时候只解锁，什么时候必须重新授权
 
 ## 关键配置项
 

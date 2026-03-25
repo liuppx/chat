@@ -1,5 +1,7 @@
 # 架构图 / 部署说明 / 安全清单
 
+> 登录/授权/钱包/UCAN 的统一说明已收口到 [用户登录](./用户登陆.md)。若你要先理解授权模型、会话存储与解锁钱包原因，请优先阅读该文档。
+
 本文档描述当前系统的整体架构、部署方式与安全建议。
 
 ## 架构图
@@ -53,6 +55,20 @@ npm run start
 
 建议将 Router 与 WebDAV 放在可信网络，浏览器直接访问 Router/WebDAV 的业务接口；WebDAV 文件同步可按需使用 `/api/webdav/*` 代理。对直连接口需在服务端配置 CORS 与来源白名单。
 
+## 与登录文档的边界
+
+本文档只保留架构和部署视角下必须出现的授权约束：
+
+- 浏览器如何向 Router / WebDAV 附带 Bearer UCAN
+- 代理层与直连的边界
+- 部署时必须满足的 `aud`、CORS、HTTPS 与最小权限要求
+
+以下通用内容不在本文重复展开，请统一参考 [用户登录](./用户登陆.md)：
+
+- 钱包登录、Access Code / API Key、WebDAV Basic Auth 的边界
+- Root / Session / Invocation 的完整概念说明
+- 本地存储位置、钱包解锁与重新授权条件
+
 ## 安全清单
 
 ### 必做
@@ -72,4 +88,7 @@ npm run start
 
 ## 相关文档
 
+- 用户登录总览：`docs/用户登陆.md`
+- Router / WebDAV 调用链路：`docs/router-webdav-integration-cn.md`
+- WebDAV 同步实现：`docs/webdav-sync-plan-cn.md`
 - MCP 开关与运行机制：`docs/mcp-enable-cn.md`

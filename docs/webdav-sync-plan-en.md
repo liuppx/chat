@@ -1,10 +1,12 @@
 # WebDAV Sync Plan (UCAN)
 
+> The unified explanation for login, wallet, UCAN, and mobile-auth behavior has been moved to [User Login](./user-login-en.md). Read that first if you need the full authorization model.
+
 This document describes the current WebDAV sync plan, proxy vs direct mode, conflict strategy, and remaining tasks.
 
 ## Goals
 
-- UCAN-based single authorization for multi-backend access.
+- Reuse the current UCAN authorization chain for WebDAV sync.
 - WebDAV sync (check / download / upload).
 - Support proxy mode and direct browser mode.
 - Prevent deleted sessions from reappearing.
@@ -55,6 +57,21 @@ flowchart TB
 - `capability` must include backend-required `resource/action` (e.g. `app:<appId>/write`).
 - When the backend enforces `required_resource=app:*`, the client must include `app:<appId>`
   and keep requests under `/apps/<appId>/...`.
+
+## Boundary with the Login Document
+
+This document only keeps sync-specific behavior:
+
+- how sync traffic uses UCAN
+- proxy vs direct mode
+- merge rules, tombstones, and remaining sync risks
+
+The following cross-cutting topics are intentionally kept in [User Login](./user-login-en.md):
+
+- wallet login overview
+- Root / Session / Invocation lifecycle
+- browser storage layout
+- wallet unlock vs re-authorization rules
 
 ## Chat Sync Rule (Plan A)
 

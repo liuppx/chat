@@ -1,5 +1,7 @@
 # Architecture / Deployment / Security Checklist
 
+> The unified explanation for login, wallet, UCAN, and mobile-auth behavior has been moved to [User Login](./user-login-en.md). Read that first if you need the full authorization model.
+
 This document describes the system architecture, deployment steps, and security recommendations.
 
 ## Architecture
@@ -52,6 +54,20 @@ npm run start
 ### 4) Proxy Strategy
 
 Deploy Router and WebDAV in trusted networks. Browser-facing business APIs are direct, and `/api/webdav/*` can still be used as an optional sync proxy. Configure strict CORS/origin policy on direct endpoints.
+
+## Boundary with the Login Document
+
+This document keeps only the authorization constraints that matter to architecture and deployment:
+
+- how the browser attaches Bearer UCAN to Router / WebDAV
+- where direct calls end and proxy calls begin
+- deployment requirements around `aud`, CORS, HTTPS, and least privilege
+
+The following cross-cutting topics are intentionally kept in [User Login](./user-login-en.md):
+
+- wallet login vs Access Code / API Key vs WebDAV Basic Auth
+- Root / Session / Invocation concepts
+- local storage layout and wallet unlock behavior
 
 ## Security Checklist
 
