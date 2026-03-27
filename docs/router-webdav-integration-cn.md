@@ -45,9 +45,20 @@ flowchart TB
 - **同步接口**：`/api/webdav/*` 负责 WebDAV 文件同步，代理到 `WEBDAV_BACKEND_BASE_URL + WEBDAV_BACKEND_PREFIX`，限制方法与目标路径，避免 SSRF。
 - **请求头**：配额请求由浏览器直接发起，需由 WebDAV 服务端正确配置 CORS 与鉴权头放行。
 - **受众 (audience)**：自动按 WebDAV 地址推导 `did:web:<webdav-host>`。
-- **应用能力**：默认携带 `app:<appId>`（`appId` 默认当前域名）。
+- **应用能力**：默认携带 `app:all:<appId>`（`appId` 默认当前域名）。
 > 说明：`WEBDAV_BACKEND_PREFIX` 仅用于 WebDAV 协议接口路径，便于兼容第三方 WebDAV 客户端。
 > quota / SIWE / UCAN 等 HTTP 接口不加前缀，仍走基础地址。
+
+## UCAN 能力模型（当前实现）
+
+- Root UCAN 统一使用 `app:all:<appId>` 资源命名空间。
+- 对 Router 的调用能力：`app:all:<appId> + invoke`。
+- 对 WebDAV 的存储能力：`app:all:<appId> + write`。
+- `appId` 来源于当前前端域名并做标准化（如 `localhost:3020 -> localhost-3020`）。
+- Root UCAN 的 SIWE 声明中会附带 `service_hosts`：
+  - `service_hosts.router = <router-host>`
+  - `service_hosts.webdav = <webdav-host>`
+- 钱包审批页会基于 `service_hosts` 展示“访问服务”文案；如果旧 Root 不含该字段，前端会要求重新授权。
 
 ## WebDAV 直连（不走代理）
 
@@ -92,7 +103,8 @@ flowchart TB
 - `WEBDAV_BACKEND_BASE_URL`: WebDAV 后端基础地址（必填，不含路径）
 - `WEBDAV_BACKEND_PREFIX`: WebDAV 路径前缀（默认 `/dav`，可选修改）
 - `WebDAV app action`: 固定为 `write`
-- `通用 UCAN 能力`: 固定为 `profile/read`
+- `Router UCAN 能力`: `app:all:<appId> + invoke`
+- `WebDAV UCAN 能力`: `app:all:<appId> + write`
 
 ## 安全要点
 

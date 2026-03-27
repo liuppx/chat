@@ -63,6 +63,7 @@ The Root UCAN is the top-level authorization proof. It captures:
 - capabilities: `cap`
 - expiration: `exp`
 - proof of wallet signature: `siwe.message` + `siwe.signature`
+- service targets in statement payload: `service_hosts.router` and `service_hosts.webdav`
 
 Default TTL:
 
@@ -109,6 +110,12 @@ Because the implementation separates reusable root authorization from request-le
 4. For later requests:
    - one Invocation UCAN is minted for Router
    - another Invocation UCAN is minted for WebDAV
+
+Current capability model:
+
+- Router capability: `app:all:<appId> + invoke`
+- WebDAV capability: `app:all:<appId> + write`
+- `appId` is derived from frontend host (for example, `localhost:3020 -> localhost-3020`)
 
 So the user experience is "log in once, use both backends", but the actual mechanism is:
 
@@ -238,6 +245,7 @@ Required when:
 - current account no longer matches the root issuer
 - capabilities changed
 - session identity no longer matches the active authorization chain
+- `service_hosts` in root statement is missing or no longer matches current Router/WebDAV backend hosts
 
 ## 10. Why "UCAN Is Still Valid" May Still Trigger Wallet Interaction
 

@@ -43,7 +43,13 @@ import {
   getUcanRootCapsKey,
   UCAN_SESSION_ID,
 } from "@/app/plugins/ucan";
-import { createInvocationUcan } from "@yeying-community/web3-bs";
+import {
+  createInvocationUcan,
+  getCapabilityAction,
+  getCapabilityResource,
+  normalizeUcanCapabilities,
+  type UcanCapability,
+} from "@yeying-community/web3-bs";
 import { getCachedUcanSession } from "@/app/plugins/ucan-session";
 import {
   getMessageTextContent,
@@ -166,24 +172,21 @@ function decodeUcanPayload(token: string): {
   }
 }
 
-function buildCapsKey(
-  caps: Array<{
-    resource: string;
-    action: string;
-  }>,
-) {
-  return caps
-    .map((cap) => `${cap.resource}:${cap.action}`)
+function buildCapsKey(caps: UcanCapability[]) {
+  return normalizeUcanCapabilities(caps || [], { includeLegacyAliases: false })
+    .map((cap) => {
+      const resource = getCapabilityResource(cap);
+      const action = getCapabilityAction(cap);
+      return `${resource}:${action}`;
+    })
+    .filter((entry) => entry !== ":")
     .sort()
     .join("|");
 }
 
 function buildRouterInvocationCacheKey(
   audience: string,
-  capabilities: Array<{
-    resource: string;
-    action: string;
-  }>,
+  capabilities: UcanCapability[],
 ) {
   if (typeof localStorage === "undefined") return "";
   const account = localStorage.getItem("currentAccount") || "";
@@ -193,10 +196,7 @@ function buildRouterInvocationCacheKey(
 
 function getValidCachedRouterInvocationToken(
   audience: string,
-  capabilities: Array<{
-    resource: string;
-    action: string;
-  }>,
+  capabilities: UcanCapability[],
 ) {
   const cacheKey = buildRouterInvocationCacheKey(audience, capabilities);
   const cached = cachedRouterInvocationToken;

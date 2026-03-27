@@ -178,9 +178,11 @@ sequenceDiagram
 
 - `aud` 必须与 WebDAV 服务端配置一致：
   - `did:web:<host>`（由 `WEBDAV_BACKEND_BASE_URL` 推导）。
-- `capability` 需包含服务端配置要求（如 `app:<appId>/write`）。
-- 当服务端开启 `required_resource=app:*` 时，前端必须携带 `app:<appId>` 能力，
+- `capability` 需包含服务端配置要求（如 `app:all:<appId> + write`）。
+- 当服务端开启 `required_resource=app:*` 时，前端必须携带 `app:all:<appId>` 能力，
   并保证访问路径落在 `/apps/<appId>/...`。
+- Root UCAN 的 SIWE 声明会带 `service_hosts.router/webdav`，用于审批页展示目标服务。
+- 当前配置与 Root 声明中的 `service_hosts` 不一致时，前端会触发重新授权。
 
 ## 聊天同步规则（方案 A）
 
@@ -207,7 +209,9 @@ sequenceDiagram
 - `WEBDAV_BACKEND_BASE_URL`: WebDAV 基础地址（必填，不含路径）
 - `WEBDAV_BACKEND_PREFIX`: WebDAV 路径前缀（默认 `/dav`，可选修改）
 - `WebDAV app action`: 固定为 `write`
-- `通用 UCAN 能力`: 固定为 `profile/read`（主要用于 Router）
+- `Router UCAN 能力`: `app:all:<appId> + invoke`
+- `WebDAV UCAN 能力`: `app:all:<appId> + write`
+- `appId`：由当前前端域名派生（如 `localhost:3020 -> localhost-3020`）
 - 同步设置：`useProxy`（关闭即直连）
 - 同步设置页会展示并可修改 WebDAV Base URL/Prefix，用于覆盖环境变量
 
@@ -222,7 +226,7 @@ sequenceDiagram
 ### 必做
 
 - **CORS 放行**：直连模式需允许来源 `http://localhost:3020` 等。
-- **UCAN 校验一致**：服务端 `audience/resource/action` 必须与前端一致。
+- **UCAN 校验一致**：服务端 `audience + with/can`（兼容 `resource/action`）必须与前端一致。
 - **直连验证**：Network 中必须看到请求直达 `WEBDAV_BACKEND_BASE_URL + WEBDAV_BACKEND_PREFIX`。
 
 ### 建议

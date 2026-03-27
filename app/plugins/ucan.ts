@@ -1,31 +1,47 @@
 import { getClientConfig } from "@/app/config/client";
-import type { UcanCapability } from "@yeying-community/web3-bs";
+import {
+  getCapabilityAction,
+  getCapabilityResource,
+  normalizeUcanCapabilities,
+  type UcanCapability,
+} from "@yeying-community/web3-bs";
 
 export const UCAN_SESSION_ID = "default";
 
-const APP_UCAN_RESOURCE_PREFIX = "app:";
+const APP_UCAN_RESOURCE_PREFIX = "app:all:";
 const DEFAULT_APP_ID = "localhost";
 const ROUTER_UCAN_ACTION = "invoke";
 const DEFAULT_WEBDAV_RESOURCE = "";
 const DEFAULT_WEBDAV_ACTION = "";
 const DEFAULT_WEBDAV_APP_ACTION = "write";
 
+function buildCapability(resource: string, action: string): UcanCapability {
+  return {
+    with: resource,
+    can: action,
+    resource,
+    action,
+  };
+}
+
+function normalizeCaps(caps: UcanCapability[]): UcanCapability[] {
+  return normalizeUcanCapabilities(caps || []);
+}
+
 function buildCapsKey(caps: UcanCapability[]): string {
-  return (caps || [])
-    .map((cap) => `${cap.resource}:${cap.action}`)
+  return normalizeUcanCapabilities(caps || [], { includeLegacyAliases: false })
+    .map((cap) => {
+      const resource = getCapabilityResource(cap);
+      const action = getCapabilityAction(cap);
+      return `${resource}:${action}`;
+    })
+    .filter((entry) => entry !== ":")
     .sort()
     .join("|");
 }
 
 function uniqCapabilities(caps: UcanCapability[]): UcanCapability[] {
-  const seen = new Map<string, UcanCapability>();
-  for (const cap of caps) {
-    const key = `${cap.resource}:${cap.action}`;
-    if (!seen.has(key)) {
-      seen.set(key, cap);
-    }
-  }
-  return Array.from(seen.values());
+  return normalizeCaps(caps);
 }
 
 function toDidWeb(rawUrl?: string | null): string | null {
@@ -89,22 +105,19 @@ export function getWebdavAppAction(): string {
 
 export function getWebdavCapabilities(): UcanCapability[] {
   if (DEFAULT_WEBDAV_RESOURCE && DEFAULT_WEBDAV_ACTION) {
-    return [
-      { resource: DEFAULT_WEBDAV_RESOURCE, action: DEFAULT_WEBDAV_ACTION },
-    ];
+    return normalizeCaps([
+      buildCapability(DEFAULT_WEBDAV_RESOURCE, DEFAULT_WEBDAV_ACTION),
+    ]);
   }
-  return [
-    { resource: getWebdavCapabilityResource(), action: getWebdavAppAction() },
-  ];
+  return normalizeCaps([
+    buildCapability(getWebdavCapabilityResource(), getWebdavAppAction()),
+  ]);
 }
 
 export function getRouterCapabilities(): UcanCapability[] {
-  return [
-    {
-      resource: getRouterCapabilityResource(),
-      action: ROUTER_UCAN_ACTION,
-    },
-  ];
+  return normalizeCaps([
+    buildCapability(getRouterCapabilityResource(), ROUTER_UCAN_ACTION),
+  ]);
 }
 
 export function getUcanRootCapabilities(): UcanCapability[] {
@@ -144,9 +157,10 @@ export function buildUcanRootStatement(options: {
   capabilities: UcanCapability[];
   notBeforeMs?: number;
 }): string {
+  const capabilities = normalizeCaps(options.capabilities);
   const payload: Record<string, unknown> = {
     aud: options.audience,
-    cap: options.capabilities,
+    cap: capabilities,
     service_hosts: {
       router: getRouterServiceHost(),
       webdav: getWebdavServiceHost(),

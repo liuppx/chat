@@ -54,9 +54,11 @@ flowchart TB
 
 - `aud` must match the backend configuration:
   - `did:web:<host>` (derived from `WEBDAV_BACKEND_BASE_URL`).
-- `capability` must include backend-required `resource/action` (e.g. `app:<appId>/write`).
-- When the backend enforces `required_resource=app:*`, the client must include `app:<appId>`
+- `capability` must include backend-required permissions (e.g. `app:all:<appId> + write`).
+- When the backend enforces `required_resource=app:*`, the client must include `app:all:<appId>`
   and keep requests under `/apps/<appId>/...`.
+- Root UCAN SIWE statement carries `service_hosts.router/webdav` for approval display.
+- If current config does not match `service_hosts` in Root UCAN, frontend forces re-authorization.
 
 ## Boundary with the Login Document
 
@@ -98,7 +100,9 @@ If a session has a newer `lastUpdate` than the delete timestamp, the update over
 - `WEBDAV_BACKEND_BASE_URL`: WebDAV base URL (required, no path)
 - `WEBDAV_BACKEND_PREFIX`: path prefix (default `/dav`, optional to change)
 - `WebDAV app action`: fixed to `write`
-- `Shared UCAN caps`: fixed to `profile/read` (mainly for Router)
+- `Router UCAN capability`: `app:all:<appId> + invoke`
+- `WebDAV UCAN capability`: `app:all:<appId> + write`
+- `appId`: derived from frontend host (for example, `localhost:3020 -> localhost-3020`)
 - Sync setting: `useProxy` (off = direct mode)
 - Sync settings page shows and allows editing of WebDAV Base URL/Prefix to override env defaults
 
@@ -113,7 +117,7 @@ Default values (this project):
 ### Must
 
 - **CORS allowlist** for direct mode (e.g. `http://localhost:3020`).
-- **UCAN alignment** between frontend and backend (aud/resource/action).
+- **UCAN alignment** between frontend and backend (`aud` + `with/can`, compat with `resource/action`).
 - **Direct-mode verification** (Network shows direct requests to `WEBDAV_BACKEND_BASE_URL + WEBDAV_BACKEND_PREFIX`).
 
 ### Recommended

@@ -31,7 +31,14 @@ flowchart TB
 - `ROUTER_BACKEND_URL`: default Router backend URL (optional, frontend default)
 - `WEBDAV_BACKEND_BASE_URL`: WebDAV base URL (required, no path)
 - `WEBDAV_BACKEND_PREFIX`: path prefix (default `/dav`, optional to change)
-- Shared UCAN caps: fixed to `profile/read`
+- Root UCAN capability model (frontend default):
+  - Router: `app:all:<appId> + invoke`
+  - WebDAV: `app:all:<appId> + write`
+  - `appId` is derived from the frontend host (for example, `localhost:3020 -> localhost-3020`)
+- Root UCAN statement includes `service_hosts`:
+  - `service_hosts.router = <router-host>`
+  - `service_hosts.webdav = <webdav-host>`
+  - if `service_hosts` is missing or mismatched with current config, the frontend forces re-authorization
 
 ### 2) Local Dev
 
@@ -75,7 +82,7 @@ The following cross-cutting topics are intentionally kept in [User Login](./user
 
 - [ ] **Path allowlist**: only proxy required endpoints
 - [ ] **Strip sensitive headers**: do not forward `host/origin/referer`
-- [ ] **Least-privilege UCAN**: minimal `resource/action`
+- [ ] **Least-privilege UCAN**: minimal `with/can` (compat with `resource/action`)
 - [ ] **Audience binding**: ensure `aud` matches backend `UCAN_AUD`
 - [ ] **Root UCAN expiry**: enforce re-authorization on expiry
 

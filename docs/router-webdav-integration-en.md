@@ -44,9 +44,20 @@ flowchart TB
 - **Sync**: `/api/webdav/*` proxies WebDAV file sync to `WEBDAV_BACKEND_BASE_URL + WEBDAV_BACKEND_PREFIX`, with method/path restrictions to prevent SSRF.
 - **Headers**: quota is browser-direct; WebDAV backend must allow required CORS/auth headers.
 - **Audience**: auto-derived as `did:web:<webdav-host>`.
-- **App capability**: defaults to `app:<appId>` (`appId` defaults to current host).
+- **App capability**: defaults to `app:all:<appId>` (`appId` defaults to current host).
 > Note: `WEBDAV_BACKEND_PREFIX` applies only to WebDAV protocol paths (for third‑party WebDAV client compatibility).
 > Other HTTP APIs (quota / SIWE / UCAN) must not include the prefix and use the base URL directly.
+
+## UCAN Capability Model (Current)
+
+- Root UCAN uses one unified resource namespace: `app:all:<appId>`.
+- Router invocation capability: `app:all:<appId> + invoke`.
+- WebDAV storage capability: `app:all:<appId> + write`.
+- `appId` is derived from the frontend host and sanitized (for example, `localhost:3020 -> localhost-3020`).
+- The Root UCAN SIWE statement includes `service_hosts`:
+  - `service_hosts.router = <router-host>`
+  - `service_hosts.webdav = <webdav-host>`
+- Wallet approval copy reads service targets from `service_hosts`; if an old Root UCAN has no `service_hosts`, frontend forces re-authorization.
 
 ## Direct WebDAV (No Proxy)
 
@@ -91,7 +102,8 @@ The following cross-cutting topics are intentionally kept in [User Login](./user
 - `WEBDAV_BACKEND_BASE_URL`: WebDAV base URL (required, no path)
 - `WEBDAV_BACKEND_PREFIX`: path prefix (default `/dav`, optional to change)
 - `WebDAV app action`: fixed to `write`
-- `Shared UCAN caps`: fixed to `profile/read`
+- `Router UCAN capability`: `app:all:<appId> + invoke`
+- `WebDAV UCAN capability`: `app:all:<appId> + write`
 
 ## Security Notes
 

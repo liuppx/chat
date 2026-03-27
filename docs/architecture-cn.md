@@ -31,7 +31,14 @@ flowchart TB
 - `ROUTER_BACKEND_URL`：Router 默认后端地址（可选，前端默认值）
 - `WEBDAV_BACKEND_BASE_URL`：WebDAV 后端基础地址（必填，不含路径）
 - `WEBDAV_BACKEND_PREFIX`：WebDAV 路径前缀（默认 `/dav`，可选修改）
-- 通用 UCAN 能力：固定为 `profile/read`
+- Root UCAN 能力模型（前端默认）：
+  - Router：`app:all:<appId> + invoke`
+  - WebDAV：`app:all:<appId> + write`
+  - 其中 `appId` 由当前前端域名派生（如 `localhost:3020 -> localhost-3020`）
+- Root UCAN 声明中会附带 `service_hosts`：
+  - `service_hosts.router = <router-host>`
+  - `service_hosts.webdav = <webdav-host>`
+  - 当 `service_hosts` 缺失或与当前配置不一致时，前端会要求重新授权
 
 ### 2) 启动
 
@@ -75,7 +82,7 @@ npm run start
 
 - [ ] **路径白名单**：仅允许转发需要的 API 路由
 - [ ] **过滤敏感头**：不透传 `host/origin/referer`
-- [ ] **最小权限 UCAN**：仅授予必须的 `resource/action`
+- [ ] **最小权限 UCAN**：仅授予必须的 `with/can`（兼容 `resource/action`）
 - [ ] **audience 绑定**：确保 `aud` 与后端 `UCAN_AUD` 匹配
 - [ ] **Root UCAN 过期控制**：过期必须重新授权
 
