@@ -259,6 +259,103 @@ async function getHeadersWithRouterUcan(url: string) {
   return headers;
 }
 
+function isResponsesPath(path: string) {
+  return path.includes("/v1/responses");
+}
+
+function normalizeResponsesTextFormat(responseFormat: any) {
+  if (!responseFormat || typeof responseFormat !== "object") return undefined;
+  if (!responseFormat.type) return undefined;
+  const format: Record<string, any> = {
+    type: responseFormat.type,
+  };
+  if (
+    responseFormat.type === "json_schema" &&
+    responseFormat.json_schema &&
+    typeof responseFormat.json_schema === "object"
+  ) {
+    const schema = responseFormat.json_schema;
+    ["name", "schema", "strict", "description"].forEach((key) => {
+      if (schema[key] !== undefined) format[key] = schema[key];
+    });
+  }
+  return format;
+}
+
+function toResponsesPayload(payload: Record<string, any>) {
+  const next = { ...payload };
+  if (next.input === undefined && Array.isArray(next.messages)) {
+    next.input = next.messages;
+  }
+  delete next.messages;
+
+  if (next.max_output_tokens === undefined) {
+    if (typeof next.max_completion_tokens === "number") {
+      next.max_output_tokens = next.max_completion_tokens;
+    } else if (typeof next.max_tokens === "number") {
+      next.max_output_tokens = next.max_tokens;
+    }
+  }
+  delete next.max_completion_tokens;
+  delete next.max_tokens;
+
+  if (next.response_format !== undefined) {
+    const format = normalizeResponsesTextFormat(next.response_format);
+    if (format) {
+      next.text = { ...(next.text ?? {}), format };
+    }
+    delete next.response_format;
+  }
+
+  return next;
+}
+
+function extractResponsesTextFromOutput(output: any): string {
+  if (!Array.isArray(output)) return "";
+  const texts: string[] = [];
+  output.forEach((item: any) => {
+    if (typeof item?.output_text === "string" && item.output_text) {
+      texts.push(item.output_text);
+    }
+    if (Array.isArray(item?.content)) {
+      item.content.forEach((c: any) => {
+        if (typeof c?.output_text === "string" && c.output_text) {
+          texts.push(c.output_text);
+        } else if (typeof c?.text === "string" && c.text) {
+          texts.push(c.text);
+        }
+      });
+    } else if (typeof item?.text === "string" && item.text) {
+      texts.push(item.text);
+    }
+  });
+  return texts.join("\n\n");
+}
+
+function extractResponsesStreamFallbackText(payload: any): string {
+  if (!payload || typeof payload !== "object") return "";
+  if (typeof payload.output_text === "string" && payload.output_text) {
+    return payload.output_text;
+  }
+  if (typeof payload.text === "string" && payload.text) {
+    return payload.text;
+  }
+  if (typeof payload.delta === "string" && payload.delta) {
+    return payload.delta;
+  }
+  if (payload.response && typeof payload.response === "object") {
+    if (
+      typeof payload.response.output_text === "string" &&
+      payload.response.output_text
+    ) {
+      return payload.response.output_text;
+    }
+    const nested = extractResponsesTextFromOutput(payload.response.output);
+    if (nested) return nested;
+  }
+  return extractResponsesTextFromOutput(payload.output);
+}
+
 export class ChatGPTApi implements LLMApi {
   private disableListModels = false;
 
@@ -303,18 +400,12 @@ export class ChatGPTApi implements LLMApi {
 
   async extractMessage(res: any) {
     // handle responses api output
+    if (typeof res?.output_text === "string" && res.output_text) {
+      return res.output_text;
+    }
     if (Array.isArray(res?.output)) {
-      const texts: string[] = [];
-      res.output.forEach((item: any) => {
-        if (item?.content) {
-          item.content.forEach((c: any) => {
-            if (c?.text) texts.push(c.text);
-          });
-        } else if (item?.text) {
-          texts.push(item.text);
-        }
-      });
-      if (texts.length > 0) return texts.join("\n\n");
+      const outputText = extractResponsesTextFromOutput(res.output);
+      if (outputText) return outputText;
     }
     if (res.error) {
       return "```\n" + JSON.stringify(res, null, 4) + "\n```";
@@ -465,8 +556,27 @@ export class ChatGPTApi implements LLMApi {
     const shouldStream = !isDalle3 && !!options.config.stream;
     const controller = new AbortController();
     options.onController?.(controller);
+    let index = -1;
+    let sawResponsesDelta = false;
 
     try {
+      let tools: any[] = [];
+      let funcs: Record<string, Function> = {};
+      if (shouldStream) {
+        const toolPair = usePluginStore
+          .getState()
+          .getAsTools(
+            useChatStore.getState().currentSession().mask?.plugin || [],
+          ) as [any[], Record<string, Function>];
+        tools = toolPair[0] ?? [];
+        funcs = toolPair[1] ?? {};
+      }
+
+      const useResponsesPath =
+        !isDalle3 &&
+        modelConfig.providerName !== ServiceProvider.Azure &&
+        !(shouldStream && tools.length > 0);
+
       let chatPath = "";
       if (modelConfig.providerName === ServiceProvider.Azure) {
         // find model, and get displayName as deployName
@@ -495,17 +605,27 @@ export class ChatGPTApi implements LLMApi {
         );
       } else {
         chatPath = this.path(
-          isDalle3 ? OpenaiPath.ImagePath : OpenaiPath.ChatPath,
+          isDalle3
+            ? OpenaiPath.ImagePath
+            : useResponsesPath
+              ? OpenaiPath.ResponsePath
+              : OpenaiPath.ChatPath,
         );
       }
+
+      if (isResponsesPath(chatPath)) {
+        requestPayload = toResponsesPayload(
+          requestPayload as Record<string, any>,
+        );
+      }
+
+      console.log("[Request] openai endpoint:", chatPath, {
+        stream: shouldStream,
+        responses: isResponsesPath(chatPath),
+        tools: tools.length,
+      });
+
       if (shouldStream) {
-        let index = -1;
-        const [tools, funcs] = usePluginStore
-          .getState()
-          .getAsTools(
-            useChatStore.getState().currentSession().mask?.plugin || [],
-          );
-        // console.log("getAsTools", tools, funcs);
         const chatHeaders = await getHeadersWithRouterUcan(chatPath);
         streamWithThink(
           chatPath,
@@ -526,57 +646,82 @@ export class ChatGPTApi implements LLMApi {
               };
             }>;
 
-            if (!choices?.length) return { isThinking: false, content: "" };
-
-            const tool_calls = choices[0]?.delta?.tool_calls;
-            if (tool_calls?.length > 0) {
-              const id = tool_calls[0]?.id;
-              const args = tool_calls[0]?.function?.arguments;
-              if (id) {
-                index += 1;
-                runTools.push({
-                  id,
-                  type: tool_calls[0]?.type,
-                  function: {
-                    name: tool_calls[0]?.function?.name as string,
-                    arguments: args,
-                  },
-                });
-              } else {
-                // @ts-ignore
-                runTools[index]["function"]["arguments"] += args;
+            if (choices?.length) {
+              const tool_calls = choices[0]?.delta?.tool_calls;
+              if (tool_calls?.length > 0) {
+                const id = tool_calls[0]?.id;
+                const args = tool_calls[0]?.function?.arguments;
+                if (id) {
+                  index += 1;
+                  runTools.push({
+                    id,
+                    type: tool_calls[0]?.type,
+                    function: {
+                      name: tool_calls[0]?.function?.name as string,
+                      arguments: args,
+                    },
+                  });
+                } else if (
+                  runTools[index]?.function &&
+                  typeof args === "string"
+                ) {
+                  const prev = runTools[index].function?.arguments ?? "";
+                  runTools[index].function!.arguments = prev + args;
+                }
               }
-            }
 
-            const reasoning = choices[0]?.delta?.reasoning_content;
-            const content = choices[0]?.delta?.content;
+              const reasoning = choices[0]?.delta?.reasoning_content;
+              const content = choices[0]?.delta?.content;
 
-            // Skip if both content and reasoning_content are empty or null
-            if (
-              (!reasoning || reasoning.length === 0) &&
-              (!content || content.length === 0)
-            ) {
+              // Skip if both content and reasoning_content are empty or null
+              if (
+                (!reasoning || reasoning.length === 0) &&
+                (!content || content.length === 0)
+              ) {
+                return {
+                  isThinking: false,
+                  content: "",
+                };
+              }
+
+              if (reasoning && reasoning.length > 0) {
+                return {
+                  isThinking: true,
+                  content: reasoning,
+                };
+              } else if (content && content.length > 0) {
+                return {
+                  isThinking: false,
+                  content: content,
+                };
+              }
+
               return {
                 isThinking: false,
                 content: "",
               };
             }
 
-            if (reasoning && reasoning.length > 0) {
-              return {
-                isThinking: true,
-                content: reasoning,
-              };
-            } else if (content && content.length > 0) {
-              return {
-                isThinking: false,
-                content: content,
-              };
+            // responses streaming payload
+            const eventType = typeof json?.type === "string" ? json.type : "";
+            if (!eventType.startsWith("response.")) {
+              return { isThinking: false, content: "" };
             }
-
+            const content = extractResponsesStreamFallbackText(json);
+            if (eventType === "response.output_text.delta" && content) {
+              sawResponsesDelta = true;
+            }
+            if (
+              sawResponsesDelta &&
+              (eventType === "response.output_text" ||
+                eventType === "response.output_text.done" ||
+                eventType === "response.completed")
+            ) {
+              return { isThinking: false, content: "" };
+            }
             return {
               isThinking: false,
-              content: "",
+              content: content ?? "",
             };
           },
           // processToolMessage, include tool_calls message and tool call results
@@ -587,14 +732,28 @@ export class ChatGPTApi implements LLMApi {
           ) => {
             // reset index value
             index = -1;
-            // @ts-ignore
-            requestPayload?.messages?.splice(
-              // @ts-ignore
-              requestPayload?.messages?.length,
-              0,
+            if (Array.isArray((requestPayload as any)?.messages)) {
+              (requestPayload as any).messages.splice(
+                (requestPayload as any).messages.length,
+                0,
+                toolCallMessage,
+                ...toolCallResult,
+              );
+              return;
+            }
+            if (Array.isArray((requestPayload as any)?.input)) {
+              (requestPayload as any).input.splice(
+                (requestPayload as any).input.length,
+                0,
+                toolCallMessage,
+                ...toolCallResult,
+              );
+              return;
+            }
+            (requestPayload as any).input = [
               toolCallMessage,
               ...toolCallResult,
-            );
+            ];
           },
           options,
         );
