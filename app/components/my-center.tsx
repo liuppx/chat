@@ -7,11 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { Path } from "../constant";
 import Locale from "../locales";
 import { fetchQuota, WebDAVQuota } from "../plugins/webdav";
-
-const mockProfile = {
-  phone: "+86 138****5678",
-  email: "user@example.com",
-};
+import { getClientConfig } from "../config/client";
 
 const mockUsage = {
   totalCost: "¥128.50",
@@ -33,17 +29,34 @@ function formatBytes(bytes?: number): string {
   return `${value.toFixed(precision)} ${units[unitIndex]}`;
 }
 
+function resolveConfigUrl(url?: string | null): string {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  try {
+    return new URL(value, window.location.origin).toString();
+  } catch {
+    return "";
+  }
+}
+
+function openExternalUrl(url: string) {
+  if (!url) return;
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    window.location.href = url;
+  }
+}
+
 export function Centers() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<
-    "storage" | "info" | "usage" | "service"
-  >("storage");
+  const [activeTab, setActiveTab] = useState<"storage" | "usage">("storage");
+  const clientConfig = getClientConfig();
+  const webdavPortalUrl = resolveConfigUrl(clientConfig?.webdavBackendBaseUrl);
+  const routerPortalUrl = resolveConfigUrl(clientConfig?.routerBackendUrl);
 
   const tabs = [
     { key: "storage", label: Locale.MyCenter.Tab1.Title },
-    { key: "info", label: Locale.MyCenter.Tab2.Title },
     { key: "usage", label: Locale.MyCenter.Tab3.Title },
-    { key: "service", label: Locale.MyCenter.Tab4.Title },
   ];
 
   const [storageQuota, setStorageQuota] = useState<WebDAVQuota | null>(null);
@@ -123,19 +136,24 @@ export function Centers() {
                     : formatBytes(storageQuota?.available)
                 }
               />
-            </List>
-          )}
-
-          {activeTab === "info" && (
-            <List>
               <ListItem
-                title={Locale.MyCenter.Tab2.Info.Telephone}
-                subTitle={mockProfile.phone}
-              />
-              <ListItem
-                title={Locale.MyCenter.Tab2.Info.Email}
-                subTitle={mockProfile.email}
-              />
+                title={Locale.MyCenter.Tab4.Info.StorageExpansion}
+                subTitle={Locale.MyCenter.Tab4.Info.Desc1}
+              >
+                <IconButton
+                  text={Locale.MyCenter.Tab4.Info.ImmediatelyExpandCapacity}
+                  type="primary"
+                  onClick={() => {
+                    if (!webdavPortalUrl) {
+                      console.warn(
+                        "[MyCenter] missing webdavBackendBaseUrl in client config",
+                      );
+                      return;
+                    }
+                    openExternalUrl(webdavPortalUrl);
+                  }}
+                />
+              </ListItem>
             </List>
           )}
 
@@ -149,21 +167,6 @@ export function Centers() {
                 title={Locale.MyCenter.Tab3.Info.Tokens}
                 subTitle={mockUsage.totalTokens}
               />
-            </List>
-          )}
-
-          {activeTab === "service" && (
-            <List>
-              <ListItem
-                title={Locale.MyCenter.Tab4.Info.StorageExpansion}
-                subTitle={Locale.MyCenter.Tab4.Info.Desc1}
-              >
-                <IconButton
-                  text={Locale.MyCenter.Tab4.Info.ImmediatelyExpandCapacity}
-                  type="primary"
-                  onClick={() => console.log(`go to new page`)}
-                />
-              </ListItem>
               <ListItem
                 title={Locale.MyCenter.Tab4.Info.TopUpBalance}
                 subTitle={Locale.MyCenter.Tab4.Info.Desc2}
@@ -172,7 +175,13 @@ export function Centers() {
                   text={Locale.MyCenter.Tab4.Info.GotoRecharge}
                   type="primary"
                   onClick={() => {
-                    window.location.href = "#";
+                    if (!routerPortalUrl) {
+                      console.warn(
+                        "[MyCenter] missing routerBackendUrl in client config",
+                      );
+                      return;
+                    }
+                    openExternalUrl(routerPortalUrl);
                   }}
                 />
               </ListItem>

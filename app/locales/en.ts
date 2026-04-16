@@ -893,15 +893,8 @@ const en: LocaleType = {
         Remain: "remaining space",
       },
     },
-    Tab2: {
-      Title: "Personal Information",
-      Info: {
-        Telephone: "mobile phone number",
-        Email: "email",
-      },
-    },
     Tab3: {
-      Title: "Large model invocation status",
+      Title: "Model usage",
       Info: {
         Moneys: "Total consumption amount",
         Tokens: "token consumption",

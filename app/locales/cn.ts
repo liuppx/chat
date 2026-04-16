@@ -883,15 +883,8 @@ const cn = {
         Remain: "剩余空间",
       },
     },
-    Tab2: {
-      Title: "个人信息",
-      Info: {
-        Telephone: "手机号",
-        Email: "邮箱",
-      },
-    },
     Tab3: {
-      Title: "大模型调用情况",
+      Title: "模型使用情况",
       Info: {
         Moneys: "总消费金额",
         Tokens: "tokens消耗",
