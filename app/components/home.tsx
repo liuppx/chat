@@ -27,7 +27,7 @@ import { SideBar } from "./sidebar";
 import { useAppConfig } from "../store/config";
 import { AuthPage } from "./auth";
 import { getClientConfig } from "../config/client";
-import { type ClientApi, getClientApi } from "../client/api";
+import { getRouterClientApi } from "../client/api";
 import { useAccessStore } from "../store";
 import clsx from "clsx";
 import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
@@ -305,8 +305,7 @@ function Screen() {
 export function useLoadData() {
   const mergeModels = useAppConfig((state) => state.mergeModels);
   const loadModels = useCallback(async () => {
-    const providerName = useAppConfig.getState().modelConfig.providerName;
-    const api: ClientApi = getClientApi(providerName);
+    const api = getRouterClientApi();
     const models = await api.llm.models();
     mergeModels(models);
   }, [mergeModels]);

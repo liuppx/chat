@@ -147,6 +147,7 @@ export enum GoogleSafetySettingsThreshold {
 }
 
 export enum ModelProvider {
+  Router = "Router",
   Stability = "Stability",
   GPT = "GPT",
   GeminiPro = "GeminiPro",
