@@ -323,9 +323,36 @@ export function stream(
         return Promise.all(
           toolCallMessage.tool_calls.map((tool) => {
             options?.onBeforeTool?.(tool);
+            const toolName = tool?.function?.name;
+            const toolFn =
+              typeof toolName === "string" && toolName
+                ? funcs[toolName]
+                : undefined;
+            if (typeof toolFn !== "function") {
+              return Promise.resolve(
+                Promise.reject(
+                  new Error(
+                    `tool function not found: ${String(toolName || "(empty)")}`,
+                  ),
+                ),
+              )
+                .catch((e) => {
+                  options?.onAfterTool?.({
+                    ...tool,
+                    isError: true,
+                    errorMsg: e.toString(),
+                  });
+                  return e.toString();
+                })
+                .then((content) => ({
+                  name: toolName,
+                  role: "tool",
+                  content,
+                  tool_call_id: tool.id,
+                }));
+            }
             return Promise.resolve(
-              // @ts-ignore
-              funcs[tool.function.name](
+              toolFn(
                 // @ts-ignore
                 tool?.function?.arguments
                   ? JSON.parse(tool?.function?.arguments)
@@ -576,9 +603,36 @@ export function streamWithThink(
         return Promise.all(
           toolCallMessage.tool_calls.map((tool) => {
             options?.onBeforeTool?.(tool);
+            const toolName = tool?.function?.name;
+            const toolFn =
+              typeof toolName === "string" && toolName
+                ? funcs[toolName]
+                : undefined;
+            if (typeof toolFn !== "function") {
+              return Promise.resolve(
+                Promise.reject(
+                  new Error(
+                    `tool function not found: ${String(toolName || "(empty)")}`,
+                  ),
+                ),
+              )
+                .catch((e) => {
+                  options?.onAfterTool?.({
+                    ...tool,
+                    isError: true,
+                    errorMsg: e.toString(),
+                  });
+                  return e.toString();
+                })
+                .then((content) => ({
+                  name: toolName,
+                  role: "tool",
+                  content,
+                  tool_call_id: tool.id,
+                }));
+            }
             return Promise.resolve(
-              // @ts-ignore
-              funcs[tool.function.name](
+              toolFn(
                 // @ts-ignore
                 tool?.function?.arguments
                   ? JSON.parse(tool?.function?.arguments)
