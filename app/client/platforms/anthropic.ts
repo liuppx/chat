@@ -1,5 +1,11 @@
 import { ACCESS_CODE_PREFIX, Anthropic, ApiPath } from "@/app/constant";
-import { ChatOptions, LLMApi, SpeechOptions } from "../api";
+import {
+  ChatOptions,
+  LLMApi,
+  normalizeModelEndpointPath,
+  SupportedTextEndpoint,
+  SpeechOptions,
+} from "../api";
 import {
   useAccessStore,
   useAppConfig,
@@ -394,7 +400,12 @@ export class ClaudeApi implements LLMApi {
       top_k: 5,
     };
 
-    const path = this.path(Anthropic.ChatPath);
+    const endpointPath = normalizeModelEndpointPath(options.config.endpointPath);
+    const chatEndpointPath =
+      endpointPath === SupportedTextEndpoint.Messages
+        ? endpointPath.replace(/^\//, "")
+        : Anthropic.ChatPath;
+    const path = this.path(chatEndpointPath);
     const requestHeaders = await getHeadersWithRouterUcan(path);
 
     const controller = new AbortController();

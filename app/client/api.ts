@@ -56,6 +56,9 @@ export interface RequestMessage {
 export interface LLMConfig {
   model: string;
   providerName?: string;
+  endpointPath?: string;
+  supportedEndpoints?: string[];
+  ownedBy?: string;
   temperature?: number;
   top_p?: number;
   stream?: boolean;
@@ -98,6 +101,8 @@ export interface LLMModel {
   available: boolean;
   provider: LLMModelProvider;
   sorted: number;
+  ownedBy?: string;
+  supportedEndpoints?: string[];
 }
 
 export interface LLMModelProvider {
@@ -133,6 +138,72 @@ interface ChatProvider {
 
   chat: () => void;
   usage: () => void;
+}
+
+export const SupportedTextEndpoint = {
+  Responses: "/v1/responses",
+  ChatCompletions: "/v1/chat/completions",
+  Messages: "/v1/messages",
+} as const;
+
+export function normalizeModelEndpointPath(
+  endpointPath?: string,
+): string | undefined {
+  if (!endpointPath) return undefined;
+  let normalized = endpointPath.trim();
+  if (!normalized) return undefined;
+  if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+    try {
+      normalized = new URL(normalized).pathname;
+    } catch {
+      return undefined;
+    }
+  }
+  const queryIndex = normalized.indexOf("?");
+  if (queryIndex >= 0) {
+    normalized = normalized.slice(0, queryIndex);
+  }
+  const hashIndex = normalized.indexOf("#");
+  if (hashIndex >= 0) {
+    normalized = normalized.slice(0, hashIndex);
+  }
+  if (!normalized.startsWith("/")) {
+    normalized = `/${normalized}`;
+  }
+  if (normalized.length > 1 && normalized.endsWith("/")) {
+    normalized = normalized.slice(0, -1);
+  }
+  return normalized;
+}
+
+export function normalizeSupportedEndpoints(
+  endpoints?: readonly string[],
+): string[] {
+  if (!Array.isArray(endpoints)) return [];
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  endpoints.forEach((endpoint) => {
+    const value = normalizeModelEndpointPath(endpoint);
+    if (!value || seen.has(value)) return;
+    seen.add(value);
+    normalized.push(value);
+  });
+  return normalized;
+}
+
+export function selectPreferredTextEndpoint(
+  endpoints?: readonly string[],
+): string | undefined {
+  const normalized = normalizeSupportedEndpoints(endpoints);
+  if (normalized.length === 0) return undefined;
+  const order = [
+    SupportedTextEndpoint.Responses,
+    SupportedTextEndpoint.ChatCompletions,
+  ];
+  for (const endpoint of order) {
+    if (normalized.includes(endpoint)) return endpoint;
+  }
+  return undefined;
 }
 
 export class ClientApi {
@@ -246,7 +317,10 @@ export function validString(x: string): boolean {
   return x?.length > 0;
 }
 
-export function getHeaders(ignoreHeaders: boolean = false) {
+export function getHeaders(
+  ignoreHeaders: boolean = false,
+  providerNameOverride?: string,
+) {
   const accessStore = useAccessStore.getState();
   const chatStore = useChatStore.getState();
   let headers: Record<string, string> = {};
@@ -261,20 +335,21 @@ export function getHeaders(ignoreHeaders: boolean = false) {
 
   function getConfig() {
     const modelConfig = chatStore.currentSession().mask.modelConfig;
-    const isGoogle = modelConfig.providerName === ServiceProvider.Google;
-    const isAzure = modelConfig.providerName === ServiceProvider.Azure;
-    const isAnthropic = modelConfig.providerName === ServiceProvider.Anthropic;
-    const isBaidu = modelConfig.providerName == ServiceProvider.Baidu;
-    const isByteDance = modelConfig.providerName === ServiceProvider.ByteDance;
-    const isAlibaba = modelConfig.providerName === ServiceProvider.Alibaba;
-    const isMoonshot = modelConfig.providerName === ServiceProvider.Moonshot;
-    const isIflytek = modelConfig.providerName === ServiceProvider.Iflytek;
-    const isDeepSeek = modelConfig.providerName === ServiceProvider.DeepSeek;
-    const isXAI = modelConfig.providerName === ServiceProvider.XAI;
-    const isChatGLM = modelConfig.providerName === ServiceProvider.ChatGLM;
+    const providerName = providerNameOverride ?? modelConfig.providerName;
+    const isGoogle = providerName === ServiceProvider.Google;
+    const isAzure = providerName === ServiceProvider.Azure;
+    const isAnthropic = providerName === ServiceProvider.Anthropic;
+    const isBaidu = providerName == ServiceProvider.Baidu;
+    const isByteDance = providerName === ServiceProvider.ByteDance;
+    const isAlibaba = providerName === ServiceProvider.Alibaba;
+    const isMoonshot = providerName === ServiceProvider.Moonshot;
+    const isIflytek = providerName === ServiceProvider.Iflytek;
+    const isDeepSeek = providerName === ServiceProvider.DeepSeek;
+    const isXAI = providerName === ServiceProvider.XAI;
+    const isChatGLM = providerName === ServiceProvider.ChatGLM;
     const isSiliconFlow =
-      modelConfig.providerName === ServiceProvider.SiliconFlow;
-    const isAI302 = modelConfig.providerName === ServiceProvider["302.AI"];
+      providerName === ServiceProvider.SiliconFlow;
+    const isAI302 = providerName === ServiceProvider["302.AI"];
     const isEnabledAccessControl = accessStore.enabledAccessControl();
     const apiKey = isGoogle
       ? accessStore.googleApiKey
