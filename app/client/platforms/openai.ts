@@ -54,6 +54,12 @@ import {
 } from "@yeying-community/web3-bs";
 import { getCachedUcanSession } from "@/app/plugins/ucan-session";
 import {
+  getErrorMessage,
+  invalidateUcan,
+  invalidateUcanAndThrow,
+  shouldInvalidateUcanByError,
+} from "@/app/plugins/ucan-auth";
+import {
   getMessageTextContent,
   isVisionModel,
   isDalle3 as _isDalle3,
@@ -226,6 +232,7 @@ async function getHeadersWithRouterUcan(
   const audience = getRouterAudience();
   const capabilities = getRouterCapabilities();
   if (!audience || !capabilities.length) return headers;
+  const hasFallbackAuthorization = Boolean(headers["Authorization"]);
 
   const cachedToken = getValidCachedRouterInvocationToken(
     audience,
@@ -236,11 +243,19 @@ async function getHeadersWithRouterUcan(
     return headers;
   }
 
+  // Do not proactively wake the wallet on request paths.
+  // If a valid UCAN session has already been stored locally, use it.
+  const issuer = await getCachedUcanSession();
+  if (!issuer) {
+    cachedRouterInvocationToken = null;
+    if (!hasFallbackAuthorization) {
+      return await invalidateUcanAndThrow("UCAN session is not available");
+    }
+    await invalidateUcan("UCAN session is not available");
+    return headers;
+  }
+
   try {
-    // Do not proactively wake the wallet on request paths.
-    // If a valid UCAN session has already been stored locally, use it.
-    const issuer = await getCachedUcanSession();
-    if (!issuer) return headers;
     const ucan = await createInvocationUcan({
       audience,
       capabilities,
@@ -259,6 +274,16 @@ async function getHeadersWithRouterUcan(
     }
     headers["Authorization"] = `Bearer ${ucan}`;
   } catch (error) {
+    cachedRouterInvocationToken = null;
+    if (shouldInvalidateUcanByError(error)) {
+      if (!hasFallbackAuthorization) {
+        return await invalidateUcanAndThrow(
+          getErrorMessage(error) || "UCAN invocation failed",
+        );
+      }
+      await invalidateUcan(getErrorMessage(error) || "UCAN invocation failed");
+      return headers;
+    }
     console.warn("[UCAN] Failed to create invocation", error);
   }
   return headers;

@@ -9,6 +9,12 @@ import {
 import { getClientConfig } from "@/app/config/client";
 import { getCachedUcanSession } from "@/app/plugins/ucan-session";
 import {
+  getErrorMessage,
+  invalidateUcan,
+  invalidateUcanAndThrow,
+  shouldInvalidateUcanByError,
+} from "@/app/plugins/ucan-auth";
+import {
   getRouterAudience,
   getRouterCapabilities,
   getUcanRootCapsKey,
@@ -191,6 +197,7 @@ async function getHeadersWithRouterUcan(url: string) {
   const audience = getRouterAudience();
   const capabilities = getRouterCapabilities();
   if (!audience || !capabilities.length) return headers;
+  const hasFallbackAuthorization = Boolean(headers["Authorization"]);
 
   const cachedToken = getValidCachedRouterInvocationToken(
     audience,
@@ -201,9 +208,17 @@ async function getHeadersWithRouterUcan(url: string) {
     return headers;
   }
 
+  const issuer = await getCachedUcanSession();
+  if (!issuer) {
+    cachedRouterInvocationToken = null;
+    if (!hasFallbackAuthorization) {
+      return await invalidateUcanAndThrow("UCAN session is not available");
+    }
+    await invalidateUcan("UCAN session is not available");
+    return headers;
+  }
+
   try {
-    const issuer = await getCachedUcanSession();
-    if (!issuer) return headers;
     const ucan = await createInvocationUcan({
       audience,
       capabilities,
@@ -222,6 +237,16 @@ async function getHeadersWithRouterUcan(url: string) {
     }
     headers["Authorization"] = `Bearer ${ucan}`;
   } catch (error) {
+    cachedRouterInvocationToken = null;
+    if (shouldInvalidateUcanByError(error)) {
+      if (!hasFallbackAuthorization) {
+        return await invalidateUcanAndThrow(
+          getErrorMessage(error) || "UCAN invocation failed",
+        );
+      }
+      await invalidateUcan(getErrorMessage(error) || "UCAN invocation failed");
+      return headers;
+    }
     console.warn("[Router Models] failed to create invocation token", error);
   }
   return headers;

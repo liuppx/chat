@@ -27,7 +27,7 @@ import {
   getUcanRootCapsKey,
   getWebdavServiceHost,
 } from "./ucan";
-import { clearCachedUcanSession, getCachedUcanSession } from "./ucan-session";
+import { clearCachedUcanSession, ensureLocalUcanSession } from "./ucan-session";
 
 const providerOptions = {
   preferYeYing: true,
@@ -457,9 +457,7 @@ export async function loginWithUcan(
     }
 
     const rootCapabilities = getUcanRootCapabilities();
-    const session = await getCachedUcanSession(providerInstance, {
-      refresh: true,
-    });
+    const session = await ensureLocalUcanSession();
     if (!session) {
       throw new Error("UCAN session is not available");
     }
