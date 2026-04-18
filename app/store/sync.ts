@@ -52,6 +52,27 @@ type MaskLike = {
 
 const CHATGPT_NEXT_WEB_FILE_CACHE = "chatgpt-next-web-file";
 
+function toStableValue(input: unknown): unknown {
+  if (Array.isArray(input)) {
+    return input.map((item) => toStableValue(item));
+  }
+  if (input && typeof input === "object") {
+    const entries = Object.entries(input as Record<string, unknown>).sort(
+      ([left], [right]) => left.localeCompare(right),
+    );
+    const normalized: Record<string, unknown> = {};
+    for (const [key, value] of entries) {
+      normalized[key] = toStableValue(value);
+    }
+    return normalized;
+  }
+  return input;
+}
+
+function stableSerialize(input: unknown) {
+  return JSON.stringify(toStableValue(input));
+}
+
 function isCacheMediaUrl(url?: string) {
   return typeof url === "string" && url.includes(CACHE_URL_PREFIX);
 }
@@ -450,18 +471,31 @@ export const useSyncStore = createPersistStore(
           const latestLocalState = getLocalAppState();
           mergeAppState(latestLocalState, parsedRemoteState);
           setLocalAppState(latestLocalState);
+
+          const latestLocalStateForSync = getLocalAppStateForSync();
+          const hasStateDiff =
+            stableSerialize(latestLocalStateForSync) !==
+            stableSerialize(parsedRemoteState);
+
+          if (!hasStateDiff) {
+            set({ lastSyncTime: Date.now(), lastProvider: provider });
+            console.log("[Sync] Local state already matches remote, skip write.");
+            return;
+          }
+
+          if (provider === ProviderType.WebDAV) {
+            await uploadCacheMediaForWebdav(latestLocalStateForSync, client);
+          }
+          await writeSyncState(
+            client,
+            stateBaseKey,
+            JSON.stringify(latestLocalStateForSync),
+          );
+          set({ lastSyncTime: Date.now(), lastProvider: provider });
         } catch (e) {
           console.log("[Sync] failed to get remote state", e);
           throw e;
         }
-
-        const latestLocalState = await getLocalAppStateForUpload(
-          provider,
-          client,
-        );
-        await writeSyncState(client, stateBaseKey, JSON.stringify(latestLocalState));
-
-        set({ lastSyncTime: Date.now(), lastProvider: provider });
       });
     },
 
