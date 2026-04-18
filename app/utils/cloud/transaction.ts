@@ -3,6 +3,10 @@ import { type SyncClient, ProviderType } from ".";
 
 const SYNC_TXN_VERSION = 1;
 const DEFAULT_STATE_KEY = "backup";
+const SYNC_LOCK_KEY_SUFFIX = "__sync_mutex_v1";
+const SYNC_LOCK_TTL_MS = 150 * 1000;
+const SYNC_LOCK_WAIT_TIMEOUT_MS = 180 * 1000;
+const SYNC_LOCK_RETRY_BASE_MS = 300;
 
 type TxnKeyLayout = {
   name: "safe";
@@ -111,6 +115,14 @@ function createTxId() {
   return `${timestamp}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
+function buildSyncLockKey(baseKey: string) {
+  return `${baseKey}.${SYNC_LOCK_KEY_SUFFIX}`;
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
 async function loadLatestTxnHead(
   client: SyncClient,
   baseKey: string,
@@ -188,6 +200,44 @@ export async function readSyncState(
 
   // Fallback for non-transactional data.
   return await client.get(normalizedBaseKey);
+}
+
+export async function withSyncStateLock<T>(
+  client: SyncClient,
+  baseKey: string,
+  runner: () => Promise<T>,
+): Promise<T> {
+  const normalizedBaseKey = normalizeStateKey(baseKey);
+  const lockKey = buildSyncLockKey(normalizedBaseKey);
+  const lockOwner = createTxId();
+  const deadline = Date.now() + SYNC_LOCK_WAIT_TIMEOUT_MS;
+  let acquired = false;
+
+  while (Date.now() <= deadline) {
+    acquired = await client.acquireLock(lockKey, lockOwner, SYNC_LOCK_TTL_MS);
+    if (acquired) break;
+    const jitter = Math.floor(Math.random() * SYNC_LOCK_RETRY_BASE_MS);
+    await sleep(SYNC_LOCK_RETRY_BASE_MS + jitter);
+  }
+
+  if (!acquired) {
+    throw new Error(
+      `sync lock timeout after ${SYNC_LOCK_WAIT_TIMEOUT_MS}ms (${lockKey})`,
+    );
+  }
+
+  try {
+    return await runner();
+  } finally {
+    try {
+      await client.releaseLock(lockKey, lockOwner);
+    } catch (error) {
+      console.warn("[Sync] failed to release sync lock", {
+        lockKey,
+        error,
+      });
+    }
+  }
 }
 
 export async function writeSyncState(

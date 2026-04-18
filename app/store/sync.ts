@@ -23,6 +23,12 @@ import {
   type SyncClient,
 } from "../utils/cloud";
 import {
+  readSyncState,
+  resolveSyncStateBaseKey,
+  withSyncStateLock,
+  writeSyncState,
+} from "../utils/cloud/transaction";
+import {
   getCachedUcanSession,
   refreshUcanSession,
 } from "../plugins/ucan-session";
@@ -409,40 +415,54 @@ export const useSyncStore = createPersistStore(
       }
 
       const client = createSyncClient(provider, get());
-
-      try {
-        const remoteState = await client.get(config.username);
-        if (!remoteState || remoteState === "") {
+      const stateBaseKey = resolveSyncStateBaseKey(
+        provider,
+        config as { username?: string },
+      );
+      await withSyncStateLock(client, stateBaseKey, async () => {
+        const persistLocalStateToRemote = async (reason: string) => {
           const latestLocalState = await getLocalAppStateForUpload(
             provider,
             client,
           );
-          await client.set(config.username, JSON.stringify(latestLocalState));
-          console.log(
-            "[Sync] Remote state is empty, using local state instead.",
+          await writeSyncState(
+            client,
+            stateBaseKey,
+            JSON.stringify(latestLocalState),
           );
-          return;
+          set({ lastSyncTime: Date.now(), lastProvider: provider });
+          console.log(reason);
+        };
+
+        try {
+          const remoteState = await readSyncState(client, stateBaseKey);
+          if (!remoteState || remoteState === "") {
+            await persistLocalStateToRemote(
+              "[Sync] Remote state is empty, using local state instead.",
+            );
+            return;
+          }
+
+          const parsedRemoteState = JSON.parse(remoteState) as AppState;
+          if (provider === ProviderType.WebDAV) {
+            await hydrateCacheMediaFromWebdav(parsedRemoteState, client);
+          }
+          const latestLocalState = getLocalAppState();
+          mergeAppState(latestLocalState, parsedRemoteState);
+          setLocalAppState(latestLocalState);
+        } catch (e) {
+          console.log("[Sync] failed to get remote state", e);
+          throw e;
         }
 
-        const parsedRemoteState = JSON.parse(remoteState) as AppState;
-        if (provider === ProviderType.WebDAV) {
-          await hydrateCacheMediaFromWebdav(parsedRemoteState, client);
-        }
-        const latestLocalState = getLocalAppState();
-        mergeAppState(latestLocalState, parsedRemoteState);
-        setLocalAppState(latestLocalState);
-      } catch (e) {
-        console.log("[Sync] failed to get remote state", e);
-        throw e;
-      }
+        const latestLocalState = await getLocalAppStateForUpload(
+          provider,
+          client,
+        );
+        await writeSyncState(client, stateBaseKey, JSON.stringify(latestLocalState));
 
-      const latestLocalState = await getLocalAppStateForUpload(
-        provider,
-        client,
-      );
-      await client.set(config.username, JSON.stringify(latestLocalState));
-
-      set({ lastSyncTime: Date.now(), lastProvider: provider });
+        set({ lastSyncTime: Date.now(), lastProvider: provider });
+      });
     },
 
     async check() {

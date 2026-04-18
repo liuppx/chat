@@ -33,12 +33,12 @@ async function handle(
     return NextResponse.json({ body: "OK" }, { status: 200 });
   }
   const folder = STORAGE_KEY;
-  const fileName = `${folder}/backup.json`;
-  const mediaFolder = `${folder}/media`;
 
   const requestUrl = new URL(req.url);
   let endpoint = requestUrl.searchParams.get("endpoint");
-  let proxy_method = requestUrl.searchParams.get("proxy_method") || req.method;
+  const proxy_method = (
+    requestUrl.searchParams.get("proxy_method") || req.method
+  ).toUpperCase();
 
   // Validate the endpoint to prevent potential SSRF attacks
   if (
@@ -75,16 +75,14 @@ async function handle(
   const normalizedEndpointPath = endpointPath
     .replace(/^\/+/, "")
     .replace(/\/+$/, "");
-  const isBackupPath = normalizedEndpointPath === fileName;
-  const isMediaFilePath = normalizedEndpointPath.startsWith(`${mediaFolder}/`);
+  const pathSegments = normalizedEndpointPath.split("/").filter(Boolean);
+  const hasPathTraversal = pathSegments.some((segment) => segment === "..");
+  const isInsideFolder =
+    normalizedEndpointPath === folder ||
+    normalizedEndpointPath.startsWith(`${folder}/`);
   const targetPath = `${endpoint}${endpointPath}`;
 
-  // only allow MKCOL, GET, PUT
-  if (
-    proxy_method !== "MKCOL" &&
-    proxy_method !== "GET" &&
-    proxy_method !== "PUT"
-  ) {
+  if (hasPathTraversal || !isInsideFolder) {
     return NextResponse.json(
       {
         error: true,
@@ -96,11 +94,8 @@ async function handle(
     );
   }
 
-  // for MKCOL request, only allow request `${folder}` and `${mediaFolder}`
-  if (
-    proxy_method === "MKCOL" &&
-    ![folder, mediaFolder].includes(normalizedEndpointPath)
-  ) {
+  const allowedMethods = new Set(["MKCOL", "GET", "PUT", "DELETE"]);
+  if (!allowedMethods.has(proxy_method)) {
     return NextResponse.json(
       {
         error: true,
@@ -112,21 +107,8 @@ async function handle(
     );
   }
 
-  // for GET request, only allow backup.json and media files
-  if (proxy_method === "GET" && !isBackupPath && !isMediaFilePath) {
-    return NextResponse.json(
-      {
-        error: true,
-        msg: "you are not allowed to request " + targetPath,
-      },
-      {
-        status: 403,
-      },
-    );
-  }
-
-  // for PUT request, only allow backup.json and media files
-  if (proxy_method === "PUT" && !isBackupPath && !isMediaFilePath) {
+  // never allow deleting the root sync folder from proxy.
+  if (proxy_method === "DELETE" && normalizedEndpointPath === folder) {
     return NextResponse.json(
       {
         error: true,
