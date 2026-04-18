@@ -13,7 +13,12 @@ import type {
   MultimodalContent,
   RequestMessage,
 } from "../client/api";
-import { getClientApi } from "../client/api";
+import {
+  getClientApi,
+  normalizeSupportedEndpoints,
+  selectPreferredTextEndpoint,
+  SupportedTextEndpoint,
+} from "../client/api";
 import { ChatControllerPool } from "../client/controller";
 import { showToast } from "../components/ui-lib";
 import {
@@ -192,6 +197,37 @@ function toTextOnlyMessages(messages: RequestMessage[]): RequestMessage[] {
   return messages
     .map((message) => toTextOnlyMessage(message))
     .filter((message): message is RequestMessage => Boolean(message));
+}
+
+function resolveRuntimeModelRouting(
+  modelName: string,
+  providerName: ServiceProvider,
+) {
+  const models = useAppConfig.getState().models ?? [];
+  const selectedModel =
+    models.find(
+      (model) =>
+        model.name === modelName &&
+        model?.provider?.providerName === providerName,
+    ) ?? models.find((model) => model.name === modelName);
+  const supportedEndpoints = normalizeSupportedEndpoints(
+    selectedModel?.supportedEndpoints,
+  );
+  const endpointPath = selectPreferredTextEndpoint(supportedEndpoints);
+
+  let requestProvider = providerName;
+  if (endpointPath === SupportedTextEndpoint.Messages) {
+    requestProvider = ServiceProvider.Anthropic;
+  } else if (endpointPath) {
+    requestProvider = ServiceProvider.OpenAI;
+  }
+
+  return {
+    requestProvider,
+    endpointPath,
+    supportedEndpoints,
+    ownedBy: selectedModel?.ownedBy,
+  };
 }
 
 function fillTemplateWith(input: string, modelConfig: ModelConfig) {
@@ -559,11 +595,22 @@ export const useChatStore = createPersistStore(
           ]);
         });
 
-        const api: ClientApi = getClientApi(modelConfig.providerName);
+        const routing = resolveRuntimeModelRouting(
+          modelConfig.model,
+          modelConfig.providerName,
+        );
+        const api: ClientApi = getClientApi(routing.requestProvider);
         // make request
         api.llm.chat({
           messages: sendMessages,
-          config: { ...modelConfig, stream: true },
+          config: {
+            ...modelConfig,
+            providerName: routing.requestProvider,
+            endpointPath: routing.endpointPath,
+            supportedEndpoints: routing.supportedEndpoints,
+            ownedBy: routing.ownedBy,
+            stream: true,
+          },
           onUpdate(message) {
             botMessage.streaming = true;
             botMessage.status = "streaming";
@@ -786,7 +833,13 @@ export const useChatStore = createPersistStore(
               session.mask.modelConfig.model,
               session.mask.modelConfig.providerName,
             );
-        const api: ClientApi = getClientApi(providerName as ServiceProvider);
+        const summarizeProviderName =
+          (providerName as ServiceProvider) || ServiceProvider.OpenAI;
+        const summarizeRouting = resolveRuntimeModelRouting(
+          model,
+          summarizeProviderName,
+        );
+        const api: ClientApi = getClientApi(summarizeRouting.requestProvider);
 
         // remove error messages if any
         const messages = session.messages;
@@ -818,7 +871,10 @@ export const useChatStore = createPersistStore(
               config: {
                 model,
                 stream: false,
-                providerName,
+                providerName: summarizeRouting.requestProvider,
+                endpointPath: summarizeRouting.endpointPath,
+                supportedEndpoints: summarizeRouting.supportedEndpoints,
+                ownedBy: summarizeRouting.ownedBy,
               },
               onFinish(message, responseRes) {
                 if (responseRes?.status === 200) {
@@ -889,7 +945,10 @@ export const useChatStore = createPersistStore(
               ...modelcfg,
               stream: true,
               model,
-              providerName,
+              providerName: summarizeRouting.requestProvider,
+              endpointPath: summarizeRouting.endpointPath,
+              supportedEndpoints: summarizeRouting.supportedEndpoints,
+              ownedBy: summarizeRouting.ownedBy,
             },
             onUpdate(message) {
               session.memoryPrompt = message;

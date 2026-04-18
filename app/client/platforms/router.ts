@@ -24,11 +24,20 @@ import {
   normalizeUcanCapabilities,
   type UcanCapability,
 } from "@yeying-community/web3-bs";
-import { ChatOptions, LLMApi, LLMModel, LLMUsage, SpeechOptions } from "../api";
+import {
+  ChatOptions,
+  LLMApi,
+  LLMModel,
+  LLMUsage,
+  normalizeSupportedEndpoints,
+  SupportedTextEndpoint,
+  SpeechOptions,
+} from "../api";
 
 type RouterModelCard = {
   id?: string;
   owned_by?: string;
+  supported_endpoints?: string[];
 };
 
 type RouterModelListResponse = {
@@ -221,8 +230,19 @@ async function getHeadersWithRouterUcan(url: string) {
 function resolveProviderNameFromOwnedBy(
   ownedBy: string,
   modelName: string,
+  supportedEndpoints: string[],
 ): ServiceProvider {
   const source = `${ownedBy} ${modelName}`.toLowerCase();
+  const hasMessages = supportedEndpoints.includes(
+    SupportedTextEndpoint.Messages,
+  );
+  const hasOpenAIText =
+    supportedEndpoints.includes(SupportedTextEndpoint.Responses) ||
+    supportedEndpoints.includes(SupportedTextEndpoint.ChatCompletions);
+
+  if (hasMessages && !hasOpenAIText) {
+    return ServiceProvider.Anthropic;
+  }
 
   if (source.includes("anthropic") || source.includes("claude")) {
     return ServiceProvider.Anthropic;
@@ -285,6 +305,9 @@ function resolveProviderNameFromOwnedBy(
   }
   if (source.includes("302.ai") || source.includes("302ai")) {
     return ServiceProvider["302.AI"];
+  }
+  if (hasMessages) {
+    return ServiceProvider.Anthropic;
   }
   return ServiceProvider.OpenAI;
 }
@@ -388,9 +411,13 @@ export class RouterApi implements LLMApi {
       for (const item of list) {
         const name = item.id?.trim();
         if (!name) continue;
+        const supportedEndpoints = normalizeSupportedEndpoints(
+          item.supported_endpoints,
+        );
         const providerName = resolveProviderNameFromOwnedBy(
           item.owned_by || "",
           name,
+          supportedEndpoints,
         );
         const key = `${name}@${providerName}`;
         if (seen.has(key)) continue;
@@ -401,6 +428,8 @@ export class RouterApi implements LLMApi {
           displayName: name,
           available: true,
           sorted: seq++,
+          ownedBy: (item.owned_by || "").trim() || undefined,
+          supportedEndpoints,
           provider: {
             id: providerId(providerName),
             providerName,

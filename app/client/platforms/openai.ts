@@ -33,6 +33,8 @@ import {
   LLMModel,
   LLMUsage,
   MultimodalContent,
+  normalizeModelEndpointPath,
+  SupportedTextEndpoint,
   SpeechOptions,
 } from "../api";
 import Locale from "../../locales";
@@ -213,8 +215,11 @@ function getValidCachedRouterInvocationToken(
   return cached.token;
 }
 
-async function getHeadersWithRouterUcan(url: string) {
-  const headers = getHeaders();
+async function getHeadersWithRouterUcan(
+  url: string,
+  providerNameOverride?: string,
+) {
+  const headers = getHeaders(false, providerNameOverride);
   if (!isRouterUrl(url)) return headers;
   if (!isUcanMetaValid()) return headers;
 
@@ -261,6 +266,20 @@ async function getHeadersWithRouterUcan(url: string) {
 
 function isResponsesPath(path: string) {
   return path.includes("/v1/responses");
+}
+
+function resolveOpenAITextEndpointPath(
+  endpointPath?: string,
+): string | undefined {
+  const normalized = normalizeModelEndpointPath(endpointPath);
+  if (!normalized) return undefined;
+  if (
+    normalized !== SupportedTextEndpoint.Responses &&
+    normalized !== SupportedTextEndpoint.ChatCompletions
+  ) {
+    return undefined;
+  }
+  return normalized;
 }
 
 function normalizeResponsesTextFormat(responseFormat: any) {
@@ -769,8 +788,15 @@ export class ChatGPTApi implements LLMApi {
         funcs = toolPair[1] ?? {};
       }
 
+      const endpointPath = resolveOpenAITextEndpointPath(
+        options.config.endpointPath,
+      );
       const useResponsesEndpoint =
-        !isDalle3 && modelConfig.providerName !== ServiceProvider.Azure;
+        !isDalle3 &&
+        modelConfig.providerName !== ServiceProvider.Azure &&
+        (endpointPath
+          ? endpointPath === SupportedTextEndpoint.Responses
+          : true);
 
       let chatPath = "";
       if (modelConfig.providerName === ServiceProvider.Azure) {
@@ -799,12 +825,15 @@ export class ChatGPTApi implements LLMApi {
           ),
         );
       } else {
+        const textPath = endpointPath
+          ? endpointPath.replace(/^\//, "")
+          : useResponsesEndpoint
+            ? OpenaiPath.ResponsePath
+            : OpenaiPath.ChatPath;
         chatPath = this.path(
           isDalle3
             ? OpenaiPath.ImagePath
-            : useResponsesEndpoint
-              ? OpenaiPath.ResponsePath
-              : OpenaiPath.ChatPath,
+            : textPath,
         );
       }
 
@@ -955,7 +984,10 @@ export class ChatGPTApi implements LLMApi {
           return toolIndex;
         };
 
-        const chatHeaders = await getHeadersWithRouterUcan(chatPath);
+        const chatHeaders = await getHeadersWithRouterUcan(
+          chatPath,
+          modelConfig.providerName,
+        );
         streamWithThink(
           chatPath,
           requestPayload,
@@ -1195,7 +1227,10 @@ export class ChatGPTApi implements LLMApi {
           options,
         );
       } else {
-        const chatHeaders = await getHeadersWithRouterUcan(chatPath);
+        const chatHeaders = await getHeadersWithRouterUcan(
+          chatPath,
+          modelConfig.providerName,
+        );
         const chatPayload = {
           method: "POST",
           body: JSON.stringify(requestPayload),
