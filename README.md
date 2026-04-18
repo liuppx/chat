@@ -22,7 +22,6 @@ Chat（UCAN 定制版）
 - 登录页前置方案评估：`docs/登录页前置方案评估.md`
 - 移动端登录与双后端鉴权方案：`docs/移动端登录与双后端鉴权方案.md`
 - Router 与 WebDAV 集成说明：`docs/Router与WebDAV集成说明.md`
-- WebDAV 同步方案（UCAN）：`docs/WebDAV同步方案UCAN.md`
 - 数据同步：`docs/数据同步.md`
 - UCAN 与 SIWE 权限设计（可扩展版）：`docs/UCAN与SIWE权限设计可扩展版.md`
 - Cloudflare Pages 部署指南：`docs/CloudflarePages部署指南.md`
