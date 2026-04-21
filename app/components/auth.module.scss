@@ -65,7 +65,7 @@
   .auth-wallet {
     --wallet-gap: 8px;
     --wallet-button-width: 132px;
-    margin-top: 16vh;
+    margin-top: 16px;
     margin-bottom: 3vh;
     padding: 0;
     border: none;
@@ -75,6 +75,74 @@
     grid-template-columns: 240px var(--wallet-button-width);
     align-items: center;
     column-gap: var(--wallet-gap);
+  }
+
+  .auth-mode-switch {
+    margin-top: 10vh;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .auth-mode-option {
+    border: 1px solid #d7e4fb;
+    background: #f6f9ff;
+    color: #26466f;
+    border-radius: 999px;
+    height: 34px;
+    padding: 0 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.16s ease;
+
+    &[data-active="true"] {
+      border-color: #7aa3e7;
+      background: #dce9ff;
+      color: #1f4f99;
+      font-weight: 600;
+    }
+  }
+
+  .auth-central {
+    margin-top: 16px;
+    width: 420px;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid #d7e4fb;
+    background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .auth-central-row {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    align-items: center;
+    gap: 8px;
+
+    label {
+      color: #456486;
+      font-size: 12px;
+    }
+
+    input {
+      width: 100%;
+      height: 36px;
+      border: 1px solid #c7d9f5;
+      border-radius: 8px;
+      padding: 0 10px;
+      font-size: 13px;
+      color: #233750;
+      background: #fff;
+      outline: none;
+
+      &:focus {
+        border-color: #6a97dd;
+        box-shadow: 0 0 0 2px rgba(106, 151, 221, 0.15);
+      }
+    }
   }
 
   .auth-wallet-select-wrap {
@@ -226,8 +294,14 @@
   }
 
   @media (max-width: 600px) {
+    .auth-mode-switch {
+      margin-top: 8vh;
+      flex-wrap: wrap;
+      width: min(320px, calc(100vw - 32px));
+    }
+
     .auth-wallet {
-      margin-top: 12vh;
+      margin-top: 12px;
       width: min(320px, calc(100vw - 32px));
       display: flex;
       flex-direction: column;
@@ -248,6 +322,15 @@
     .auth-wallet-connect {
       width: 100%;
       min-width: 0;
+    }
+
+    .auth-central {
+      width: min(340px, calc(100vw - 32px));
+    }
+
+    .auth-central-row {
+      grid-template-columns: 1fr;
+      gap: 6px;
     }
   }
 }

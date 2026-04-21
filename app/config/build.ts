@@ -54,6 +54,13 @@ export const getBuildConfig = () => {
     process.env.ROUTER_BACKEND_URL ??
     process.env.YEYING_BACKEND_URL ??
     defaultRouterBackendUrl;
+  const centralUcanAuthBaseUrl =
+    process.env.CENTRAL_UCAN_AUTH_BASE_URL?.trim() ||
+    "http://127.0.0.1:8100";
+  const centralUcanClientId =
+    process.env.CENTRAL_UCAN_CLIENT_ID?.trim() || "chat-web";
+  const centralUcanAppName =
+    process.env.CENTRAL_UCAN_APP_NAME?.trim() || "chat-web";
 
   const commitInfo = (() => {
     try {
@@ -86,6 +93,9 @@ export const getBuildConfig = () => {
     webdavBackendBaseUrl,
     webdavBackendPrefix,
     routerBackendUrl,
+    centralUcanAuthBaseUrl,
+    centralUcanClientId,
+    centralUcanAppName,
   };
 };
 

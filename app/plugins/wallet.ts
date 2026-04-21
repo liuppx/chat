@@ -28,6 +28,13 @@ import {
   getWebdavServiceHost,
 } from "./ucan";
 import { clearCachedUcanSession, ensureLocalUcanSession } from "./ucan-session";
+import {
+  clearCentralUcanAuth,
+  isCentralModeEnabled,
+  isCentralUcanAuthorized,
+  setUcanAuthMode,
+  UCAN_AUTH_MODE_WALLET,
+} from "./central-ucan";
 
 const providerOptions = {
   preferYeYing: true,
@@ -72,6 +79,9 @@ function getUcanIssuer(address: string) {
 }
 
 export function isUcanMetaAuthorized(): boolean {
+  if (isCentralModeEnabled()) {
+    return isCentralUcanAuthorized();
+  }
   try {
     if (typeof localStorage === "undefined") return false;
     const account = getCurrentAccount();
@@ -293,6 +303,8 @@ export async function connectWallet(preferredAccount?: string) {
           currentAccount = matchedAccount;
         }
         localStorage.setItem("currentAccount", currentAccount);
+        setUcanAuthMode(UCAN_AUTH_MODE_WALLET, { emit: false });
+        clearCentralUcanAuth({ preserveMode: true, emit: false });
         await loginWithUcan(provider, currentAccount, {
           silent: false,
           reload: false,
@@ -414,6 +426,8 @@ export async function loginWithUcan(
   loginInFlight = true;
   try {
     const providerInstance = provider || (await requireProvider());
+    setUcanAuthMode(UCAN_AUTH_MODE_WALLET, { emit: false });
+    clearCentralUcanAuth({ preserveMode: true, emit: false });
     const currentAccount = address || getCurrentAccount();
     if (!currentAccount) {
       notifyError("❌请先连接钱包");
@@ -531,6 +545,9 @@ export async function logoutWallet() {
  * @returns
  */
 export async function isValidUcanAuthorization(): Promise<boolean> {
+  if (isCentralModeEnabled()) {
+    return isCentralUcanAuthorized();
+  }
   try {
     const root = await getStoredRoot();
     if (!root || typeof root.exp !== "number") {

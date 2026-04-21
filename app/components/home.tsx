@@ -37,6 +37,10 @@ import {
   isUcanMetaAuthorized,
   waitForWallet,
 } from "../plugins/wallet";
+import {
+  getCentralUcanExpiresAt,
+  isCentralModeEnabled,
+} from "../plugins/central-ucan";
 import { toast } from "sonner";
 
 import { useToastStore } from "../store/toast";
@@ -233,8 +237,13 @@ function Screen() {
 
   useEffect(() => {
     if (typeof window === "undefined" || !isAuthorized) return;
-    const expRaw = localStorage.getItem("ucanRootExp");
-    const exp = Number(expRaw);
+    let exp = 0;
+    if (isCentralModeEnabled()) {
+      exp = getCentralUcanExpiresAt() || 0;
+    } else {
+      const expRaw = localStorage.getItem("ucanRootExp");
+      exp = Number(expRaw);
+    }
     if (!Number.isFinite(exp) || exp <= Date.now()) return;
     const delay = Math.max(0, exp - Date.now());
     const expiryTimer = window.setTimeout(() => {

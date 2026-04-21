@@ -44,6 +44,8 @@ Chat（UCAN 定制版）
 cp .env.template .env
 # 确保本地 router 地址指向 3011（示例）
 # ROUTER_BACKEND_URL=http://localhost:3011/
+# 如启用中心化 UCAN 登录，需配置 Node 认证服务地址
+# CENTRAL_UCAN_AUTH_BASE_URL=http://127.0.0.1:8100
 # 如使用 WebDAV 代理，请设置 WEBDAV_BACKEND_BASE_URL（仅填基础地址，不含路径）
 npm install
 npm run dev

@@ -1,7 +1,7 @@
 import styles from "./auth.module.scss";
 import { IconButton } from "./button";
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Path, SAAS_CHAT_URL } from "../constant";
 import Locale from "../locales";
 import Delete from "../icons/close.svg";
@@ -18,6 +18,18 @@ import {
   getCurrentAccount,
   isValidUcanAuthorization,
 } from "../plugins/wallet";
+import {
+  applyCentralAuthorizeExchange,
+  createCentralAuthorizeRequest,
+  exchangeCentralAuthorizeCode,
+  getDefaultCentralAppName,
+  getDefaultCentralClientId,
+  getUcanAuthMode,
+  setUcanAuthMode,
+  UCAN_AUTH_MODE_CENTRAL,
+  UCAN_AUTH_MODE_WALLET,
+} from "../plugins/central-ucan";
+import { notifyError, notifyInfo, notifySuccess } from "../plugins/show_window";
 
 const storage = safeLocalStorage();
 const WALLET_HISTORY_KEY = "walletAccountHistory";
@@ -70,15 +82,43 @@ function formatWalletAccount(account: string) {
   return `${account.slice(0, 10)}...${account.slice(-8)}`;
 }
 
+function normalizeRedirectPath(raw: string | null | undefined) {
+  const value = (raw || "").trim();
+  if (!value || !value.startsWith("/")) {
+    return Path.Home;
+  }
+  if (value === Path.Auth) {
+    return Path.Home;
+  }
+  return value;
+}
+
+function getCentralRedirectUri() {
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}/central-ucan-callback.html`;
+}
+
 export function AuthPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [ucanStatus, setUcanStatus] = useState<
     "checking" | "authorized" | "expired" | "unauthorized"
   >("checking");
+  const [authMode, setAuthMode] = useState(getUcanAuthMode());
   const [walletHistory, setWalletHistory] = useState<string[]>([]);
   const [selectedWalletAccount, setSelectedWalletAccount] = useState("");
   const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false);
+  const [centralAddress, setCentralAddress] = useState("");
+  const [centralClientId, setCentralClientId] = useState(
+    getDefaultCentralClientId(),
+  );
+  const [centralAppName, setCentralAppName] = useState(getDefaultCentralAppName());
+  const [centralAuthBaseUrl, setCentralAuthBaseUrl] = useState(
+    getClientConfig()?.centralUcanAuthBaseUrl || "http://127.0.0.1:8100",
+  );
+  const [centralLoading, setCentralLoading] = useState(false);
   const walletMenuRef = useRef<HTMLDivElement>(null);
+  const exchangedCodeRef = useRef("");
 
   useEffect(() => {
     if (getClientConfig()?.isApp) {
@@ -99,6 +139,8 @@ export function AuthPage() {
       }
       setWalletHistory(history);
       setSelectedWalletAccount(account || "");
+      setCentralAddress((prev) => prev || account || "");
+      setAuthMode(getUcanAuthMode());
       if (valid) {
         setUcanStatus("authorized");
       } else if (account) {
@@ -119,6 +161,47 @@ export function AuthPage() {
       window.removeEventListener("storage", onAuthChange);
     };
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const code = (params.get("code") || "").trim();
+    if (!code) {
+      return;
+    }
+    if (exchangedCodeRef.current === code) {
+      return;
+    }
+    exchangedCodeRef.current = code;
+    setAuthMode(UCAN_AUTH_MODE_CENTRAL);
+    setUcanAuthMode(UCAN_AUTH_MODE_CENTRAL, { emit: false });
+
+    const redirectPath = normalizeRedirectPath(params.get("state"));
+    const redirectUri = getCentralRedirectUri();
+
+    const run = async () => {
+      setCentralLoading(true);
+      try {
+        const result = await exchangeCentralAuthorizeCode({
+          code,
+          clientId: centralClientId,
+          redirectUri,
+          baseUrl: centralAuthBaseUrl,
+        });
+        applyCentralAuthorizeExchange(result, { emit: false });
+        notifySuccess("✅中心化 UCAN 登录成功");
+        const target = encodeURIComponent(redirectPath);
+        navigate(`${Path.Auth}?redirect=${target}`, { replace: true });
+        window.dispatchEvent(new Event(UCAN_AUTH_EVENT));
+      } catch (error) {
+        const message = `❌中心化授权码兑换失败: ${error}`;
+        notifyError(message);
+      } finally {
+        setCentralLoading(false);
+      }
+    };
+
+    run();
+  }, [location.search, navigate, centralClientId, centralAuthBaseUrl]);
 
   useEffect(() => {
     if (!isWalletMenuOpen) return;
@@ -154,7 +237,51 @@ export function AuthPage() {
   };
 
   const handleWalletConnect = () => {
+    setAuthMode(UCAN_AUTH_MODE_WALLET);
+    setUcanAuthMode(UCAN_AUTH_MODE_WALLET, { emit: false });
     connectWallet(selectedWalletAccount || undefined);
+  };
+
+  const handleAuthModeChange = (
+    mode: typeof UCAN_AUTH_MODE_WALLET | typeof UCAN_AUTH_MODE_CENTRAL,
+  ) => {
+    if (mode === authMode) return;
+    setAuthMode(mode);
+    setUcanAuthMode(mode, { emit: true });
+    if (mode === UCAN_AUTH_MODE_CENTRAL) {
+      setCentralAddress((prev) => prev || selectedWalletAccount || getCurrentAccount());
+    }
+  };
+
+  const handleCentralAuthorizeLogin = async () => {
+    const address = normalizeAccount(centralAddress || selectedWalletAccount);
+    if (!address) {
+      notifyInfo("请先输入区块链地址");
+      return;
+    }
+    const redirectUri = getCentralRedirectUri();
+    const params = new URLSearchParams(location.search);
+    const redirectPath = normalizeRedirectPath(params.get("redirect"));
+    setCentralLoading(true);
+    try {
+      const request = await createCentralAuthorizeRequest({
+        address,
+        clientId: centralClientId,
+        redirectUri,
+        state: redirectPath,
+        appName: centralAppName,
+        baseUrl: centralAuthBaseUrl,
+      });
+      setAuthMode(UCAN_AUTH_MODE_CENTRAL);
+      setUcanAuthMode(UCAN_AUTH_MODE_CENTRAL, { emit: false });
+      storage.setItem("currentAccount", address);
+      notifySuccess("✅已创建中心化授权请求，跳转认证页");
+      window.location.href = request.verifyUrl;
+    } catch (error) {
+      notifyError(`❌创建中心化授权请求失败: ${error}`);
+    } finally {
+      setCentralLoading(false);
+    }
   };
 
   const isWalletConnectDisabled = ucanStatus === "authorized";
@@ -172,67 +299,129 @@ export function AuthPage() {
   return (
     <div className={styles["auth-page"]}>
       <TopBanner></TopBanner>
-
-      <div className={styles["auth-wallet"]}>
-        <div className={styles["auth-wallet-select-wrap"]} ref={walletMenuRef}>
-          <button
-            type="button"
-            className={styles["auth-wallet-select"]}
-            aria-label="wallet-history-select"
-            aria-haspopup="listbox"
-            aria-expanded={isWalletMenuOpen}
-            onClick={() => setIsWalletMenuOpen((open) => !open)}
-            onKeyDown={handleWalletMenuKeyDown}
-          >
-            <span
-              className={
-                selectedWalletAccount
-                  ? styles["auth-wallet-select-value"]
-                  : styles["auth-wallet-select-placeholder"]
-              }
-              title={selectedWalletAccount || undefined}
-            >
-              {selectedWalletLabel}
-            </span>
-            <span
-              className={styles["auth-wallet-select-arrow"]}
-              data-open={isWalletMenuOpen}
-            />
-          </button>
-          {isWalletMenuOpen && (
-            <div className={styles["auth-wallet-menu"]} role="listbox">
-              {walletHistory.length > 0 ? (
-                walletHistory.map((account) => (
-                  <button
-                    type="button"
-                    key={account}
-                    className={styles["auth-wallet-option"]}
-                    data-active={
-                      account.toLowerCase() ===
-                      selectedWalletAccount.toLowerCase()
-                    }
-                    onClick={() => handleWalletAccountSelect(account)}
-                    title={account}
-                  >
-                    {account}
-                  </button>
-                ))
-              ) : (
-                <div className={styles["auth-wallet-option-empty"]}>
-                  暂无历史账户
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <IconButton
-          text="连接钱包"
-          type="primary"
-          className={styles["auth-wallet-connect"]}
-          onClick={handleWalletConnect}
-          disabled={isWalletConnectDisabled}
-        />
+      <div className={styles["auth-mode-switch"]}>
+        <button
+          type="button"
+          className={styles["auth-mode-option"]}
+          data-active={authMode === UCAN_AUTH_MODE_WALLET}
+          onClick={() => handleAuthModeChange(UCAN_AUTH_MODE_WALLET)}
+        >
+          钱包 UCAN
+        </button>
+        <button
+          type="button"
+          className={styles["auth-mode-option"]}
+          data-active={authMode === UCAN_AUTH_MODE_CENTRAL}
+          onClick={() => handleAuthModeChange(UCAN_AUTH_MODE_CENTRAL)}
+        >
+          中心化 UCAN（服务）
+        </button>
       </div>
+
+      {authMode === UCAN_AUTH_MODE_WALLET ? (
+        <div className={styles["auth-wallet"]}>
+          <div className={styles["auth-wallet-select-wrap"]} ref={walletMenuRef}>
+            <button
+              type="button"
+              className={styles["auth-wallet-select"]}
+              aria-label="wallet-history-select"
+              aria-haspopup="listbox"
+              aria-expanded={isWalletMenuOpen}
+              onClick={() => setIsWalletMenuOpen((open) => !open)}
+              onKeyDown={handleWalletMenuKeyDown}
+            >
+              <span
+                className={
+                  selectedWalletAccount
+                    ? styles["auth-wallet-select-value"]
+                    : styles["auth-wallet-select-placeholder"]
+                }
+                title={selectedWalletAccount || undefined}
+              >
+                {selectedWalletLabel}
+              </span>
+              <span
+                className={styles["auth-wallet-select-arrow"]}
+                data-open={isWalletMenuOpen}
+              />
+            </button>
+            {isWalletMenuOpen && (
+              <div className={styles["auth-wallet-menu"]} role="listbox">
+                {walletHistory.length > 0 ? (
+                  walletHistory.map((account) => (
+                    <button
+                      type="button"
+                      key={account}
+                      className={styles["auth-wallet-option"]}
+                      data-active={
+                        account.toLowerCase() ===
+                        selectedWalletAccount.toLowerCase()
+                      }
+                      onClick={() => handleWalletAccountSelect(account)}
+                      title={account}
+                    >
+                      {account}
+                    </button>
+                  ))
+                ) : (
+                  <div className={styles["auth-wallet-option-empty"]}>
+                    暂无历史账户
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <IconButton
+            text="连接钱包"
+            type="primary"
+            className={styles["auth-wallet-connect"]}
+            onClick={handleWalletConnect}
+            disabled={isWalletConnectDisabled}
+          />
+        </div>
+      ) : (
+        <div className={styles["auth-central"]}>
+          <div className={styles["auth-central-row"]}>
+            <label>区块链地址</label>
+            <input
+              value={centralAddress}
+              onChange={(event) => setCentralAddress(event.target.value)}
+              placeholder="0x..."
+            />
+          </div>
+          <div className={styles["auth-central-row"]}>
+            <label>认证服务地址</label>
+            <input
+              value={centralAuthBaseUrl}
+              onChange={(event) => setCentralAuthBaseUrl(event.target.value)}
+              placeholder="http://127.0.0.1:8100"
+            />
+          </div>
+          <div className={styles["auth-central-row"]}>
+            <label>clientId</label>
+            <input
+              value={centralClientId}
+              onChange={(event) => setCentralClientId(event.target.value)}
+              placeholder="chat-web"
+            />
+          </div>
+          <div className={styles["auth-central-row"]}>
+            <label>appName</label>
+            <input
+              value={centralAppName}
+              onChange={(event) => setCentralAppName(event.target.value)}
+              placeholder="chat-web"
+            />
+          </div>
+          <IconButton
+            text={centralLoading ? "处理中..." : "中心化 UCAN 登录"}
+            type="primary"
+            className={styles["auth-wallet-connect"]}
+            onClick={handleCentralAuthorizeLogin}
+            disabled={centralLoading}
+          />
+        </div>
+      )}
     </div>
   );
 }

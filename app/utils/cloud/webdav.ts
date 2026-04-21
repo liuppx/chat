@@ -16,6 +16,7 @@ import {
 } from "@yeying-community/web3-bs";
 import { getCachedUcanSession } from "@/app/plugins/ucan-session";
 import { invalidateUcanAuthorization } from "@/app/plugins/wallet";
+import { isCentralModeEnabled } from "@/app/plugins/central-ucan";
 import {
   acquireUcanSignLock,
   isUcanSignPending,
@@ -586,6 +587,9 @@ function createWebdavProxyFetcher(endpoint: string) {
 }
 
 async function getUcanWebDavClient(store: SyncStore) {
+  if (isCentralModeEnabled()) {
+    throw new Error("中心化 UCAN 模式暂不支持 WebDAV 同步");
+  }
   const envBaseUrl = getEnvWebdavBaseUrl();
   const envPrefix = getEnvWebdavPrefix();
   console.log("[WebDav UCAN] config", {

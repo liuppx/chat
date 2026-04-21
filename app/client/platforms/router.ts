@@ -20,6 +20,7 @@ import {
   getUcanRootCapsKey,
   UCAN_SESSION_ID,
 } from "@/app/plugins/ucan";
+import { getCentralUcanAuthorizationHeader } from "@/app/plugins/central-ucan";
 import { useAccessStore } from "@/app/store";
 import { cloudflareAIGatewayUrl } from "@/app/utils/cloudflare";
 import { fetch } from "@/app/utils/stream";
@@ -88,6 +89,9 @@ function isRouterUrl(url: string): boolean {
 }
 
 function isUcanMetaValid(): boolean {
+  if (getCentralUcanAuthorizationHeader()) {
+    return true;
+  }
   try {
     if (typeof localStorage === "undefined") return false;
     const expRaw = localStorage.getItem("ucanRootExp");
@@ -191,6 +195,11 @@ function getBaseRouterHeaders() {
 
 async function getHeadersWithRouterUcan(url: string) {
   const headers = getBaseRouterHeaders();
+  const centralAuthorization = getCentralUcanAuthorizationHeader();
+  if (centralAuthorization) {
+    headers["Authorization"] = centralAuthorization;
+    return headers;
+  }
   if (!isRouterUrl(url)) return headers;
   if (!isUcanMetaValid()) return headers;
 
