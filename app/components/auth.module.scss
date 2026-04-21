@@ -63,18 +63,17 @@
   }
 
   .auth-wallet {
-    --wallet-gap: 8px;
-    --wallet-button-width: 132px;
-    margin-top: 16px;
-    margin-bottom: 3vh;
+    margin-top: clamp(40px, 10vh, 120px);
+    margin-bottom: 0;
     padding: 0;
     border: none;
     border-radius: 0;
-    width: 380px;
+    width: min(420px, calc(100vw - 32px));
     display: grid;
-    grid-template-columns: 240px var(--wallet-button-width);
+    grid-template-columns: minmax(0, 260px) auto;
+    justify-content: center;
     align-items: center;
-    column-gap: var(--wallet-gap);
+    column-gap: 12px;
   }
 
   .auth-mode-switch {
@@ -106,7 +105,7 @@
 
   .auth-central {
     margin-top: 16px;
-    width: 420px;
+    width: 380px;
     padding: 14px;
     border-radius: 12px;
     border: 1px solid #d7e4fb;
@@ -114,6 +113,12 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+  }
+
+  .auth-central-tip {
+    color: #55708f;
+    font-size: 12px;
+    line-height: 1.5;
   }
 
   .auth-central-row {
@@ -147,32 +152,43 @@
 
   .auth-wallet-select-wrap {
     position: relative;
-    width: 240px;
-    min-width: 240px;
-    max-width: 240px;
+    width: 100%;
+    min-width: 0;
   }
 
   .auth-wallet-select {
-    position: relative;
+    box-sizing: border-box;
     width: 100%;
     height: 40px;
     min-height: 40px;
     border: 0;
     border-radius: 10px;
-    padding: 0 32px 0 12px;
+    padding: 0 68px 0 12px;
     background: var(--white);
     color: var(--black);
     font-size: 14px;
-    text-align: left;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
     box-shadow: inset 0 0 0 1.5px #9ab7e6;
     transition:
       box-shadow 0.16s ease,
       transform 0.16s ease;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
+    cursor: text;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &[data-empty="true"] {
+      color: #7a8aa0;
+      font-family:
+        "PingFang SC",
+        "Hiragino Sans GB",
+        "Microsoft YaHei",
+        sans-serif;
+    }
 
     &:hover,
     &:focus {
@@ -184,65 +200,110 @@
     &:focus {
       box-shadow: inset 0 0 0 2px #3f7fe0;
     }
-  }
 
-  .auth-wallet-select-placeholder {
-    color: #7a8aa0;
-  }
+    &::-webkit-calendar-picker-indicator {
+      opacity: 0;
+      pointer-events: none;
+      width: 0;
+      margin: 0;
+    }
 
-  .auth-wallet-select-value,
-  .auth-wallet-select-placeholder {
-    display: block;
-    width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: left;
-  }
-
-  .auth-wallet-select-value {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  }
-
-  .auth-wallet-select-arrow {
-    width: 8px;
-    height: 8px;
-    pointer-events: none;
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    border-right: 2px solid #667485;
-    border-bottom: 2px solid #667485;
-    transform: translateY(-65%) rotate(45deg);
-    opacity: 0.9;
-    transition: transform 0.16s ease;
-
-    &[data-open="true"] {
-      transform: translateY(-35%) rotate(-135deg);
+    &::-webkit-list-button {
+      opacity: 0;
+      pointer-events: none;
+      width: 0;
+      margin: 0;
     }
   }
 
-  .auth-wallet-menu {
+  .auth-wallet-copy {
     position: absolute;
-    left: 0;
-    top: calc(100% + 8px);
-    width: calc(100% + var(--wallet-gap) + var(--wallet-button-width));
-    box-sizing: border-box;
-    z-index: 40;
-    border-radius: 12px;
-    border: 1px solid #d7e4fb;
-    background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
-    box-shadow:
-      0 14px 32px rgba(25, 76, 151, 0.16),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.85);
-    max-height: 240px;
-    overflow-y: auto;
-    padding: 6px;
-    animation: auth-wallet-menu-in 0.14s ease;
+    right: 26px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 0;
+    border-radius: 6px;
+    padding: 0 6px;
+    height: 22px;
+    min-width: 34px;
+    font-size: 12px;
+    line-height: 22px;
+    background: #eaf2ff;
+    color: #315f9f;
+    cursor: pointer;
+    transition:
+      background-color 0.16s ease,
+      color 0.16s ease;
+
+    &:hover:not(:disabled) {
+      background: #d9e8ff;
+      color: #204f9e;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      background: #f0f4fb;
+      color: #97a6bd;
+    }
   }
 
-  .auth-wallet-option {
-    display: block;
+  .auth-wallet-arrow-button {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+
+    &:hover {
+      background: #edf3ff;
+    }
+  }
+
+  .auth-wallet-select-arrow {
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 6px solid #5d6b7d;
+    transform: rotate(0deg);
+    transform-origin: center 40%;
+    transition: transform 0.16s ease;
+    opacity: 0.95;
+
+    &[data-open="true"] {
+      transform: rotate(180deg);
+    }
+  }
+
+  .auth-wallet-history-menu {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 6px);
+    width: 100%;
+    z-index: 40;
+    border-radius: 10px;
+    border: 1px solid #d7e4fb;
+    background: #ffffff;
+    box-shadow:
+      0 10px 24px rgba(25, 76, 151, 0.16),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+    padding: 6px;
+    box-sizing: border-box;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+
+  .auth-wallet-history-option {
     width: 100%;
     border: 0;
     border-radius: 8px;
@@ -250,11 +311,10 @@
     color: #233750;
     padding: 9px 10px;
     text-align: left;
-    cursor: pointer;
     font-size: 13px;
     line-height: 1.4;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    word-break: break-all;
+    cursor: pointer;
     transition: background-color 0.12s ease;
 
     &:hover {
@@ -267,42 +327,26 @@
     }
   }
 
-  .auth-wallet-option-empty {
+  .auth-wallet-history-empty {
     color: #7a8aa0;
     font-size: 13px;
     padding: 8px 10px;
   }
 
-  @keyframes auth-wallet-menu-in {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
   .auth-wallet-connect {
-    width: 132px;
-    min-width: 132px;
+    width: auto;
+    min-width: 120px;
     height: 40px;
     border-radius: 10px;
-    padding: 0;
+    padding: 0 14px;
     box-sizing: border-box;
+    white-space: nowrap;
   }
 
   @media (max-width: 600px) {
-    .auth-mode-switch {
-      margin-top: 8vh;
-      flex-wrap: wrap;
-      width: min(320px, calc(100vw - 32px));
-    }
-
     .auth-wallet {
       margin-top: 12px;
-      width: min(320px, calc(100vw - 32px));
+      width: min(360px, calc(100vw - 32px));
       display: flex;
       flex-direction: column;
       align-items: stretch;
@@ -315,17 +359,13 @@
       max-width: none;
     }
 
-    .auth-wallet-menu {
-      width: 100%;
-    }
-
     .auth-wallet-connect {
       width: 100%;
       min-width: 0;
     }
 
     .auth-central {
-      width: min(340px, calc(100vw - 32px));
+      width: min(320px, calc(100vw - 32px));
     }
 
     .auth-central-row {
