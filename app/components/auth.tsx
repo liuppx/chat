@@ -29,6 +29,7 @@ import {
   UCAN_AUTH_MODE_CENTRAL,
   UCAN_AUTH_MODE_WALLET,
 } from "../plugins/central-ucan";
+import { getRouterAudience } from "../plugins/ucan";
 import { notifyError, notifyInfo, notifySuccess } from "../plugins/show_window";
 
 const storage = safeLocalStorage();
@@ -259,6 +260,11 @@ export function AuthPage() {
       notifyInfo("请先输入区块链地址");
       return;
     }
+    const routerAudience = getRouterAudience();
+    if (!routerAudience) {
+      notifyError("❌无法解析 Router audience，请检查 ROUTER_BACKEND_URL");
+      return;
+    }
     const redirectUri = getCentralRedirectUri();
     const params = new URLSearchParams(location.search);
     const redirectPath = normalizeRedirectPath(params.get("redirect"));
@@ -269,6 +275,7 @@ export function AuthPage() {
         clientId: centralClientId,
         redirectUri,
         state: redirectPath,
+        audience: routerAudience,
         appName: centralAppName,
         baseUrl: centralAuthBaseUrl,
       });

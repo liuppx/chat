@@ -532,9 +532,14 @@ export async function logoutWallet() {
   }, 2000);
   localStorage.removeItem("currentAccount");
   localStorage.removeItem("authToken");
-  await clearUcanSession(UCAN_SESSION_ID);
+  try {
+    await clearUcanSession(UCAN_SESSION_ID);
+  } catch (error) {
+    console.warn("[UCAN] failed to clear session on logout", error);
+  }
   clearUcanMeta();
   clearCachedUcanSession();
+  clearCentralUcanAuth({ emit: false });
   emitAuthChange();
   notifySuccess("✅已退出");
 }
