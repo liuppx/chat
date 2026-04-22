@@ -23,7 +23,6 @@ import {
   applyCentralAuthorizeExchange,
   createCentralAuthorizeRequest,
   exchangeCentralAuthorizeCode,
-  getDefaultCentralAppName,
   getDefaultCentralClientId,
   setUcanAuthMode,
   UCAN_AUTH_MODE_CENTRAL,
@@ -220,7 +219,6 @@ export function AuthPage() {
         redirectUri,
         state: redirectPath,
         audience: routerAudience,
-        appName: getDefaultCentralAppName(),
       });
       setUcanAuthMode(UCAN_AUTH_MODE_CENTRAL, { emit: false });
       storage.setItem("currentAccount", address);

@@ -57,8 +57,12 @@ export const getBuildConfig = () => {
   const centralUcanAuthBaseUrl =
     process.env.CENTRAL_UCAN_AUTH_BASE_URL?.trim() ||
     "http://127.0.0.1:8100";
+  const centralUcanAppId =
+    process.env.CENTRAL_UCAN_APP_ID?.trim() || "";
   const centralUcanClientId =
-    process.env.CENTRAL_UCAN_CLIENT_ID?.trim() || "chat-web";
+    centralUcanAppId ||
+    process.env.CENTRAL_UCAN_CLIENT_ID?.trim() ||
+    "chat-web";
   const centralUcanAppName =
     process.env.CENTRAL_UCAN_APP_NAME?.trim() || "chat-web";
 
@@ -94,6 +98,7 @@ export const getBuildConfig = () => {
     webdavBackendPrefix,
     routerBackendUrl,
     centralUcanAuthBaseUrl,
+    centralUcanAppId,
     centralUcanClientId,
     centralUcanAppName,
   };

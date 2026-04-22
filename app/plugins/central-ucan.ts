@@ -172,12 +172,11 @@ function buildApiUrl(path: string, baseUrlOverride?: string) {
 
 export function getDefaultCentralClientId() {
   const config = getClientConfig();
-  return config?.centralUcanClientId?.trim() || "chat-web";
-}
-
-export function getDefaultCentralAppName() {
-  const config = getClientConfig();
-  return config?.centralUcanAppName?.trim() || "chat-web";
+  return (
+    config?.centralUcanAppId?.trim() ||
+    config?.centralUcanClientId?.trim() ||
+    "chat-web"
+  );
 }
 
 export function getUcanAuthMode(): UcanAuthMode {
@@ -301,7 +300,7 @@ export async function createCentralAuthorizeRequest(input: {
   baseUrl?: string;
 }): Promise<CentralAuthorizeRequestResult> {
   const response = await fetch(
-    buildApiUrl("/api/v1/public/auth/mobile/authorize/request", input.baseUrl),
+    buildApiUrl("/api/v1/public/auth/totp/authorize/request", input.baseUrl),
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -313,7 +312,7 @@ export async function createCentralAuthorizeRequest(input: {
         state: input.state || undefined,
         audience: input.audience || undefined,
         capabilities: input.capabilities || undefined,
-        appName: input.appName || getDefaultCentralAppName(),
+        appName: input.appName || undefined,
         requestTtlMs: input.requestTtlMs,
       }),
     },
@@ -339,7 +338,7 @@ export async function exchangeCentralAuthorizeCode(input: {
   baseUrl?: string;
 }): Promise<CentralAuthorizeExchangeResult> {
   const response = await fetch(
-    buildApiUrl("/api/v1/public/auth/mobile/authorize/exchange", input.baseUrl),
+    buildApiUrl("/api/v1/public/auth/totp/authorize/exchange", input.baseUrl),
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
