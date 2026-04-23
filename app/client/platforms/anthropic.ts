@@ -17,11 +17,18 @@ import { getClientConfig } from "@/app/config/client";
 import { ANTHROPIC_BASE_URL } from "@/app/constant";
 import { getCachedUcanSession } from "@/app/plugins/ucan-session";
 import {
+  getErrorMessage,
+  invalidateUcan,
+  invalidateUcanAndThrow,
+  shouldInvalidateUcanByError,
+} from "@/app/plugins/ucan-auth";
+import {
   getRouterAudience,
   getRouterCapabilities,
   getUcanRootCapsKey,
   UCAN_SESSION_ID,
 } from "@/app/plugins/ucan";
+import { getCentralUcanAuthorizationHeader } from "@/app/plugins/central-ucan";
 import { getMessageTextContent, isVisionModel } from "@/app/utils";
 import { preProcessImageContent, stream } from "@/app/utils/chat";
 import { cloudflareAIGatewayUrl } from "@/app/utils/cloudflare";
@@ -129,6 +136,9 @@ function isRouterUrl(url: string): boolean {
 }
 
 function isUcanMetaValid(): boolean {
+  if (getCentralUcanAuthorizationHeader()) {
+    return true;
+  }
   try {
     if (typeof localStorage === "undefined") return false;
     const expRaw = localStorage.getItem("ucanRootExp");
@@ -231,12 +241,18 @@ function getBaseGatewayHeaders() {
 
 async function getHeadersWithRouterUcan(url: string) {
   const headers = getBaseGatewayHeaders();
+  const centralAuthorization = getCentralUcanAuthorizationHeader();
+  if (centralAuthorization) {
+    headers["Authorization"] = centralAuthorization;
+    return headers;
+  }
   if (!isRouterUrl(url)) return headers;
   if (!isUcanMetaValid()) return headers;
 
   const audience = getRouterAudience();
   const capabilities = getRouterCapabilities();
   if (!audience || !capabilities.length) return headers;
+  const hasFallbackAuthorization = Boolean(headers["Authorization"]);
 
   const cachedToken = getValidCachedRouterInvocationToken(
     audience,
@@ -247,9 +263,17 @@ async function getHeadersWithRouterUcan(url: string) {
     return headers;
   }
 
+  const issuer = await getCachedUcanSession();
+  if (!issuer) {
+    cachedRouterInvocationToken = null;
+    if (!hasFallbackAuthorization) {
+      return await invalidateUcanAndThrow("UCAN session is not available");
+    }
+    await invalidateUcan("UCAN session is not available");
+    return headers;
+  }
+
   try {
-    const issuer = await getCachedUcanSession();
-    if (!issuer) return headers;
     const ucan = await createInvocationUcan({
       audience,
       capabilities,
@@ -268,6 +292,16 @@ async function getHeadersWithRouterUcan(url: string) {
     }
     headers["Authorization"] = `Bearer ${ucan}`;
   } catch (error) {
+    cachedRouterInvocationToken = null;
+    if (shouldInvalidateUcanByError(error)) {
+      if (!hasFallbackAuthorization) {
+        return await invalidateUcanAndThrow(
+          getErrorMessage(error) || "UCAN invocation failed",
+        );
+      }
+      await invalidateUcan(getErrorMessage(error) || "UCAN invocation failed");
+      return headers;
+    }
     console.warn("[UCAN] failed to create invocation", error);
   }
 

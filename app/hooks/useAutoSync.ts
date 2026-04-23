@@ -4,6 +4,7 @@ import { useMaskStore } from "../store/mask";
 import { usePromptStore } from "../store/prompt";
 import { useSyncStore } from "../store/sync";
 import { UCAN_AUTH_EVENT } from "../plugins/wallet";
+import { isCentralModeEnabled } from "../plugins/central-ucan";
 import {
   isUcanSignPending,
   isUcanSignPendingError,
@@ -17,7 +18,8 @@ export function useAutoSync() {
   const autoSyncDebounceMs = useSyncStore((state) => state.autoSyncDebounceMs);
   const autoSyncIntervalMs = useSyncStore((state) => state.autoSyncIntervalMs);
   const [authTick, setAuthTick] = useState(0);
-  const canSync = cloudSync() && authTick >= 0;
+  const [centralMode, setCentralMode] = useState(() => isCentralModeEnabled());
+  const canSync = cloudSync() && authTick >= 0 && !centralMode;
   const debounceMs = autoSyncDebounceMs ?? 2000;
   const intervalMs = autoSyncIntervalMs ?? 5 * 60 * 1000;
 
@@ -32,7 +34,10 @@ export function useAutoSync() {
   const inFlightRef = useRef(false);
 
   useEffect(() => {
-    const onAuthChange = () => setAuthTick((value) => value + 1);
+    const onAuthChange = () => {
+      setAuthTick((value) => value + 1);
+      setCentralMode(isCentralModeEnabled());
+    };
     window.addEventListener(UCAN_AUTH_EVENT, onAuthChange);
     window.addEventListener("storage", onAuthChange);
     return () => {

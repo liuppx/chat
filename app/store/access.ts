@@ -26,6 +26,7 @@ import { ensure } from "../utils/clone";
 import { DEFAULT_CONFIG } from "./config";
 import { getModelProvider } from "../utils/model";
 import { getUcanRootCapsKey } from "../plugins/ucan";
+import { isCentralUcanAuthorized } from "../plugins/central-ucan";
 
 let fetchState = 0; // 0 not fetch, 1 fetching, 2 done
 
@@ -303,7 +304,7 @@ export const useAccessStore = createPersistStore(
       const routerJwtOk =
         typeof window !== "undefined" &&
         isRouterEndpoint(get().openaiUrl) &&
-        isValidUcanMeta();
+        (isValidUcanMeta() || isCentralUcanAuthorized());
 
       return (
         this.isValidOpenAI() ||

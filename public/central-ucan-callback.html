@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UCAN 登录回调</title>
+  </head>
+  <body>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var code = (params.get("code") || "").trim();
+        var state = (params.get("state") || "").trim();
+        var routeParams = new URLSearchParams();
+        if (code) routeParams.set("code", code);
+        if (state) routeParams.set("state", state);
+        var query = routeParams.toString();
+        var hashPath = "/auth" + (query ? "?" + query : "");
+        window.location.replace(window.location.origin + "/#" + hashPath);
+      })();
+    </script>
+  </body>
+</html>

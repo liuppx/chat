@@ -22,8 +22,7 @@ Chat（UCAN 定制版）
 - 登录页前置方案评估：`docs/登录页前置方案评估.md`
 - 移动端登录与双后端鉴权方案：`docs/移动端登录与双后端鉴权方案.md`
 - Router 与 WebDAV 集成说明：`docs/Router与WebDAV集成说明.md`
-- WebDAV 同步方案（UCAN）：`docs/WebDAV同步方案UCAN.md`
-- 同步聊天记录：`docs/同步聊天记录.md`
+- 数据同步：`docs/数据同步.md`
 - UCAN 与 SIWE 权限设计（可扩展版）：`docs/UCAN与SIWE权限设计可扩展版.md`
 - Cloudflare Pages 部署指南：`docs/CloudflarePages部署指南.md`
 - Vercel 使用说明：`docs/Vercel使用说明.md`
@@ -45,6 +44,8 @@ Chat（UCAN 定制版）
 cp .env.template .env
 # 确保本地 router 地址指向 3011（示例）
 # ROUTER_BACKEND_URL=http://localhost:3011/
+# 如启用中心化 UCAN 登录，需配置 Node 认证服务地址
+# CENTRAL_UCAN_AUTH_BASE_URL=http://127.0.0.1:8100
 # 如使用 WebDAV 代理，请设置 WEBDAV_BACKEND_BASE_URL（仅填基础地址，不含路径）
 npm install
 npm run dev

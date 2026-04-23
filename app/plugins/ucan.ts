@@ -1,5 +1,6 @@
 import { getClientConfig } from "@/app/config/client";
 import {
+  deriveAppIdFromLocation,
   getCapabilityAction,
   getCapabilityResource,
   normalizeUcanCapabilities,
@@ -95,8 +96,8 @@ function getRouterCapabilityResource(): string {
 }
 
 export function getWebdavAppId(): string {
-  const host = typeof window !== "undefined" ? window.location.host || "" : "";
-  return host ? sanitizeAppId(host) : "";
+  const appId = deriveAppIdFromLocation();
+  return appId ? sanitizeAppId(appId) : "";
 }
 
 export function getWebdavAppAction(): string {
