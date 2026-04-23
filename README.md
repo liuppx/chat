@@ -46,6 +46,8 @@ cp .env.template .env
 # ROUTER_BACKEND_URL=http://localhost:3011/
 # 如启用中心化 UCAN 登录，需配置 Node 认证服务地址
 # CENTRAL_UCAN_AUTH_BASE_URL=http://127.0.0.1:8100
+# 登录路径强制模式：auto（默认）| wallet（仅钱包）| central（仅中心化授权）
+# UCAN_LOGIN_FORCE_MODE=auto
 # 如使用 WebDAV 代理，请设置 WEBDAV_BACKEND_BASE_URL（仅填基础地址，不含路径）
 npm install
 npm run dev
@@ -66,6 +68,7 @@ bash scripts/start-all.sh
 1) **统一使用 npm 安装依赖**。
 2) 配置环境变量（`.env`）：
    - `ROUTER_BACKEND_URL`：router 鉴权后端地址  
+   - `UCAN_LOGIN_FORCE_MODE`：登录路径强制模式（`auto`/`wallet`/`central`，默认 `auto`）
    - `WEBDAV_BACKEND_BASE_URL`：WebDAV 后端基础地址（**不设会导致 build 失败**，不含路径）
    - `WEBDAV_BACKEND_PREFIX`：WebDAV 路径前缀（默认 `/dav`，可选修改）
 
