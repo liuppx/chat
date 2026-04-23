@@ -16,6 +16,7 @@ import {
 } from "@yeying-community/web3-bs";
 import { getCachedUcanSession } from "@/app/plugins/ucan-session";
 import { invalidateUcanAuthorization } from "@/app/plugins/wallet";
+import { isCentralModeEnabled } from "@/app/plugins/central-ucan";
 import {
   acquireUcanSignLock,
   isUcanSignPending,
@@ -29,9 +30,11 @@ export type WebDavClient = ReturnType<typeof createWebDavClient>;
 
 const DEFAULT_FOLDER = STORAGE_KEY;
 const BACKUP_FILENAME = "backup.json";
-const DEFAULT_FILE = `${DEFAULT_FOLDER}/${BACKUP_FILENAME}`;
 const MEDIA_FOLDER = `${DEFAULT_FOLDER}/media`;
 const WEBDAV_PROXY_PREFIX = "/api/webdav";
+const DEFAULT_STATE_KEY = BACKUP_FILENAME.replace(/\.json$/i, "");
+const LOCK_DIR_SUFFIX = ".__sync_lock_v1";
+const LOCK_META_FILENAME = "lock.json";
 const ensuredAppDirs = new Set<string>();
 const ensuredBasicMediaDirs = new Set<string>();
 const INVOCATION_TOKEN_SKEW_MS = 5 * 1000;
@@ -48,6 +51,11 @@ type CachedUcanWebDavClient = {
   mediaDir: string;
   exp: number;
   nbf?: number;
+};
+
+type SyncLockMeta = {
+  owner: string;
+  expiresAt: number;
 };
 
 let cachedUcanWebDavClient: CachedUcanWebDavClient | null = null;
@@ -196,6 +204,68 @@ function resolveWebdavPrefix(
   }
 }
 
+function normalizeSyncStateKey(key?: string) {
+  const normalized = (key || "").trim();
+  const safe = (normalized || DEFAULT_STATE_KEY).replaceAll("/", "_");
+  return safe || DEFAULT_STATE_KEY;
+}
+
+function resolveBasicStateFilePath(key: string) {
+  const fileName = `${normalizeSyncStateKey(key)}.json`;
+  return `${DEFAULT_FOLDER}/${fileName}`;
+}
+
+function resolveUcanStateFilePath(defaultFilePath: string, key: string) {
+  const fileName = `${normalizeSyncStateKey(key)}.json`;
+  const index = defaultFilePath.lastIndexOf("/");
+  const dir = index >= 0 ? defaultFilePath.slice(0, index) : "";
+  return `${dir}/${fileName}`;
+}
+
+function resolveBasicLockDirPath(key: string) {
+  const lockDir = `${normalizeSyncStateKey(key)}${LOCK_DIR_SUFFIX}`;
+  return `${DEFAULT_FOLDER}/${lockDir}`;
+}
+
+function resolveBasicLockMetaPath(key: string) {
+  return `${resolveBasicLockDirPath(key)}/${LOCK_META_FILENAME}`;
+}
+
+function resolveUcanLockDirPath(defaultFilePath: string, key: string) {
+  const lockDir = `${normalizeSyncStateKey(key)}${LOCK_DIR_SUFFIX}`;
+  const index = defaultFilePath.lastIndexOf("/");
+  const dir = index >= 0 ? defaultFilePath.slice(0, index) : "";
+  return `${dir}/${lockDir}`;
+}
+
+function resolveUcanLockMetaPath(defaultFilePath: string, key: string) {
+  return `${resolveUcanLockDirPath(defaultFilePath, key)}/${LOCK_META_FILENAME}`;
+}
+
+function createLockMeta(owner: string, ttlMs: number): SyncLockMeta {
+  return {
+    owner,
+    expiresAt: Date.now() + Math.max(1000, Math.floor(ttlMs)),
+  };
+}
+
+function parseLockMeta(raw: string): SyncLockMeta | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as SyncLockMeta;
+    if (
+      typeof parsed.owner === "string" &&
+      parsed.owner.length > 0 &&
+      Number.isFinite(parsed.expiresAt)
+    ) {
+      return parsed;
+    }
+  } catch {
+    // ignore invalid lock metadata
+  }
+  return null;
+}
+
 function createBasicWebDavClient(store: SyncStore) {
   const config = store.webdav;
   const proxyUrl =
@@ -233,7 +303,8 @@ function createBasicWebDavClient(store: SyncStore) {
     },
 
     async get(key: string) {
-      const res = await fetch(this.path(DEFAULT_FILE, proxyUrl, "", endpoint), {
+      const statePath = resolveBasicStateFilePath(key);
+      const res = await fetch(this.path(statePath, proxyUrl, "", endpoint), {
         method: "GET",
         headers: this.headers(),
       });
@@ -248,13 +319,145 @@ function createBasicWebDavClient(store: SyncStore) {
     },
 
     async set(key: string, value: string) {
-      const res = await fetch(this.path(DEFAULT_FILE, proxyUrl, "", endpoint), {
+      const statePath = resolveBasicStateFilePath(key);
+      const res = await fetch(this.path(statePath, proxyUrl, "", endpoint), {
         method: "PUT",
         headers: this.headers(),
         body: value,
       });
 
       console.log("[WebDav] set key = ", key, res.status, res.statusText);
+    },
+
+    async del(key: string) {
+      const statePath = resolveBasicStateFilePath(key);
+      const httpMethod = store.useProxy ? "GET" : "DELETE";
+      const proxyMethod = store.useProxy ? "DELETE" : "";
+      const res = await fetch(
+        this.path(statePath, proxyUrl, proxyMethod, endpoint),
+        {
+          method: httpMethod,
+          headers: this.headers(),
+        },
+      );
+      if (![200, 204, 404].includes(res.status)) {
+        throw new Error(
+          `WebDav del key failed (${key}): ${res.status} ${res.statusText}`,
+        );
+      }
+    },
+
+    async requestLockPath(
+      targetPath: string,
+      method: "GET" | "PUT" | "MKCOL" | "DELETE",
+      body?: string,
+    ) {
+      const httpMethod = store.useProxy
+        ? method === "PUT"
+          ? "PUT"
+          : "GET"
+        : method;
+      const proxyMethod = store.useProxy ? method : "";
+      const headers: Record<string, string> = this.headers();
+      if (body !== undefined) {
+        headers["content-type"] = "application/json";
+      }
+      return await fetch(
+        this.path(targetPath, proxyUrl, proxyMethod, endpoint),
+        {
+          method: httpMethod,
+          headers,
+          body: body ?? null,
+        },
+      );
+    },
+
+    async readLockMeta(lockMetaPath: string) {
+      const res = await this.requestLockPath(lockMetaPath, "GET");
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
+      return parseLockMeta(await res.text());
+    },
+
+    async writeLockMeta(lockMetaPath: string, owner: string, ttlMs: number) {
+      const payload = JSON.stringify(createLockMeta(owner, ttlMs));
+      const res = await this.requestLockPath(lockMetaPath, "PUT", payload);
+      if (![200, 201, 204].includes(res.status)) {
+        throw new Error(
+          `WebDav write lock metadata failed: ${res.status} ${res.statusText}`,
+        );
+      }
+    },
+
+    async deleteLockPath(targetPath: string) {
+      const res = await this.requestLockPath(targetPath, "DELETE");
+      if ([200, 204, 404].includes(res.status)) return;
+      throw new Error(`WebDav DELETE ${targetPath} failed: ${res.status}`);
+    },
+
+    async acquireLock(key: string, owner: string, ttlMs: number) {
+      const lockDirPath = resolveBasicLockDirPath(key);
+      const lockMetaPath = resolveBasicLockMetaPath(key);
+      const createRes = await this.requestLockPath(lockDirPath, "MKCOL");
+      if (createRes.status === 201) {
+        await this.writeLockMeta(lockMetaPath, owner, ttlMs);
+        return true;
+      }
+
+      if (![405, 409].includes(createRes.status)) {
+        throw new Error(
+          `WebDav acquire lock failed: ${createRes.status} ${createRes.statusText}`,
+        );
+      }
+
+      const currentMeta = await this.readLockMeta(lockMetaPath);
+      const now = Date.now();
+      if (!currentMeta) return false;
+
+      if (currentMeta.owner === owner) {
+        await this.writeLockMeta(lockMetaPath, owner, ttlMs);
+        return true;
+      }
+
+      if (currentMeta.expiresAt > now) {
+        return false;
+      }
+
+      try {
+        await this.deleteLockPath(lockMetaPath);
+      } catch (error) {
+        console.warn("[WebDav] failed to cleanup stale lock metadata", error);
+      }
+      try {
+        await this.deleteLockPath(lockDirPath);
+      } catch (error) {
+        console.warn("[WebDav] failed to cleanup stale lock dir", error);
+      }
+      return false;
+    },
+
+    async releaseLock(key: string, owner: string) {
+      const lockDirPath = resolveBasicLockDirPath(key);
+      const lockMetaPath = resolveBasicLockMetaPath(key);
+      const currentMeta = await this.readLockMeta(lockMetaPath);
+      const now = Date.now();
+      if (
+        currentMeta &&
+        currentMeta.owner !== owner &&
+        currentMeta.expiresAt > now
+      ) {
+        return;
+      }
+      try {
+        await this.deleteLockPath(lockMetaPath);
+      } catch (error) {
+        console.warn("[WebDav] failed to remove lock metadata", error);
+      }
+      try {
+        await this.deleteLockPath(lockDirPath);
+      } catch (error) {
+        console.warn("[WebDav] failed to remove lock dir", error);
+      }
     },
 
     async ensureMediaDir() {
@@ -384,6 +587,9 @@ function createWebdavProxyFetcher(endpoint: string) {
 }
 
 async function getUcanWebDavClient(store: SyncStore) {
+  if (isCentralModeEnabled()) {
+    throw new Error("中心化 UCAN 模式暂不支持 WebDAV 同步");
+  }
   const envBaseUrl = getEnvWebdavBaseUrl();
   const envPrefix = getEnvWebdavPrefix();
   console.log("[WebDav UCAN] config", {
@@ -541,10 +747,11 @@ function createUcanWebDavClient(store: SyncStore) {
       return false;
     },
 
-    async get(_: string) {
+    async get(key: string) {
       const { client, filePath } = await getUcanWebDavClient(store);
+      const statePath = resolveUcanStateFilePath(filePath, key);
       try {
-        return await client.downloadText(filePath);
+        return await client.downloadText(statePath);
       } catch (e) {
         if (String(e).includes("404")) {
           return "";
@@ -553,9 +760,128 @@ function createUcanWebDavClient(store: SyncStore) {
       }
     },
 
-    async set(_: string, value: string) {
+    async set(key: string, value: string) {
       const { client, filePath } = await getUcanWebDavClient(store);
-      await client.upload(filePath, value, "application/json");
+      const statePath = resolveUcanStateFilePath(filePath, key);
+      await client.upload(statePath, value, "application/json");
+    },
+
+    async del(key: string) {
+      const { client, filePath } = await getUcanWebDavClient(store);
+      const statePath = resolveUcanStateFilePath(filePath, key);
+      try {
+        await client.remove(statePath);
+      } catch (error) {
+        if (String(error).includes("404")) return;
+        throw error;
+      }
+    },
+
+    async readLockMeta(lockMetaPath: string) {
+      const { client } = await getUcanWebDavClient(store);
+      try {
+        const raw = await client.downloadText(lockMetaPath);
+        return parseLockMeta(raw);
+      } catch (error) {
+        if (String(error).includes("404")) {
+          return null;
+        }
+        throw error;
+      }
+    },
+
+    async writeLockMeta(
+      lockMetaPath: string,
+      owner: string,
+      ttlMs: number,
+    ) {
+      const { client } = await getUcanWebDavClient(store);
+      const payload = JSON.stringify(createLockMeta(owner, ttlMs));
+      await client.upload(lockMetaPath, payload, "application/json");
+    },
+
+    async removeLockPath(targetPath: string) {
+      const { client } = await getUcanWebDavClient(store);
+      try {
+        await client.remove(targetPath);
+      } catch (error) {
+        if (String(error).includes("404")) return;
+        throw error;
+      }
+    },
+
+    async acquireLock(key: string, owner: string, ttlMs: number) {
+      const { client, filePath } = await getUcanWebDavClient(store);
+      const lockDirPath = resolveUcanLockDirPath(filePath, key);
+      const lockMetaPath = resolveUcanLockMetaPath(filePath, key);
+      try {
+        const res = await client.createDirectory(lockDirPath);
+        if (![200, 201, 204].includes(res.status)) {
+          throw new Error(
+            `WebDAV MKCOL ${lockDirPath} failed: ${res.status} ${res.statusText}`,
+          );
+        }
+        await this.writeLockMeta(lockMetaPath, owner, ttlMs);
+        return true;
+      } catch (error) {
+        const errorText = String(error);
+        if (!errorText.includes("405") && !errorText.includes("409")) {
+          throw error;
+        }
+        const currentMeta = await this.readLockMeta(lockMetaPath);
+        const now = Date.now();
+        if (!currentMeta) return false;
+
+        if (currentMeta.owner === owner) {
+          await this.writeLockMeta(lockMetaPath, owner, ttlMs);
+          return true;
+        }
+
+        if (currentMeta.expiresAt > now) return false;
+
+        try {
+          await this.removeLockPath(lockMetaPath);
+        } catch (cleanupError) {
+          console.warn(
+            "[WebDav UCAN] failed to cleanup stale lock metadata",
+            cleanupError,
+          );
+        }
+        try {
+          await this.removeLockPath(lockDirPath);
+        } catch (cleanupError) {
+          console.warn(
+            "[WebDav UCAN] failed to cleanup stale lock dir",
+            cleanupError,
+          );
+        }
+        return false;
+      }
+    },
+
+    async releaseLock(key: string, owner: string) {
+      const { filePath } = await getUcanWebDavClient(store);
+      const lockDirPath = resolveUcanLockDirPath(filePath, key);
+      const lockMetaPath = resolveUcanLockMetaPath(filePath, key);
+      const currentMeta = await this.readLockMeta(lockMetaPath);
+      const now = Date.now();
+      if (
+        currentMeta &&
+        currentMeta.owner !== owner &&
+        currentMeta.expiresAt > now
+      ) {
+        return;
+      }
+      try {
+        await this.removeLockPath(lockMetaPath);
+      } catch (error) {
+        console.warn("[WebDav UCAN] failed to remove lock metadata", error);
+      }
+      try {
+        await this.removeLockPath(lockDirPath);
+      } catch (error) {
+        console.warn("[WebDav UCAN] failed to remove lock dir", error);
+      }
     },
 
     async uploadMedia(mediaKey: string, blob: Blob, contentType?: string) {

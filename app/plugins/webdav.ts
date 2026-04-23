@@ -6,6 +6,7 @@ import {
 } from "./ucan";
 import { getCachedUcanSession } from "./ucan-session";
 import { getClientConfig } from "../config/client";
+import { isCentralModeEnabled } from "./central-ucan";
 
 export interface WebDAVQuota {
   quota: number; // 总配额（字节）
@@ -63,6 +64,10 @@ function getDirectQuotaUrl(): string {
 
 export async function fetchQuota(): Promise<WebDAVQuota | undefined> {
   try {
+    if (isCentralModeEnabled()) {
+      // Center-issued login currently targets Router access only.
+      return;
+    }
     const audience = getWebdavAudience();
     if (!audience) {
       throw new Error("WebDAV UCAN audience is not configured");
