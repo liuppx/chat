@@ -1,7 +1,7 @@
 export class AudioHandler {
   private context: AudioContext;
   private mergeNode: ChannelMergerNode;
-  private analyserData: Uint8Array;
+  private analyserData: Uint8Array<ArrayBuffer>;
   public analyser: AnalyserNode;
   private workletNode: AudioWorkletNode | null = null;
   private stream: MediaStream | null = null;
@@ -19,7 +19,9 @@ export class AudioHandler {
     // using ChannelMergerNode to get merged audio data, and then get analyser data.
     this.mergeNode = new ChannelMergerNode(this.context, { numberOfInputs: 2 });
     this.analyser = new AnalyserNode(this.context, { fftSize: 256 });
-    this.analyserData = new Uint8Array(this.analyser.frequencyBinCount);
+    this.analyserData = new Uint8Array(
+      new ArrayBuffer(this.analyser.frequencyBinCount),
+    );
     this.mergeNode.connect(this.analyser);
   }
 
@@ -168,8 +170,9 @@ export class AudioHandler {
     view.setUint32(36, 1684108385, false); // data chunk identifier 'data'
     view.setUint32(40, byteLength, true); // data chunk length
 
-    // using data.buffer, so no need to setUint16 to view.
-    return new Blob([view, data.buffer], { type: "audio/mpeg" });
+    const pcmBytes = new Uint8Array(data.byteLength);
+    pcmBytes.set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+    return new Blob([header, pcmBytes], { type: "audio/mpeg" });
   }
   savePlayFile() {
     // @ts-ignore
