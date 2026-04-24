@@ -1,6 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSideConfig } from "@/app/config/server";
 
+interface ProxyTarget {
+  baseUrl: string;
+  subpath: string;
+}
+
+const LEGACY_BASE_URL_BY_PROVIDER: Record<string, string> = {
+  openai: "https://api.openai.com",
+  google: "https://generativelanguage.googleapis.com",
+  anthropic: "https://api.anthropic.com",
+  alibaba: "https://dashscope.aliyuncs.com/api",
+};
+
+function resolveLegacyProxyTarget(path: string[]): ProxyTarget | undefined {
+  if (!Array.isArray(path) || path.length === 0) return undefined;
+
+  const provider = path[0]?.toLowerCase();
+  if (!provider) return undefined;
+
+  if (provider === "azure") {
+    // legacy format:
+    // /api/proxy/azure/{resource_name}/deployments/{deploy_name}/{path*}
+    if (path.length < 4 || path[2]?.toLowerCase() !== "deployments") {
+      return undefined;
+    }
+    const resourceName = path[1];
+    const azureSubpath = path.slice(3).join("/");
+    if (!resourceName || !azureSubpath) return undefined;
+    return {
+      baseUrl: `https://${resourceName}.openai.azure.com`,
+      subpath: `openai/deployments/${azureSubpath}`,
+    };
+  }
+
+  const baseUrl = LEGACY_BASE_URL_BY_PROVIDER[provider];
+  if (!baseUrl) return undefined;
+
+  const subpath = path.slice(1).join("/");
+  if (!subpath) return undefined;
+
+  return { baseUrl, subpath };
+}
+
 export async function handle(
   req: NextRequest,
   { params }: { params: { path: string[] } },
@@ -16,16 +58,19 @@ export async function handle(
   req.nextUrl.searchParams.delete("path");
   req.nextUrl.searchParams.delete("provider");
 
-  const subpath = params.path.join("/");
   const rawBaseUrl = req.headers.get("x-base-url")?.trim();
-  if (!rawBaseUrl) {
+  const legacyTarget = rawBaseUrl
+    ? undefined
+    : resolveLegacyProxyTarget(params.path);
+  if (!rawBaseUrl && !legacyTarget) {
     return NextResponse.json(
       { error: "Missing x-base-url header" },
       { status: 400 },
     );
   }
 
-  let baseUrl = rawBaseUrl;
+  const subpath = legacyTarget?.subpath ?? params.path.join("/");
+  let baseUrl = rawBaseUrl ?? legacyTarget?.baseUrl ?? "";
   if (baseUrl.endsWith("/")) {
     baseUrl = baseUrl.slice(0, -1);
   }
