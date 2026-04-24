@@ -6,7 +6,10 @@ import {
 } from "./ucan";
 import { getCachedUcanSession } from "./ucan-session";
 import { getClientConfig } from "../config/client";
-import { isCentralModeEnabled } from "./central-ucan";
+import {
+  getCentralUcanAuthorizationHeaderForAudience,
+  isCentralModeEnabled,
+} from "./central-ucan";
 
 export interface WebDAVQuota {
   quota: number; // 总配额（字节）
@@ -64,13 +67,30 @@ function getDirectQuotaUrl(): string {
 
 export async function fetchQuota(): Promise<WebDAVQuota | undefined> {
   try {
-    if (isCentralModeEnabled()) {
-      // Center-issued login currently targets Router access only.
-      return;
-    }
     const audience = getWebdavAudience();
     if (!audience) {
       throw new Error("WebDAV UCAN audience is not configured");
+    }
+    const capabilities = getWebdavCapabilities();
+    if (isCentralModeEnabled()) {
+      const authorization = await getCentralUcanAuthorizationHeaderForAudience({
+        audience,
+        capabilities,
+      });
+      if (!authorization) return;
+      const response = await fetch(getDirectQuotaUrl(), {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: authorization,
+        },
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP response.status:{await response.text()}`);
+      }
+      const data = await response.json();
+      return normalizeQuota(data);
     }
     const issuer = await getCachedUcanSession();
     if (!issuer) {
@@ -87,7 +107,7 @@ export async function fetchQuota(): Promise<WebDAVQuota | undefined> {
       {
         sessionId: UCAN_SESSION_ID,
         audience,
-        capabilities: getWebdavCapabilities(),
+        capabilities,
         issuer: issuer ?? undefined,
       },
     );

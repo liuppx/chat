@@ -20,7 +20,10 @@ import {
   getUcanRootCapsKey,
   UCAN_SESSION_ID,
 } from "@/app/plugins/ucan";
-import { getCentralUcanAuthorizationHeader } from "@/app/plugins/central-ucan";
+import {
+  getCentralUcanAuthorizationHeaderForAudience,
+  isCentralModeEnabled,
+} from "@/app/plugins/central-ucan";
 import { useAccessStore } from "@/app/store";
 import { cloudflareAIGatewayUrl } from "@/app/utils/cloudflare";
 import { fetch } from "@/app/utils/stream";
@@ -89,9 +92,6 @@ function isRouterUrl(url: string): boolean {
 }
 
 function isUcanMetaValid(): boolean {
-  if (getCentralUcanAuthorizationHeader()) {
-    return true;
-  }
   try {
     if (typeof localStorage === "undefined") return false;
     const expRaw = localStorage.getItem("ucanRootExp");
@@ -195,9 +195,27 @@ function getBaseRouterHeaders() {
 
 async function getHeadersWithRouterUcan(url: string) {
   const headers = getBaseRouterHeaders();
-  const centralAuthorization = getCentralUcanAuthorizationHeader();
-  if (centralAuthorization) {
-    headers["Authorization"] = centralAuthorization;
+  const hasFallbackAuthorization = Boolean(headers["Authorization"]);
+  if (isCentralModeEnabled()) {
+    if (!isRouterUrl(url)) return headers;
+    const audience = getRouterAudience();
+    const capabilities = getRouterCapabilities();
+    if (!audience || !capabilities.length) return headers;
+    try {
+      const centralAuthorization =
+        await getCentralUcanAuthorizationHeaderForAudience({
+          audience,
+          capabilities,
+        });
+      if (centralAuthorization) {
+        headers["Authorization"] = centralAuthorization;
+      }
+    } catch (error) {
+      if (!hasFallbackAuthorization) {
+        throw error;
+      }
+      console.warn("[Router Models] failed to issue central UCAN", error);
+    }
     return headers;
   }
   if (!isRouterUrl(url)) return headers;
@@ -206,7 +224,6 @@ async function getHeadersWithRouterUcan(url: string) {
   const audience = getRouterAudience();
   const capabilities = getRouterCapabilities();
   if (!audience || !capabilities.length) return headers;
-  const hasFallbackAuthorization = Boolean(headers["Authorization"]);
 
   const cachedToken = getValidCachedRouterInvocationToken(
     audience,

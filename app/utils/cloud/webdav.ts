@@ -13,10 +13,14 @@ import { SyncStore } from "@/app/store/sync";
 import {
   getStoredUcanRoot,
   initWebDavStorage,
+  createWebDavClient as createSdkWebDavClient,
 } from "@yeying-community/web3-bs";
 import { getCachedUcanSession } from "@/app/plugins/ucan-session";
 import { invalidateUcanAuthorization } from "@/app/plugins/wallet";
-import { isCentralModeEnabled } from "@/app/plugins/central-ucan";
+import {
+  getCentralUcanAuthorizationHeaderForAudience,
+  isCentralModeEnabled,
+} from "@/app/plugins/central-ucan";
 import {
   acquireUcanSignLock,
   isUcanSignPending,
@@ -220,6 +224,16 @@ function resolveUcanStateFilePath(defaultFilePath: string, key: string) {
   const index = defaultFilePath.lastIndexOf("/");
   const dir = index >= 0 ? defaultFilePath.slice(0, index) : "";
   return `${dir}/${fileName}`;
+}
+
+function sanitizeAppId(appId: string) {
+  return appId.trim().replace(/[^a-zA-Z0-9._-]/g, "-");
+}
+
+function resolveUcanAppDir(appId: string) {
+  const normalized = sanitizeAppId(appId);
+  if (!normalized) return "";
+  return `/apps/${normalized}`;
 }
 
 function resolveBasicLockDirPath(key: string) {
@@ -587,9 +601,6 @@ function createWebdavProxyFetcher(endpoint: string) {
 }
 
 async function getUcanWebDavClient(store: SyncStore) {
-  if (isCentralModeEnabled()) {
-    throw new Error("中心化 UCAN 模式暂不支持 WebDAV 同步");
-  }
   const envBaseUrl = getEnvWebdavBaseUrl();
   const envPrefix = getEnvWebdavPrefix();
   console.log("[WebDav UCAN] config", {
@@ -612,6 +623,96 @@ async function getUcanWebDavClient(store: SyncStore) {
   const baseUrl = useProxy ? "" : backendUrl;
   const prefix = useProxy ? WEBDAV_PROXY_PREFIX : webdavPrefix;
   const fetcher = useProxy ? createWebdavProxyFetcher(endpoint) : undefined;
+  const appId = getWebdavAppId();
+  const appAction = getWebdavAppAction();
+  const invocationCaps = getWebdavCapabilities();
+
+  if (isCentralModeEnabled()) {
+    const currentAccount =
+      typeof localStorage === "undefined"
+        ? ""
+        : (localStorage.getItem("currentAccount") || "").trim().toLowerCase();
+    const cacheKey = buildUcanWebdavCacheKey({
+      backendUrl,
+      webdavPrefix,
+      useProxy,
+      audience,
+      appId,
+      appAction,
+      invocationCapsKey: getUcanCapsKey(invocationCaps),
+      rootIss: `central:${currentAccount}`,
+      rootExp: 0,
+    });
+    const cached = getValidCachedUcanWebdavClient(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const authorization = await getCentralUcanAuthorizationHeaderForAudience({
+      audience,
+      capabilities: invocationCaps,
+    });
+    if (!authorization) {
+      throw new Error("中心化 UCAN 未授权");
+    }
+    const token = authorization.replace(/^Bearer\s+/i, "").trim();
+    if (!token) {
+      throw new Error("中心化 UCAN token 无效");
+    }
+
+    const client = createSdkWebDavClient({
+      baseUrl,
+      prefix,
+      token,
+      fetcher,
+    });
+    const appDir = resolveUcanAppDir(appId);
+    const filePath = `${appDir || ""}/${BACKUP_FILENAME}`;
+    const mediaDir = `${appDir || DEFAULT_FOLDER}/media`;
+
+    if (appDir) {
+      const key = `${baseUrl}|${prefix}|${appDir}`;
+      if (!ensuredAppDirs.has(key)) {
+        try {
+          const res = await client.createDirectory(appDir);
+          if (![201, 405, 409].includes(res.status)) {
+            throw new Error(`WebDAV MKCOL ${appDir} failed: ${res.status}`);
+          }
+          ensuredAppDirs.add(key);
+        } catch (error) {
+          console.error("[WebDav UCAN] ensure app dir failed", error);
+        }
+      }
+    }
+
+    const mediaDirKey = `${baseUrl}|${prefix}|${mediaDir}`;
+    if (!ensuredAppDirs.has(mediaDirKey)) {
+      try {
+        const res = await client.createDirectory(mediaDir);
+        if (![201, 405, 409].includes(res.status)) {
+          throw new Error(`WebDAV MKCOL ${mediaDir} failed: ${res.status}`);
+        }
+        ensuredAppDirs.add(mediaDirKey);
+      } catch (error) {
+        console.error("[WebDav UCAN] ensure media dir failed", error);
+      }
+    }
+
+    const payload = decodeUcanPayload(token);
+    if (payload && typeof payload.exp === "number") {
+      cachedUcanWebDavClient = {
+        key: cacheKey,
+        client,
+        filePath,
+        mediaDir,
+        exp: payload.exp,
+        nbf: payload.nbf,
+      };
+    }
+
+    return { client, filePath, mediaDir };
+  }
+
   const root = await getStoredUcanRoot(UCAN_SESSION_ID);
   if (!root) {
     await invalidateUcanAuthorization("UCAN root is not ready");
@@ -625,9 +726,6 @@ async function getUcanWebDavClient(store: SyncStore) {
     await invalidateUcanAuthorization("UCAN root expired");
     throw new Error("UCAN root expired");
   }
-  const appId = getWebdavAppId();
-  const appAction = getWebdavAppAction();
-  const invocationCaps = getWebdavCapabilities();
   const cacheKey = buildUcanWebdavCacheKey({
     backendUrl,
     webdavPrefix,
