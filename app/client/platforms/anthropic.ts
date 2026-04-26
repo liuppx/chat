@@ -394,8 +394,8 @@ export class ClaudeApi implements LLMApi {
         }
         return {
           role: insideRole,
-          content: content
-            .filter((v) => v.image_url || v.text)
+          content: (content as any[])
+            .filter((part) => part?.type === "text" || part?.type === "image_url")
             .map(({ type, text, image_url }) => {
               if (type === "text") {
                 return {

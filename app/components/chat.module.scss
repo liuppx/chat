@@ -17,6 +17,7 @@
   background-size: cover;
   background-position: center;
   background-color: var(--white);
+  position: relative;
 
   .attach-image-mask {
     width: 100%;
@@ -27,6 +28,22 @@
 
   .attach-image-mask:hover {
     opacity: 1;
+  }
+
+  .attach-file-name {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: 6px;
+    font-size: 12px;
+    line-height: 1.2;
+    color: var(--black);
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 4px;
+    padding: 4px 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .delete-image {

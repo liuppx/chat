@@ -529,7 +529,7 @@ export const useChatStore = createPersistStore(
 
       async onUserInput(
         content: string,
-        attachImages?: string[],
+        attachments?: MultimodalContent[],
         isMcpResponse?: boolean,
         isAuthenticated: boolean = true,
       ) {
@@ -539,22 +539,32 @@ export const useChatStore = createPersistStore(
         }
         const session = get().currentSession();
         const modelConfig = session.mask.modelConfig;
+        const normalizedAttachments = attachments ?? [];
+        const hasFileAttachment = normalizedAttachments.some(
+          (item) => item.type === "file_url",
+        );
+        const routing = resolveRuntimeModelRouting(
+          modelConfig.model,
+          modelConfig.providerName,
+        );
+        if (
+          hasFileAttachment &&
+          routing.endpointPath &&
+          routing.endpointPath !== SupportedTextEndpoint.Responses
+        ) {
+          showToast("当前模型不支持文件附件，请切换到支持 /v1/responses 的模型");
+          return;
+        }
 
         // MCP Response no need to fill template
         let mContent: string | MultimodalContent[] = isMcpResponse
           ? content
           : fillTemplateWith(content, modelConfig);
 
-        if (!isMcpResponse && attachImages && attachImages.length > 0) {
+        if (!isMcpResponse && normalizedAttachments.length > 0) {
           mContent = [
             ...(content ? [{ type: "text" as const, text: content }] : []),
-            ...attachImages.map((url) => ({
-              type: "image_url" as const,
-              image_url: {
-                url,
-                detail: "low" as const,
-              },
-            })),
+            ...normalizedAttachments.map((item) => ({ ...item })),
           ];
         }
 
@@ -595,10 +605,6 @@ export const useChatStore = createPersistStore(
           ]);
         });
 
-        const routing = resolveRuntimeModelRouting(
-          modelConfig.model,
-          modelConfig.providerName,
-        );
         const api: ClientApi = getClientApi(routing.requestProvider);
         // make request
         api.llm.chat({

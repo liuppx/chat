@@ -34,14 +34,32 @@ export const Models = ["gpt-3.5-turbo", "gpt-4"] as const;
 export const TTSModels = ["tts-1", "tts-1-hd"] as const;
 export type ChatModel = ModelType;
 
-export interface MultimodalContent {
-  type: "text" | "image_url";
+export interface MultimodalTextContent {
+  type: "text";
   text?: string;
+}
+
+export interface MultimodalImageContent {
+  type: "image_url";
   image_url?: {
     url: string;
     detail?: "low" | "high" | "auto" | string;
   };
 }
+
+export interface MultimodalFileContent {
+  type: "file_url";
+  file_url?: {
+    url: string;
+    name?: string;
+    mime_type?: string;
+  };
+}
+
+export type MultimodalContent =
+  | MultimodalTextContent
+  | MultimodalImageContent
+  | MultimodalFileContent;
 
 export interface MultimodalContentForAlibaba {
   text?: string;

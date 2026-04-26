@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { showToast } from "./components/ui-lib";
 import Locale from "./locales";
-import { RequestMessage } from "./client/api";
+import { MultimodalContent, RequestMessage } from "./client/api";
 import {
   REQUEST_TIMEOUT_MS,
   REQUEST_TIMEOUT_MS_FOR_THINKING,
@@ -314,6 +314,17 @@ export function getMessageImages(message: RequestMessage): string[] {
     }
   }
   return urls;
+}
+
+export function getMessageAttachments(
+  message: RequestMessage,
+): MultimodalContent[] {
+  if (typeof message.content === "string") {
+    return [];
+  }
+  return message.content
+    .filter((item) => item.type === "image_url" || item.type === "file_url")
+    .map((item) => ({ ...item }));
 }
 
 export function isVisionModel(model: string) {

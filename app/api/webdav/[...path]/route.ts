@@ -39,6 +39,17 @@ async function handle(
   const proxy_method = (
     requestUrl.searchParams.get("proxy_method") || req.method
   ).toUpperCase();
+  const endpointPath = resolvedParams.path.join("/");
+  const normalizedEndpointPath = endpointPath
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
+  const isPublicShareApiPath = normalizedEndpointPath.startsWith(
+    "api/v1/public/share/",
+  );
+  const isPublicWebdavApiPath = normalizedEndpointPath.startsWith(
+    "api/v1/public/webdav/",
+  );
+  const isPublicApiPath = isPublicShareApiPath || isPublicWebdavApiPath;
 
   // Validate the endpoint to prevent potential SSRF attacks
   if (
@@ -47,12 +58,17 @@ async function handle(
       const normalizedAllowedEndpoint = normalizeUrl(allowedEndpoint);
       const normalizedEndpoint = normalizeUrl(endpoint as string);
 
+      if (!normalizedEndpoint || !normalizedAllowedEndpoint) {
+        return false;
+      }
+      if (normalizedEndpoint.hostname !== normalizedAllowedEndpoint.hostname) {
+        return false;
+      }
+      if (isPublicApiPath) {
+        return true;
+      }
       return (
-        normalizedEndpoint &&
-        normalizedEndpoint.hostname === normalizedAllowedEndpoint?.hostname &&
-        normalizedEndpoint.pathname.startsWith(
-          normalizedAllowedEndpoint.pathname,
-        )
+        normalizedEndpoint.pathname.startsWith(normalizedAllowedEndpoint.pathname)
       );
     })
   ) {
@@ -71,10 +87,6 @@ async function handle(
     endpoint += "/";
   }
 
-  const endpointPath = resolvedParams.path.join("/");
-  const normalizedEndpointPath = endpointPath
-    .replace(/^\/+/, "")
-    .replace(/\/+$/, "");
   const pathSegments = normalizedEndpointPath.split("/").filter(Boolean);
   const hasPathTraversal = pathSegments.some((segment) => segment === "..");
   const isInsideFolder =
@@ -82,7 +94,7 @@ async function handle(
     normalizedEndpointPath.startsWith(`${folder}/`);
   const targetPath = `${endpoint}${endpointPath}`;
 
-  if (hasPathTraversal || !isInsideFolder) {
+  if (hasPathTraversal || (!isInsideFolder && !isPublicApiPath)) {
     return NextResponse.json(
       {
         error: true,
@@ -94,7 +106,9 @@ async function handle(
     );
   }
 
-  const allowedMethods = new Set(["MKCOL", "GET", "PUT", "DELETE"]);
+  const allowedMethods = isPublicApiPath
+    ? new Set(["GET", "POST", "DELETE"])
+    : new Set(["MKCOL", "GET", "PUT", "DELETE"]);
   if (!allowedMethods.has(proxy_method)) {
     return NextResponse.json(
       {
@@ -108,7 +122,11 @@ async function handle(
   }
 
   // never allow deleting the root sync folder from proxy.
-  if (proxy_method === "DELETE" && normalizedEndpointPath === folder) {
+  if (
+    !isPublicApiPath &&
+    proxy_method === "DELETE" &&
+    normalizedEndpointPath === folder
+  ) {
     return NextResponse.json(
       {
         error: true,
@@ -161,6 +179,8 @@ async function handle(
 
 export const PUT = handle;
 export const GET = handle;
+export const POST = handle;
+export const DELETE = handle;
 export const OPTIONS = handle;
 
 export const runtime = "nodejs";

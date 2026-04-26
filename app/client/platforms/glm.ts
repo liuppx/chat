@@ -83,7 +83,10 @@ export class ChatGLMApi implements LLMApi {
     const prompt =
       typeof lastMessage.content === "string"
         ? lastMessage.content
-        : lastMessage.content.map((c) => c.text).join("\n");
+        : lastMessage.content
+            .map((part) => (part.type === "text" ? (part.text ?? "") : ""))
+            .filter(Boolean)
+            .join("\n");
 
     switch (modelType) {
       case "image":

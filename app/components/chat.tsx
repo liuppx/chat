@@ -65,6 +65,7 @@ import {
 import {
   autoGrowTextArea,
   copyToClipboard,
+  getMessageAttachments,
   getMessageImages,
   getMessageTextContent,
   isDalle3,
@@ -77,7 +78,7 @@ import {
   showPlugins,
 } from "../utils";
 
-import { uploadImage as uploadImageRemote } from "@/app/utils/chat";
+import { uploadAttachmentForChat } from "@/app/utils/chat";
 import { useAuth } from "../hooks/useAuth";
 import { getCurrentAccount } from "../plugins/wallet";
 
@@ -495,7 +496,7 @@ function useScrollToBottom(
 
 export function ChatActions(props: {
   uploadImage: () => void;
-  setAttachImages: (images: string[]) => void;
+  setAttachContents: (content: MultimodalContent[]) => void;
   setUploading: (uploading: boolean) => void;
   showPromptModal: () => void;
   scrollToBottom: () => void;
@@ -511,7 +512,7 @@ export function ChatActions(props: {
   const chatStore = useChatStore();
   const pluginStore = usePluginStore();
   const session = chatStore.currentSession();
-  const { setAttachImages, setUploading } = props;
+  const { setAttachContents, setUploading } = props;
 
   // switch themes
   const theme = config.theme;
@@ -611,7 +612,7 @@ export function ChatActions(props: {
     const show = isVisionModel(currentModel);
     setShowUploadImage(show);
     if (!show) {
-      setAttachImages([]);
+      setAttachContents([]);
       setUploading(false);
     }
 
@@ -632,7 +633,14 @@ export function ChatActions(props: {
           : nextModel.name,
       );
     }
-  }, [chatStore, currentModel, models, session, setAttachImages, setUploading]);
+  }, [
+    chatStore,
+    currentModel,
+    models,
+    session,
+    setAttachContents,
+    setUploading,
+  ]);
 
   return (
     <div className={styles["chat-input-actions"]}>
@@ -1064,7 +1072,7 @@ function ChatView() {
   const [hitBottom, setHitBottom] = useState(true);
   const isMobileScreen = useMobileScreen();
   const navigate = useNavigate();
-  const [attachImages, setAttachImages] = useState<string[]>([]);
+  const [attachContents, setAttachContents] = useState<MultimodalContent[]>([]);
   const [uploading, setUploading] = useState(false);
 
   // prompt hints
@@ -1136,7 +1144,7 @@ function ChatView() {
   };
 
   const doSubmit = (userInput: string) => {
-    if (userInput.trim() === "" && isEmpty(attachImages)) return;
+    if (userInput.trim() === "" && isEmpty(attachContents)) return;
     const matchCommand = chatCommands.match(userInput);
     if (matchCommand.matched) {
       setUserInput("");
@@ -1146,9 +1154,9 @@ function ChatView() {
     }
     setIsLoading(true);
     chatStore
-      .onUserInput(userInput, attachImages)
+      .onUserInput(userInput, attachContents)
       .then(() => setIsLoading(false));
-    setAttachImages([]);
+    setAttachContents([]);
     chatStore.setLastInput(userInput);
     setUserInput("");
     setPromptHints([]);
@@ -1298,9 +1306,11 @@ function ChatView() {
     // resend the message
     setIsLoading(true);
     const textContent = getMessageTextContent(userMessage);
-    const images = getMessageImages(userMessage);
+    const attachments = getMessageAttachments(userMessage);
 
-    chatStore.onUserInput(textContent, images).then(() => setIsLoading(false));
+    chatStore
+      .onUserInput(textContent, attachments)
+      .then(() => setIsLoading(false));
     inputRef.current?.focus();
   };
 
@@ -1555,80 +1565,60 @@ function ChatView() {
           event.preventDefault();
           const file = item.getAsFile();
           if (file) {
-            const images: string[] = [];
-            images.push(...attachImages);
-            images.push(
-              ...(await new Promise<string[]>((res, rej) => {
-                setUploading(true);
-                const imagesData: string[] = [];
-                uploadImageRemote(file)
-                  .then((dataUrl) => {
-                    imagesData.push(dataUrl);
-                    setUploading(false);
-                    res(imagesData);
-                  })
-                  .catch((e) => {
-                    setUploading(false);
-                    rej(e);
-                  });
-              })),
-            );
-            const imagesLength = images.length;
-
-            if (imagesLength > 3) {
-              images.splice(3, imagesLength - 3);
+            setUploading(true);
+            try {
+              const next = [...attachContents];
+              next.push(await uploadAttachmentForChat(file));
+              if (next.length > 3) {
+                next.splice(3, next.length - 3);
+              }
+              setAttachContents(next);
+            } catch (error) {
+              showToast(
+                `上传失败: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            } finally {
+              setUploading(false);
             }
-            setAttachImages(images);
           }
         }
       }
     },
-    [attachImages, chatStore],
+    [attachContents, chatStore],
   );
 
   async function uploadImage() {
-    const images: string[] = [];
-    images.push(...attachImages);
+    const files = await new Promise<File[]>((resolve) => {
+      const fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.accept =
+        "image/png,image/jpeg,image/webp,image/heic,image/heif,application/pdf";
+      fileInput.multiple = true;
+      fileInput.onchange = (event: any) => {
+        resolve(Array.from(event.target.files || []));
+      };
+      fileInput.click();
+    });
 
-    images.push(
-      ...(await new Promise<string[]>((res, rej) => {
-        const fileInput = document.createElement("input");
-        fileInput.type = "file";
-        fileInput.accept =
-          "image/png, image/jpeg, image/webp, image/heic, image/heif";
-        fileInput.multiple = true;
-        fileInput.onchange = (event: any) => {
-          setUploading(true);
-          const files = event.target.files;
-          const imagesData: string[] = [];
-          for (let i = 0; i < files.length; i++) {
-            const file = event.target.files[i];
-            uploadImageRemote(file)
-              .then((dataUrl) => {
-                imagesData.push(dataUrl);
-                if (
-                  imagesData.length === 3 ||
-                  imagesData.length === files.length
-                ) {
-                  setUploading(false);
-                  res(imagesData);
-                }
-              })
-              .catch((e) => {
-                setUploading(false);
-                rej(e);
-              });
-          }
-        };
-        fileInput.click();
-      })),
-    );
+    if (files.length === 0) return;
 
-    const imagesLength = images.length;
-    if (imagesLength > 3) {
-      images.splice(3, imagesLength - 3);
+    const next = [...attachContents];
+    setUploading(true);
+    try {
+      for (const file of files) {
+        if (next.length >= 3) break;
+        next.push(await uploadAttachmentForChat(file));
+      }
+      setAttachContents(next);
+    } catch (error) {
+      showToast(
+        `上传失败: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      setUploading(false);
     }
-    setAttachImages(images);
   }
 
   // 快捷键 shortcut keys
@@ -1855,18 +1845,14 @@ function ChatView() {
                                     let newContent:
                                       | string
                                       | MultimodalContent[] = newMessage;
-                                    const images = getMessageImages(message);
-                                    if (images.length > 0) {
+                                    const attachments =
+                                      getMessageAttachments(message);
+                                    if (attachments.length > 0) {
                                       newContent = [
                                         { type: "text", text: newMessage },
                                       ];
-                                      for (let i = 0; i < images.length; i++) {
-                                        newContent.push({
-                                          type: "image_url",
-                                          image_url: {
-                                            url: images[i],
-                                          },
-                                        });
+                                      for (const item of attachments) {
+                                        newContent.push({ ...item });
                                       }
                                     }
                                     chatStore.updateTargetSession(
@@ -2080,7 +2066,7 @@ function ChatView() {
 
               <ChatActions
                 uploadImage={uploadImage}
-                setAttachImages={setAttachImages}
+                setAttachContents={setAttachContents}
                 setUploading={setUploading}
                 showPromptModal={() => setShowPromptModal(true)}
                 scrollToBottom={scrollToBottom}
@@ -2104,7 +2090,7 @@ function ChatView() {
               <label
                 className={clsx(styles["chat-input-panel-inner"], {
                   [styles["chat-input-panel-inner-attach"]]:
-                    attachImages.length !== 0,
+                    attachContents.length !== 0,
                 })}
                 htmlFor="chat-input"
               >
@@ -2126,20 +2112,35 @@ function ChatView() {
                     fontFamily: config.fontFamily,
                   }}
                 />
-                {attachImages.length != 0 && (
+                {attachContents.length != 0 && (
                   <div className={styles["attach-images"]}>
-                    {attachImages.map((image, index) => {
+                    {attachContents.map((item, index) => {
+                      const imageUrl =
+                        item.type === "image_url" ? item.image_url?.url || "" : "";
+                      const fileName =
+                        item.type === "file_url"
+                          ? item.file_url?.name || "PDF"
+                          : "";
                       return (
                         <div
                           key={index}
                           className={styles["attach-image"]}
-                          style={{ backgroundImage: `url("${image}")` }}
+                          style={
+                            imageUrl
+                              ? { backgroundImage: `url("${imageUrl}")` }
+                              : undefined
+                          }
                         >
+                          {!imageUrl && (
+                            <div className={styles["attach-file-name"]}>
+                              {fileName}
+                            </div>
+                          )}
                           <div className={styles["attach-image-mask"]}>
                             <DeleteImageButton
                               deleteImage={() => {
-                                setAttachImages(
-                                  attachImages.filter((_, i) => i !== index),
+                                setAttachContents(
+                                  attachContents.filter((_, i) => i !== index),
                                 );
                               }}
                             />

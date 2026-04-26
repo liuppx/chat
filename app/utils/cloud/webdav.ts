@@ -53,6 +53,8 @@ type CachedUcanWebDavClient = {
   client: Awaited<ReturnType<typeof initWebDavStorage>>["client"];
   filePath: string;
   mediaDir: string;
+  backendUrl: string;
+  token: string;
   exp: number;
   nbf?: number;
 };
@@ -60,6 +62,20 @@ type CachedUcanWebDavClient = {
 type SyncLockMeta = {
   owner: string;
   expiresAt: number;
+};
+
+type WebDavShareExpiresUnit =
+  | "minute"
+  | "hour"
+  | "day"
+  | "week"
+  | "month"
+  | "year";
+
+type WebDavShareResponse = {
+  url?: string;
+  token?: string;
+  name?: string;
 };
 
 let cachedUcanWebDavClient: CachedUcanWebDavClient | null = null;
@@ -121,6 +137,8 @@ function getValidCachedUcanWebdavClient(cacheKey: string) {
     client: cached.client,
     filePath: cached.filePath,
     mediaDir: cached.mediaDir,
+    backendUrl: cached.backendUrl,
+    token: cached.token,
   };
 }
 
@@ -705,12 +723,14 @@ async function getUcanWebDavClient(store: SyncStore) {
         client,
         filePath,
         mediaDir,
+        backendUrl,
+        token,
         exp: payload.exp,
         nbf: payload.nbf,
       };
     }
 
-    return { client, filePath, mediaDir };
+    return { client, filePath, mediaDir, backendUrl, token };
   }
 
   const root = await getStoredUcanRoot(UCAN_SESSION_ID);
@@ -824,12 +844,20 @@ async function getUcanWebDavClient(store: SyncStore) {
       client: webdav.client,
       filePath,
       mediaDir,
+      backendUrl,
+      token: webdav.token,
       exp: payload.exp,
       nbf: payload.nbf,
     };
   }
 
-  return { client: webdav.client, filePath, mediaDir };
+  return {
+    client: webdav.client,
+    filePath,
+    mediaDir,
+    backendUrl,
+    token: webdav.token,
+  };
 }
 
 function createUcanWebDavClient(store: SyncStore) {
@@ -1011,6 +1039,160 @@ function createUcanWebDavClient(store: SyncStore) {
         throw e;
       }
     },
+  };
+}
+
+function sanitizeUploadFileName(name: string) {
+  const normalized = name
+    .trim()
+    .replace(/[/\\?%*:|"<>]/g, "-")
+    .replace(/\s+/g, " ");
+  if (!normalized) return "file";
+  return normalized;
+}
+
+function buildUploadObjectName(fileName: string) {
+  const safeName = sanitizeUploadFileName(fileName)
+    .replace(/[^a-zA-Z0-9._ -]/g, "-")
+    .replace(/\s+/g, "_");
+  const random = Math.random().toString(16).slice(2, 10);
+  return `${Date.now()}-${random}-${safeName}`;
+}
+
+function getBasicAuthorizationHeader(store: SyncStore) {
+  const username = store.webdav.username.trim();
+  const password = store.webdav.password;
+  if (!username) {
+    throw new Error("WebDAV username is required");
+  }
+  const auth = btoa(`${username}:${password}`);
+  return `Basic ${auth}`;
+}
+
+async function createShareLinkViaApi(params: {
+  store: SyncStore;
+  backendUrl: string;
+  authorization: string;
+  path: string;
+  expiresValue?: number;
+  expiresUnit?: WebDavShareExpiresUnit;
+}) {
+  const { store, backendUrl, authorization, path, expiresValue, expiresUnit } =
+    params;
+  const normalizedBackendUrl = normalizeBaseUrl(backendUrl);
+  const requestBody = JSON.stringify({
+    path,
+    expiresValue: expiresValue ?? 0,
+    expiresUnit: expiresUnit ?? "day",
+  });
+
+  let requestUrl = `${normalizedBackendUrl}/api/v1/public/share/create`;
+  if (store.useProxy) {
+    const proxyPath = `${WEBDAV_PROXY_PREFIX}/api/v1/public/share/create`;
+    requestUrl = `${proxyPath}?endpoint=${encodeURIComponent(
+      normalizedBackendUrl,
+    )}`;
+  }
+
+  const res = await fetch(requestUrl, {
+    method: "POST",
+    headers: {
+      authorization,
+      "content-type": "application/json",
+    },
+    body: requestBody,
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(
+      `WebDAV create share link failed: ${res.status} ${res.statusText} ${detail}`,
+    );
+  }
+
+  const payload = (await res.json()) as WebDavShareResponse;
+  const token = String(payload?.token || "").trim();
+  const name = String(payload?.name || "").trim();
+  let url = String(payload?.url || "").trim();
+  if (!url && token) {
+    const encodedName = name ? `/${encodeURIComponent(name)}` : "";
+    url = `${normalizedBackendUrl}/api/v1/public/share/${encodeURIComponent(
+      token,
+    )}${encodedName}`;
+  }
+  if (!url) {
+    throw new Error("WebDAV create share link response missing url");
+  }
+  return {
+    ...payload,
+    url,
+    token: token || undefined,
+    name: name || undefined,
+  };
+}
+
+export async function uploadFileToWebDavAndCreateShareLink(params: {
+  store: SyncStore;
+  file: Blob;
+  fileName: string;
+  expiresValue?: number;
+  expiresUnit?: WebDavShareExpiresUnit;
+}) {
+  const normalizedFileName = sanitizeUploadFileName(params.fileName);
+  const contentType =
+    (params.file.type || "application/octet-stream").trim() ||
+    "application/octet-stream";
+  const objectName = buildUploadObjectName(normalizedFileName);
+
+  if (params.store.webdav.authType === "ucan") {
+    const { client, mediaDir, backendUrl, token } = await getUcanWebDavClient(
+      params.store,
+    );
+    if (!token) {
+      throw new Error("WebDAV UCAN token is unavailable");
+    }
+    const path = `${mediaDir}/${objectName}`;
+    await client.upload(path, params.file, contentType);
+    const share = await createShareLinkViaApi({
+      store: params.store,
+      backendUrl,
+      authorization: `Bearer ${token}`,
+      path,
+      expiresValue: params.expiresValue,
+      expiresUnit: params.expiresUnit,
+    });
+    return {
+      url: share.url as string,
+      path,
+      fileName: normalizedFileName,
+      mimeType: contentType,
+    };
+  }
+
+  const basicClient = createBasicWebDavClient(params.store);
+  if (!basicClient.uploadMedia) {
+    throw new Error("WebDAV media upload is not supported");
+  }
+  await basicClient.uploadMedia(objectName, params.file, contentType);
+  const envBaseUrl = getEnvWebdavBaseUrl();
+  const backendUrl = resolveWebdavBaseUrl(params.store, envBaseUrl);
+  if (!backendUrl) {
+    throw new Error("WEBDAV_BACKEND_BASE_URL is not configured");
+  }
+  const path = `${MEDIA_FOLDER}/${objectName}`;
+  const share = await createShareLinkViaApi({
+    store: params.store,
+    backendUrl,
+    authorization: getBasicAuthorizationHeader(params.store),
+    path,
+    expiresValue: params.expiresValue,
+    expiresUnit: params.expiresUnit,
+  });
+  return {
+    url: share.url as string,
+    path,
+    fileName: normalizedFileName,
+    mimeType: contentType,
   };
 }
 

@@ -404,6 +404,27 @@ function normalizeResponsesInputContent(content: any, role = "user") {
         ...(detail ? { detail } : {}),
       };
     }
+    if (partType === "file_url") {
+      let url = "";
+      let filename = "";
+      if (typeof part.file_url === "string") {
+        url = part.file_url;
+      } else if (part.file_url && typeof part.file_url === "object") {
+        if (typeof part.file_url.url === "string") {
+          url = part.file_url.url;
+        }
+        if (typeof part.file_url.name === "string") {
+          filename = part.file_url.name;
+        }
+      }
+      if (!url) return part;
+      changed = true;
+      return {
+        type: "input_file",
+        file_url: url,
+        ...(filename ? { filename } : {}),
+      };
+    }
     return part;
   });
 
@@ -428,14 +449,19 @@ function normalizeResponsesInputMessages(input: any) {
   return changed ? normalized : input;
 }
 
-function hasResponsesImageInput(input: any): boolean {
+function hasResponsesNonTextInput(input: any): boolean {
   if (!Array.isArray(input)) return false;
   return input.some((item: any) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) return false;
     if (!Array.isArray(item.content)) return false;
     return item.content.some((part: any) => {
       const partType = typeof part?.type === "string" ? part.type : "";
-      return partType === "input_image" || partType === "image_url";
+      return (
+        partType === "input_image" ||
+        partType === "image_url" ||
+        partType === "input_file" ||
+        partType === "file_url"
+      );
     });
   });
 }
@@ -925,14 +951,14 @@ export class ChatGPTApi implements LLMApi {
         if (useResponsesEndpoint) {
           const { instructions, input } =
             buildResponsesInputAndInstructions(messages);
-          const hasImageInput = hasResponsesImageInput(input);
+          const hasNonTextInput = hasResponsesNonTextInput(input);
           const responsesPayload: Record<string, any> = {
             model: resolvedModel,
             input,
             stream: options.config.stream,
             max_output_tokens: modelConfig.max_tokens,
           };
-          if (!isO1OrO3 && !hasImageInput) {
+          if (!isO1OrO3 && !hasNonTextInput) {
             responsesPayload.temperature = modelConfig.temperature;
             responsesPayload.top_p = modelConfig.top_p;
           }

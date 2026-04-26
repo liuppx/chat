@@ -12,6 +12,8 @@ import {
 } from "@fortaine/fetch-event-source";
 import { prettyObject } from "./format";
 import { fetch as tauriFetch } from "./stream";
+import { uploadFileToWebDavAndCreateShareLink } from "./cloud/webdav";
+import { useSyncStore } from "../store/sync";
 
 export function compressImage(file: Blob, maxSize: number): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -231,6 +233,47 @@ export function removeImage(imageUrl: string) {
     mode: "cors",
     credentials: "include",
   });
+}
+
+export async function uploadAttachmentForChat(
+  file: File,
+): Promise<MultimodalContent> {
+  const mimeType = (file.type || "").trim().toLowerCase();
+  const isImage = mimeType.startsWith("image/");
+  const isPdf =
+    mimeType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+  if (!isImage && !isPdf) {
+    throw new Error("仅支持上传图片或 PDF 文件");
+  }
+
+  const syncStore = useSyncStore.getState();
+  const uploaded = await uploadFileToWebDavAndCreateShareLink({
+    store: syncStore,
+    file,
+    fileName: file.name || (isPdf ? "attachment.pdf" : "attachment"),
+    expiresValue: 0,
+    expiresUnit: "day",
+  });
+
+  if (isImage) {
+    return {
+      type: "image_url",
+      image_url: {
+        url: uploaded.url,
+        detail: "low",
+      },
+    };
+  }
+
+  return {
+    type: "file_url",
+    file_url: {
+      url: uploaded.url,
+      name: uploaded.fileName,
+      mime_type: uploaded.mimeType,
+    },
+  };
 }
 
 function normalizeStreamError(error: unknown): Error {
