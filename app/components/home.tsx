@@ -34,7 +34,7 @@ import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
 import {
   UCAN_AUTH_EVENT,
   initWalletListeners,
-  isUcanMetaAuthorized,
+  isValidUcanAuthorization,
   waitForWallet,
 } from "../plugins/wallet";
 import {
@@ -203,7 +203,8 @@ function Screen() {
   const config = useAppConfig();
   const location = useLocation();
   const navigate = useNavigate();
-  const isAuthorized = useUcanAuthState();
+  const { authorized: isAuthorized, checking: isCheckingAuth } =
+    useUcanAuthState();
   const isArtifact = location.pathname.includes(Path.Artifacts);
   const isHome = location.pathname === Path.Home;
   const isAuth = location.pathname === Path.Auth;
@@ -212,6 +213,7 @@ function Screen() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (isCheckingAuth) return;
 
     const isAllowedPath = (pathname: string) =>
       pathname === Path.Auth || pathname.startsWith(Path.Artifacts);
@@ -233,7 +235,13 @@ function Screen() {
     if (isAuthorized && location.pathname === Path.Auth) {
       navigate(resolveRedirectTarget(), { replace: true });
     }
-  }, [isAuthorized, location.pathname, location.search, navigate]);
+  }, [
+    isAuthorized,
+    isCheckingAuth,
+    location.pathname,
+    location.search,
+    navigate,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !isAuthorized) return;
@@ -268,6 +276,9 @@ function Screen() {
         <Route path="/artifacts/:id" element={<Artifacts />} />
       </Routes>
     );
+  }
+  if (isCheckingAuth) {
+    return <Loading noLogo />;
   }
   const renderContent = () => {
     if (isAuth) return <AuthPage />;
@@ -327,10 +338,14 @@ export function useLoadData() {
 
   useEffect(() => {
     const onAuthChange = () => {
-      if (!isUcanMetaAuthorized()) return;
-      loadModels().catch((error) => {
-        console.warn("[Models] reload after auth failed", error);
-      });
+      isValidUcanAuthorization()
+        .then((valid) => {
+          if (!valid) return;
+          return loadModels();
+        })
+        .catch((error) => {
+          console.warn("[Models] reload after auth failed", error);
+        });
     };
     window.addEventListener(UCAN_AUTH_EVENT, onAuthChange);
     return () => window.removeEventListener(UCAN_AUTH_EVENT, onAuthChange);
@@ -338,24 +353,45 @@ export function useLoadData() {
 }
 
 function useUcanAuthState() {
-  const [authorized, setAuthorized] = useState<boolean>(() =>
-    isUcanMetaAuthorized(),
+  const [state, setState] = useState<{ authorized: boolean; checking: boolean }>(
+    {
+      authorized: false,
+      checking: true,
+    },
   );
 
   useEffect(() => {
-    const refresh = () => setAuthorized(isUcanMetaAuthorized());
+    let cancelled = false;
+    const refresh = async () => {
+      const authorized = await isValidUcanAuthorization();
+      if (cancelled) return;
+      setState({
+        authorized,
+        checking: false,
+      });
+    };
+
     refresh();
-    window.addEventListener(UCAN_AUTH_EVENT, refresh);
-    window.addEventListener("storage", refresh);
-    document.addEventListener("visibilitychange", refresh);
+    const onAuthChange = () => {
+      refresh();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      refresh();
+    };
+
+    window.addEventListener(UCAN_AUTH_EVENT, onAuthChange);
+    window.addEventListener("storage", onAuthChange);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
-      window.removeEventListener(UCAN_AUTH_EVENT, refresh);
-      window.removeEventListener("storage", refresh);
-      document.removeEventListener("visibilitychange", refresh);
+      cancelled = true;
+      window.removeEventListener(UCAN_AUTH_EVENT, onAuthChange);
+      window.removeEventListener("storage", onAuthChange);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
-  return authorized;
+  return state;
 }
 
 function AuthenticatedBootstrap() {
