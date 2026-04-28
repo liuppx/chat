@@ -32,7 +32,12 @@ import {
   getCachedUcanSession,
   refreshUcanSession,
 } from "../plugins/ucan-session";
+import {
+  isCentralModeEnabled,
+  isCentralUcanAuthorized,
+} from "../plugins/central-ucan";
 import { getUcanRootCapsKey, getWebdavAudience } from "../plugins/ucan";
+import { isValidUcanAuthorization } from "../plugins/wallet";
 
 type ImageUrlPart = {
   type?: string;
@@ -311,6 +316,9 @@ export type SyncStore = GetStoreState<typeof useSyncStore>;
 
 const isUcanRootMetaReady = (): boolean => {
   try {
+    if (isCentralModeEnabled()) {
+      return isCentralUcanAuthorized();
+    }
     if (typeof localStorage === "undefined") return false;
     const expRaw = localStorage.getItem("ucanRootExp");
     const iss = localStorage.getItem("ucanRootIss");
@@ -423,15 +431,26 @@ export const useSyncStore = createPersistStore(
         get().webdav.authType === "ucan" &&
         interactive
       ) {
-        await refreshUcanSession();
+        if (!isCentralModeEnabled()) {
+          await refreshUcanSession();
+        }
       } else if (
         provider === ProviderType.WebDAV &&
         get().webdav.authType === "ucan" &&
         !interactive
       ) {
-        const session = await getCachedUcanSession();
-        if (!session) {
-          return;
+        if (isCentralModeEnabled()) {
+          if (!isCentralUcanAuthorized()) {
+            return;
+          }
+        } else {
+          const [session, authorized] = await Promise.all([
+            getCachedUcanSession(),
+            isValidUcanAuthorization(),
+          ]);
+          if (!session || !authorized) {
+            return;
+          }
         }
       }
 

@@ -156,6 +156,23 @@ function isRootCapMatched(root: UcanRootProof | null) {
   );
 }
 
+function isStoredRootUsable(root: UcanRootProof | null, account?: string) {
+  if (!root || typeof root.exp !== "number") {
+    return false;
+  }
+  if (root.exp <= Date.now()) {
+    return false;
+  }
+  const currentAccount = (account || getCurrentAccount() || "").trim();
+  if (!currentAccount) {
+    return false;
+  }
+  if (root.iss !== getUcanIssuer(currentAccount)) {
+    return false;
+  }
+  return isRootCapMatched(root);
+}
+
 function storeUcanMeta(root: UcanRootProof) {
   if (typeof localStorage === "undefined") return;
   localStorage.setItem("ucanRootExp", String(root.exp));
@@ -436,13 +453,7 @@ export async function loginWithUcan(
 
     const existing = await getStoredRoot();
     const expectedIssuer = getUcanIssuer(currentAccount);
-    if (
-      existing &&
-      typeof existing.exp === "number" &&
-      existing.exp > Date.now() &&
-      existing.iss === expectedIssuer &&
-      isRootCapMatched(existing)
-    ) {
+    if (existing && isStoredRootUsable(existing, currentAccount)) {
       storeUcanMeta(existing);
       emitAuthError("");
       emitAuthChange();
@@ -487,7 +498,15 @@ export async function loginWithUcan(
       capabilities: rootCapabilities,
       statement: rootStatement,
     });
-    storeUcanMeta(root);
+    const storedRoot = await getStoredRoot();
+    if (
+      !storedRoot ||
+      !isStoredRootUsable(storedRoot, currentAccount) ||
+      storedRoot.aud !== root.aud
+    ) {
+      throw new Error("UCAN root was not persisted");
+    }
+    storeUcanMeta(storedRoot);
     localStorage.removeItem("authToken");
     emitAuthError("");
     emitAuthChange();
@@ -555,20 +574,7 @@ export async function isValidUcanAuthorization(): Promise<boolean> {
   }
   try {
     const root = await getStoredRoot();
-    if (!root || typeof root.exp !== "number") {
-      return false;
-    }
-    if (root.exp <= Date.now()) {
-      return false;
-    }
-    const account = getCurrentAccount();
-    if (!account) {
-      return false;
-    }
-    if (root.iss !== getUcanIssuer(account)) {
-      return false;
-    }
-    return isRootCapMatched(root);
+    return isStoredRootUsable(root);
   } catch (e) {
     return false;
   }
