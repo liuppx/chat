@@ -49,8 +49,9 @@ export type MultiBlockContent = {
   type: "image" | "text";
   source?: {
     type: string;
-    media_type: string;
-    data: string;
+    media_type?: string;
+    data?: string;
+    url?: string;
   };
   text?: string;
 };
@@ -392,35 +393,56 @@ export class ClaudeApi implements LLMApi {
             content: getMessageTextContent(v),
           };
         }
+        const multiBlocks: MultiBlockContent[] = [];
+        for (const part of content as any[]) {
+          if (part?.type === "text") {
+            multiBlocks.push({
+              type: "text",
+              text: part.text ?? "",
+            });
+            continue;
+          }
+          if (part?.type !== "image_url") {
+            continue;
+          }
+
+          const { url = "" } = part.image_url || {};
+          if (!url) {
+            continue;
+          }
+
+          if (url.startsWith("data:")) {
+            const colonIndex = url.indexOf(":");
+            const semicolonIndex = url.indexOf(";");
+            const comma = url.indexOf(",");
+
+            const mimeType = url.slice(colonIndex + 1, semicolonIndex);
+            const encodeType = url.slice(semicolonIndex + 1, comma);
+            const data = url.slice(comma + 1);
+
+            multiBlocks.push({
+              type: "image",
+              source: {
+                type: encodeType,
+                media_type: mimeType,
+                data,
+              },
+            });
+            continue;
+          }
+
+          multiBlocks.push({
+            type: "image",
+            source: {
+              type: "url",
+              url,
+            },
+          });
+        }
+
         return {
           role: insideRole,
-          content: (content as any[])
-            .filter((part) => part?.type === "text" || part?.type === "image_url")
-            .map(({ type, text, image_url }) => {
-              if (type === "text") {
-                return {
-                  type,
-                  text: text!,
-                };
-              }
-              const { url = "" } = image_url || {};
-              const colonIndex = url.indexOf(":");
-              const semicolonIndex = url.indexOf(";");
-              const comma = url.indexOf(",");
-
-              const mimeType = url.slice(colonIndex + 1, semicolonIndex);
-              const encodeType = url.slice(semicolonIndex + 1, comma);
-              const data = url.slice(comma + 1);
-
-              return {
-                type: "image" as const,
-                source: {
-                  type: encodeType,
-                  media_type: mimeType,
-                  data,
-                },
-              };
-            }),
+          content: multiBlocks,
         };
       });
 
