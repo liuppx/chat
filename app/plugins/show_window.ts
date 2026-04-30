@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast, type ExternalToast } from "sonner";
 
 const RECENT_TOASTS = new Map<string, number>();
 const DEDUPE_WINDOW_MS = 1500;
@@ -21,6 +21,20 @@ export const notifyError = (msg: string) => {
   const key = `error:${normalized}`;
   if (!shouldToast(key)) return;
   toast.error(normalized, { id: key, duration: 3000 });
+};
+
+export const notifyErrorWithOptions = (
+  msg: string,
+  options?: ExternalToast,
+) => {
+  const normalized = normalizeToastMessage(msg);
+  const key = `error:${normalized}`;
+  if (!shouldToast(key)) return;
+  toast.error(normalized, {
+    id: key,
+    duration: 3000,
+    ...options,
+  });
 };
 
 export const notifyInfo = (msg: string) => {

@@ -1,5 +1,6 @@
 // hooks/useAuth.ts
 import { useEffect, useState } from "react";
+import { getClientConfig } from "../config/client";
 import { isValidUcanAuthorization, UCAN_AUTH_EVENT } from "../plugins/wallet";
 import { notifyError } from "../plugins/show_window";
 
@@ -8,10 +9,15 @@ export function useAuth(options?: { notify?: boolean }) {
   const shouldNotify = options?.notify === true;
   useEffect(() => {
     let cancelled = false;
+    const loginMode = (getClientConfig()?.ucanLoginForceMode || "auto")
+      .trim()
+      .toLowerCase();
+    const shouldNotifyWalletMissing =
+      shouldNotify && loginMode === "wallet";
     const check = async () => {
       if (localStorage.getItem("hasConnectedWallet") === "false") {
         if (!cancelled) {
-          if (shouldNotify) {
+          if (shouldNotifyWalletMissing) {
             notifyError("❌未检测到钱包，请先安装并连接钱包");
           }
           setIsAuthenticated(false);
