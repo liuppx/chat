@@ -41,10 +41,9 @@ import {
   getCentralUcanExpiresAt,
   isCentralModeEnabled,
 } from "../plugins/central-ucan";
-import { toast } from "sonner";
-
 import { useToastStore } from "../store/toast";
 import { useAutoSync } from "../hooks/useAutoSync";
+import { notifyErrorWithOptions } from "../plugins/show_window";
 
 const loadFunc = async () => {
   try {
@@ -53,18 +52,25 @@ const loadFunc = async () => {
     await initWalletListeners();
   } catch (error) {
     console.error("钱包检测失败:", error);
-    const innerHTML = `
-      <p>❌ 未检测到钱包</p>
-      <p class="error">请确保：</p>
-      <ul>
-        <li>•已安装 YeYing Wallet 扩展</li>
-        <li>•已启用扩展</li>
-        <li>•已在扩展设置中允许访问文件 URL（如果使用 file:// 协议）</li>
-        <li>•刷新页面后重试</li>
-      </ul>
-    `;
     localStorage.setItem("hasConnectedWallet", "false");
-    useToastStore.getState().setPendingError(innerHTML);
+    const loginMode = (getClientConfig()?.ucanLoginForceMode || "auto")
+      .trim()
+      .toLowerCase();
+    if (loginMode === "wallet") {
+      const innerHTML = `
+        <p>❌ 未检测到钱包</p>
+        <p class="error">请确保：</p>
+        <ul>
+          <li>•已安装 YeYing Wallet 扩展</li>
+          <li>•已启用扩展</li>
+          <li>•已在扩展设置中允许访问文件 URL（如果使用 file:// 协议）</li>
+          <li>•刷新页面后重试</li>
+        </ul>
+      `;
+      useToastStore.getState().setPendingError(innerHTML);
+    } else {
+      useToastStore.getState().setPendingError(null);
+    }
   }
 };
 
@@ -427,9 +433,7 @@ export function Home() {
 
   useEffect(() => {
     if (pendingError) {
-      // ⚠️ sonner 不支持 HTML，所以只能显示纯文本摘要
-      // 或者你改用 description 为简化版消息
-      toast.error("❌ 钱包连接失败", {
+      notifyErrorWithOptions("钱包连接失败", {
         description: "请安装并启用 YeYing Wallet 扩展",
         duration: 8000,
         action: {
@@ -440,7 +444,6 @@ export function Home() {
         },
       });
 
-      // 清除状态，避免重复触发
       clearError(null);
     }
   }, [pendingError, clearError]);
