@@ -98,7 +98,7 @@
     "tsx": "^4.21.0",
     "typescript": "6.0.3",
     "watch": "^1.0.2",
-    "webpack": "^5.105.3"
+    "webpack": "^5.106.2"
   },
   "overrides": {
     "test-exclude": "^7.0.1"
