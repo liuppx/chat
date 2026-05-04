@@ -216,6 +216,7 @@ function Screen() {
   const isAuth = location.pathname === Path.Auth;
   const isSd = location.pathname === Path.Sd;
   const isSdNew = location.pathname === Path.SdNew;
+  const isMobileScreen = useMobileScreen();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -229,6 +230,7 @@ function Screen() {
       const raw = params.get("redirect") || Path.Home;
       if (!raw.startsWith("/")) return Path.Home;
       if (raw === Path.Auth) return Path.Home;
+      if (isMobileScreen && raw === Path.Chat) return Path.Home;
       return raw;
     };
 
@@ -244,6 +246,7 @@ function Screen() {
   }, [
     isAuthorized,
     isCheckingAuth,
+    isMobileScreen,
     location.pathname,
     location.search,
     navigate,
@@ -268,7 +271,6 @@ function Screen() {
     };
   }, [isAuthorized]);
 
-  const isMobileScreen = useMobileScreen();
   const shouldTightBorder =
     getClientConfig()?.isApp || (config.tightBorder && !isMobileScreen);
 
