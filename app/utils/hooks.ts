@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { ModelCandidate } from "../client/api";
 import {
-  useImageStudioStore,
   useAccessStore,
   useAppConfig,
   useMaskProviderModelsStore,
 } from "../store";
-import { ImageStudioWorkspace } from "../store/image-studio";
 import {
   collectModelsWithDefaultModel,
   filterModelsByCandidates,
@@ -48,29 +46,4 @@ export function useSessionModels(candidateModels?: readonly ModelCandidate[]) {
     const availableModels = allModels.filter((model) => model.available);
     return filterModelsByCandidates(availableModels, candidateModels);
   }, [allModels, candidateModels]);
-}
-
-export function useImageStudioWorkspace(
-  sessionId: string,
-  defaults?: Partial<ImageStudioWorkspace>,
-) {
-  const ensureWorkspace = useImageStudioStore((state) => state.ensureWorkspace);
-  const updateWorkspace = useImageStudioStore((state) => state.updateWorkspace);
-  const workspace = useImageStudioStore((state) => state.workspaces[sessionId]);
-
-  useEffect(() => {
-    ensureWorkspace(sessionId, defaults);
-  }, [defaults, ensureWorkspace, sessionId]);
-
-  const update = useCallback(
-    (updater: (workspace: ImageStudioWorkspace) => void) => {
-      updateWorkspace(sessionId, updater);
-    },
-    [sessionId, updateWorkspace],
-  );
-
-  return {
-    workspace,
-    update,
-  };
 }

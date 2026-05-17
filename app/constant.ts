@@ -98,7 +98,6 @@ export enum StoreKey {
   Update = "chat-update",
   Sync = "sync",
   SdList = "sd-list",
-  ImageStudio = "image-studio-store",
   Mcp = "mcp-store",
 }
 

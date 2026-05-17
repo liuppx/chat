@@ -21,8 +21,6 @@ import { useMobileScreen } from "../utils";
 import clsx from "clsx";
 import { useAuth } from "../hooks/useAuth";
 import { useShallow } from "zustand/react/shallow";
-import ImageIcon from "../icons/image.svg";
-import { SessionType, StudioKind } from "../store/chat";
 
 export function ChatItem(props: {
   onClick?: () => void;
@@ -35,8 +33,6 @@ export function ChatItem(props: {
   index: number;
   narrow?: boolean;
   mask: Mask;
-  sessionType?: SessionType;
-  studioKind?: StudioKind;
 }) {
   const draggableRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -70,14 +66,10 @@ export function ChatItem(props: {
           {props.narrow ? (
             <div className={styles["chat-item-narrow"]}>
               <div className={clsx(styles["chat-item-avatar"], "no-dark")}>
-                {props.sessionType === "studio" ? (
-                  <ImageIcon />
-                ) : (
-                  <MaskAvatar
-                    avatar={props.mask.avatar}
-                    model={props.mask.modelConfig.model}
-                  />
-                )}
+                <MaskAvatar
+                  avatar={props.mask.avatar}
+                  model={props.mask.modelConfig.model}
+                />
               </div>
               <div className={styles["chat-item-narrow-count"]}>
                 {props.count}
@@ -88,9 +80,7 @@ export function ChatItem(props: {
               <div className={styles["chat-item-title"]}>{props.title}</div>
               <div className={styles["chat-item-info"]}>
                 <div className={styles["chat-item-count"]}>
-                  {props.sessionType === "studio"
-                    ? "图像工作空间"
-                    : Locale.ChatItem.ChatItemCount(props.count)}
+                  {Locale.ChatItem.ChatItemCount(props.count)}
                 </div>
                 <div className={styles["chat-item-date"]}>{props.time}</div>
               </div>
@@ -180,8 +170,6 @@ export function ChatList(props: { narrow?: boolean }) {
                 }}
                 narrow={props.narrow}
                 mask={item.mask}
-                sessionType={item.type}
-                studioKind={item.studio?.kind}
               />
             ))}
             {provided.placeholder}

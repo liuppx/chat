@@ -12,7 +12,6 @@ import McpIcon from "../icons/mcp.svg";
 import DragIcon from "../icons/drag.svg";
 import DiscoveryIcon from "../icons/discovery.svg";
 import WalletIcon from "../icons/wallet.svg";
-import ImageIcon from "../icons/image.svg";
 import Locale from "../locales";
 import {
   connectWallet,
@@ -402,35 +401,6 @@ export function SideBar(props: { className?: string }) {
       >
         <ChatList narrow={shouldNarrow} />
       </SideBarBody>
-      <SideBarSection className={styles["sidebar-studio-entry"]}>
-        {!shouldNarrow && (
-          <div className={styles["sidebar-section-title"]}>工作空间</div>
-        )}
-        <button
-          type="button"
-          className={clsx(styles["sidebar-studio-button"], {
-            [styles["sidebar-studio-button-narrow"]]: shouldNarrow,
-          })}
-          onClick={() => {
-            chatStore.createStudioSession("image");
-            navigate(Path.Chat);
-          }}
-        >
-          <span className={styles["sidebar-studio-icon"]}>
-            <ImageIcon />
-          </span>
-          {!shouldNarrow && (
-            <span className={styles["sidebar-studio-texts"]}>
-              <span className={styles["sidebar-studio-name"]}>
-                图像工作空间
-              </span>
-              <span className={styles["sidebar-studio-desc"]}>
-                生成、编辑、扩图
-              </span>
-            </span>
-          )}
-        </button>
-      </SideBarSection>
       <SideBarTail
         primaryAction={
           <>

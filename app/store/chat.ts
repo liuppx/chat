@@ -98,16 +98,10 @@ export interface ChatStat {
   charCount: number;
 }
 
-export type SessionType = "chat" | "studio";
-export type StudioKind = "image";
-
 export interface ChatSession {
   id: string;
   topic: string;
-  type?: SessionType;
-  studio?: {
-    kind: StudioKind;
-  };
+  type?: "chat";
 
   memoryPrompt: string;
   messages: ChatMessage[];
@@ -499,20 +493,6 @@ export const useChatStore = createPersistStore(
             showToast("面具默认模型当前不可用，请先选择一个可用模型");
           }
         }
-
-        set((state) => ({
-          currentSessionIndex: 0,
-          sessions: [session].concat(state.sessions),
-        }));
-
-        return true;
-      },
-
-      createStudioSession(kind: StudioKind = "image") {
-        const session = createEmptySession();
-        session.type = "studio";
-        session.studio = { kind };
-        session.topic = kind === "image" ? "图像工作空间" : DEFAULT_TOPIC;
 
         set((state) => ({
           currentSessionIndex: 0,
@@ -1150,7 +1130,7 @@ export const useChatStore = createPersistStore(
   },
   {
     name: StoreKey.Chat,
-    version: 3.6,
+    version: 3.7,
     migrate(persistedState, version) {
       const state = persistedState as any;
       const newState = JSON.parse(
@@ -1233,11 +1213,18 @@ export const useChatStore = createPersistStore(
           }
         });
       }
+      if (version < 3.7) {
+        newState.sessions.forEach((s) => {
+          s.type = "chat";
+          delete (s as { studio?: unknown }).studio;
+        });
+      }
 
       newState.sessions.forEach((s) => {
-        if (!s.type) {
+        if (s.type !== "chat") {
           s.type = "chat";
         }
+        delete (s as { studio?: unknown }).studio;
       });
 
       return newState as any;
