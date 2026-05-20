@@ -1,6 +1,20 @@
 // Learn more: https://github.com/testing-library/jest-dom
 import "@testing-library/jest-dom";
 import { jest } from "@jest/globals";
+import { TextDecoder, TextEncoder } from "node:util";
+
+Object.assign(globalThis, {
+  TextEncoder,
+  TextDecoder,
+});
+
+for (const listener of process.listeners("unhandledRejection")) {
+  process.removeListener("unhandledRejection", listener);
+}
+
+process.on("unhandledRejection", (reason) => {
+  throw reason instanceof Error ? reason : new Error(String(reason));
+});
 
 global.fetch = jest.fn(() =>
   Promise.resolve({

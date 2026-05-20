@@ -7,13 +7,15 @@ const createJestConfig = nextJest({
 
 // Add any custom config to be passed to Jest
 const config = {
-  coverageProvider: "v8",
-  testEnvironment: "jsdom",
+  coverageProvider: "v8" as const,
+  testEnvironment: "jsdom" as const,
   testMatch: ["**/*.test.js", "**/*.test.ts", "**/*.test.jsx", "**/*.test.tsx"],
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   modulePathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/out/"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    "^@yeying-community/web3-bs$":
+      "<rootDir>/node_modules/@yeying-community/web3-bs/dist/web3-bs.umd.js",
   },
   extensionsToTreatAsEsm: [".ts", ".tsx"],
   injectGlobals: true,
