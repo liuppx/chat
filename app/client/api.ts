@@ -120,6 +120,7 @@ export interface LLMModel {
   provider?: LLMModelProvider;
   sorted: number;
   ownedBy?: string;
+  tags?: string[];
   supportedEndpoints?: string[];
   modelType?: string;
   status?: string;

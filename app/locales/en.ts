@@ -828,10 +828,13 @@ const en: LocaleType = {
     Settings: "Detected settings from url, confirm to apply?",
   },
   SdPanel: {
+    Provider: "Provider",
     Prompt: "Prompt",
     NegativePrompt: "Negative Prompt",
     PleaseInput: (name: string) => `Please input ${name}`,
     AspectRatio: "Aspect Ratio",
+    ImageSize: "Image Size",
+    ImageQuality: "Image Quality",
     ImageStyle: "Image Style",
     OutFormat: "Output Format",
     AIModel: "AI Model",
@@ -859,6 +862,7 @@ const en: LocaleType = {
     },
   },
   Sd: {
+    Title: "AI Images",
     SubTitle: (count: number) => `${count} images`,
     Actions: {
       Params: "See Params",

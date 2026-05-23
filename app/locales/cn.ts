@@ -818,10 +818,13 @@ const cn = {
     Time: "时间",
   },
   SdPanel: {
+    Provider: "提供商",
     Prompt: "画面提示",
     NegativePrompt: "否定提示",
     PleaseInput: (name: string) => `请输入${name}`,
     AspectRatio: "横纵比",
+    ImageSize: "图片尺寸",
+    ImageQuality: "图片质量",
     ImageStyle: "图像风格",
     OutFormat: "输出格式",
     AIModel: "AI模型",
@@ -849,6 +852,7 @@ const cn = {
     },
   },
   Sd: {
+    Title: "AI 绘图",
     SubTitle: (count: number) => `共 ${count} 条绘画`,
     Actions: {
       Params: "查看参数",

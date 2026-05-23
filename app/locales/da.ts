@@ -783,10 +783,13 @@ const da: PartialLocaleType = {
     Settings: "Så ud til, at der var indstillinger i linket. Vil du bruge dem?",
   },
   SdPanel: {
+    Provider: "Udbyder",
     Prompt: "Prompt",
     NegativePrompt: "Negativ prompt",
     PleaseInput: (name: string) => `Indtast: ${name}`,
     AspectRatio: "Billedformat",
+    ImageSize: "Billedstørrelse",
+    ImageQuality: "Billedkvalitet",
     ImageStyle: "Stil",
     OutFormat: "Uddataformat",
     AIModel: "AI-model",
@@ -814,6 +817,7 @@ const da: PartialLocaleType = {
     },
   },
   Sd: {
+    Title: "AI-billeder",
     SubTitle: (count: number) => `${count} billeder`,
     Actions: {
       Params: "Se indstillinger",

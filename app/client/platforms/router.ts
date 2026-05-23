@@ -48,6 +48,7 @@ import {
 type RouterModelCard = {
   id?: string;
   owned_by?: string;
+  tags?: string[];
   supported_endpoints?: string[];
 };
 
@@ -61,6 +62,7 @@ type RouterProviderModelDetail = {
   type?: string;
   status?: string;
   description?: string;
+  tags?: string[];
   supported_endpoints?: string[];
 };
 
@@ -421,6 +423,19 @@ function modelNameFromProviderDetail(
   return detail.model?.trim() || "";
 }
 
+function normalizeTags(tags?: readonly string[]): string[] {
+  if (!Array.isArray(tags)) return [];
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  tags.forEach((tag) => {
+    const value = typeof tag === "string" ? tag.trim().toLowerCase() : "";
+    if (!value || seen.has(value)) return;
+    seen.add(value);
+    normalized.push(value);
+  });
+  return normalized;
+}
+
 function buildModelsFromProviderModels(
   items: RouterProviderModelsItem[],
 ): LLMModel[] {
@@ -450,6 +465,7 @@ function buildModelsFromProviderModels(
         available: true,
         sorted: seq++,
         ownedBy: providerID,
+        tags: normalizeTags(detail.tags),
         supportedEndpoints: normalizeSupportedEndpoints(
           detail.supported_endpoints,
         ),
@@ -603,6 +619,7 @@ export class RouterApi implements LLMApi {
           available: true,
           sorted: seq++,
           ownedBy: (item.owned_by || "").trim() || undefined,
+          tags: normalizeTags(item.tags),
           supportedEndpoints,
           provider: {
             id: providerId(providerName),

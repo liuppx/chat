@@ -804,10 +804,13 @@ const ko: PartialLocaleType = {
     Time: "시간",
   },
   SdPanel: {
+    Provider: "제공자",
     Prompt: "프롬프트",
     NegativePrompt: "부정적 프롬프트",
     PleaseInput: (name: string) => `${name}을 입력하세요`,
     AspectRatio: "비율",
+    ImageSize: "이미지 크기",
+    ImageQuality: "이미지 품질",
     ImageStyle: "이미지 스타일",
     OutFormat: "출력 형식",
     AIModel: "AI 모델",
@@ -835,6 +838,7 @@ const ko: PartialLocaleType = {
     },
   },
   Sd: {
+    Title: "AI 이미지",
     SubTitle: (count: number) => `${count} 개의 이미지`,
     Actions: {
       Params: "파라미터 보기",

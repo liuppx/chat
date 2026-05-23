@@ -253,7 +253,7 @@ function getValidCachedRouterInvocationToken(
   return cached.token;
 }
 
-async function getHeadersWithRouterUcan(
+export async function getHeadersWithRouterUcan(
   url: string,
   providerNameOverride?: string,
 ) {

@@ -18,6 +18,7 @@ import { getISOLang, getLang } from "../locales";
 
 import {
   HashRouter as Router,
+  Navigate,
   Route,
   Routes,
   useLocation,
@@ -292,7 +293,7 @@ function Screen() {
     if (isAuth) return <AuthPage />;
     if (!isAuthorized) return <AuthPage />;
     if (isSd) return <Sd />;
-    if (isSdNew) return <Sd />;
+    if (isSdNew) return <Navigate to={Path.Sd} replace />;
     return (
       <>
         {isAuthorized ? <AuthenticatedBootstrap /> : null}

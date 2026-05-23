@@ -3,20 +3,21 @@ import {
   StoreKey,
   ACCESS_CODE_PREFIX,
   ApiPath,
+  OpenaiPath,
+  ServiceProvider,
 } from "@/app/constant";
 import { getBearerToken } from "@/app/client/api";
 import { createPersistStore } from "@/app/utils/store";
 import { nanoid } from "nanoid";
 import { uploadImage, base64Image2Blob } from "@/app/utils/chat";
-import { models, getModelParamBasicData } from "@/app/components/sd/sd-panel";
+import { getModelParamBasicData } from "@/app/components/sd/sd-panel";
+import { getDefaultImageModel } from "@/app/components/sd/image-registry";
+import { getHeadersWithRouterUcan } from "@/app/client/platforms/openai";
 import { useAccessStore } from "./access";
 
-const defaultModel = {
-  name: models[0].name,
-  value: models[0].value,
-};
+const defaultModel = getDefaultImageModel()!;
 
-const defaultParams = getModelParamBasicData(models[0].params({}), {});
+const defaultParams = getModelParamBasicData(defaultModel.params({}), {});
 
 const DEFAULT_SD_STATE = {
   currentId: 0,
@@ -59,7 +60,15 @@ export const useSdStore = createPersistStore<
         data = { ...data, id: nanoid(), status: "running" };
         set({ draw: [data, ..._get().draw] });
         this.getNextId();
-        this.stabilityRequestCall(data);
+        switch (data.endpoint_type) {
+          case "openai-image":
+            this.openaiImageRequestCall(data);
+            break;
+          case "stability":
+          default:
+            this.stabilityRequestCall(data);
+            break;
+        }
         okCall?.();
       },
       stabilityRequestCall(data: any) {
@@ -127,6 +136,86 @@ export const useSdStore = createPersistStore<
               });
             }
             this.getNextId();
+          })
+          .catch((error) => {
+            this.updateDraw({ ...data, status: "error", error: error.message });
+            console.error("Error:", error);
+            this.getNextId();
+          });
+      },
+      openaiImageRequestCall(data: any) {
+        const accessStore = useAccessStore.getState();
+        const prefix = (
+          accessStore.useCustomConfig
+            ? accessStore.openaiUrl || (ApiPath.OpenAI as string)
+            : (ApiPath.OpenAI as string)
+        ).replace(/\/+$/, "");
+        const requestBody: Record<string, any> = {
+          model: data.model,
+          prompt: data.params.prompt,
+          response_format: "b64_json",
+          n: 1,
+          size: data.params.size || "1024x1024",
+        };
+        if (data.model === "dall-e-3") {
+          requestBody.quality = data.params.quality || "standard";
+          requestBody.style = data.params.style || "vivid";
+        }
+
+        const path = `${prefix}/${OpenaiPath.ImagePath}`;
+        getHeadersWithRouterUcan(path, ServiceProvider.OpenAI)
+          .then((headers) =>
+            fetch(path, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(requestBody),
+            }),
+          )
+          .then((response) => response.json())
+          .then((resData) => {
+            const errorMessage =
+              resData?.error?.message ||
+              resData?.message ||
+              (Array.isArray(resData?.errors) ? resData.errors[0] : "");
+            if (errorMessage) {
+              this.updateDraw({
+                ...data,
+                status: "error",
+                error: errorMessage,
+              });
+              this.getNextId();
+              return;
+            }
+
+            const imageData = resData?.data?.[0]?.b64_json;
+            if (!imageData) {
+              this.updateDraw({
+                ...data,
+                status: "error",
+                error: JSON.stringify(resData),
+              });
+              this.getNextId();
+              return;
+            }
+
+            uploadImage(base64Image2Blob(imageData, "image/png"))
+              .then((img_data) => {
+                this.updateDraw({
+                  ...data,
+                  status: "success",
+                  img_data,
+                });
+              })
+              .catch((e) => {
+                this.updateDraw({
+                  ...data,
+                  status: "error",
+                  error: JSON.stringify(e),
+                });
+              })
+              .finally(() => {
+                this.getNextId();
+              });
           })
           .catch((error) => {
             this.updateDraw({ ...data, status: "error", error: error.message });

@@ -54,6 +54,9 @@ export function SideBar(props: { className?: string }) {
       }
     }
     let data: any = {
+      provider: currentModel.provider || "",
+      provider_name: currentModel.providerName || "",
+      endpoint_type: currentModel.endpointType || "",
       model: currentModel.value,
       model_name: currentModel.name,
       status: "wait",
@@ -63,7 +66,7 @@ export function SideBar(props: { className?: string }) {
     };
     sdStore.sendTask(data, () => {
       setParams(getModelParamBasicData(columns, params, true));
-      navigate(Path.SdNew);
+      navigate(Path.Sd);
     });
   };
 
