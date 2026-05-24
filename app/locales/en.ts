@@ -828,10 +828,38 @@ const en: LocaleType = {
     Settings: "Detected settings from url, confirm to apply?",
   },
   SdPanel: {
+    Mode: "Mode",
+    SourceType: "Image Source",
+    UploadImage: "Upload Image",
+    MaskImage: "Upload Mask",
+    MaskImageSubTitle:
+      "Transparent areas will be regenerated, or open the painter to brush a mask directly.",
+    DrawMask: "Paint Mask",
+    ClearMask: "Clear Mask",
+    SaveMask: "Save Mask",
+    MaskInteractionMode: "Interaction",
+    MaskZoom: "Zoom",
+    ResetZoom: "Reset Zoom",
+    MaskBrushMode: "Brush Mode",
+    MaskBrushSize: "Brush Size",
+    MaskDrawSubTitle:
+      "Brush over the regions to regenerate. Saving will create a transparent PNG mask.",
+    MaskInteractionModes: {
+      Draw: "Draw",
+      Pan: "Pan",
+    },
+    MaskBrushModes: {
+      Erase: "Regenerate Area",
+      Restore: "Restore Area",
+    },
+    SelectHistory: "Select History Image",
+    Provider: "Provider",
     Prompt: "Prompt",
     NegativePrompt: "Negative Prompt",
     PleaseInput: (name: string) => `Please input ${name}`,
     AspectRatio: "Aspect Ratio",
+    ImageSize: "Image Size",
+    ImageQuality: "Image Quality",
     ImageStyle: "Image Style",
     OutFormat: "Output Format",
     AIModel: "AI Model",
@@ -857,9 +885,23 @@ const en: LocaleType = {
       PixelArt: "pixel-art",
       TileTexture: "tile-texture",
     },
+    Modes: {
+      Generation: "Generate",
+      Editing: "Edit",
+    },
+    SourceTypes: {
+      History: "History Images",
+      Upload: "Local Upload",
+    },
   },
   Sd: {
+    Title: "AI Images",
     SubTitle: (count: number) => `${count} images`,
+    NoModelsTitle: "No image models are currently available",
+    NoModelsDesc:
+      "Make sure Router login is active and the current group exposes image models with /v1/images/generations.",
+    EndpointLabel: "Endpoint",
+    SourceLabel: "Source",
     Actions: {
       Params: "See Params",
       Copy: "Copy Prompt",
@@ -881,6 +923,13 @@ const en: LocaleType = {
     },
     GenerateParams: "Generate Params",
     Detail: "Detail",
+    Errors: {
+      MissingToken:
+        "Router access token is missing. Sign in first and try again.",
+      Unauthorized:
+        "You do not have access to this image model. Check your login state and group configuration.",
+    },
+    SelectImageFirst: "Choose an image to edit first.",
   },
   MyCenter: {
     Title: "person center",

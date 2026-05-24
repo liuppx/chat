@@ -14,10 +14,11 @@ import dynamic from "next/dynamic";
 import { Path, SlotID } from "../constant";
 import { ErrorBoundary } from "./error";
 
-import { getISOLang, getLang } from "../locales";
+import { getISOLang } from "../locales";
 
 import {
   HashRouter as Router,
+  Navigate,
   Route,
   Routes,
   useLocation,
@@ -292,7 +293,7 @@ function Screen() {
     if (isAuth) return <AuthPage />;
     if (!isAuthorized) return <AuthPage />;
     if (isSd) return <Sd />;
-    if (isSdNew) return <Sd />;
+    if (isSdNew) return <Navigate to={Path.Sd} replace />;
     return (
       <>
         {isAuthorized ? <AuthenticatedBootstrap /> : null}
@@ -324,7 +325,6 @@ function Screen() {
     <div
       className={clsx(styles.container, {
         [styles["container-full"]]: shouldTightBorder,
-        [styles["rtl-screen"]]: getLang() === "ar",
       })}
     >
       {renderContent()}

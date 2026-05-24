@@ -197,6 +197,8 @@ export function showModal(props: ModalProps) {
   };
 
   root.render(<Modal {...props} onClose={closeModal}></Modal>);
+
+  return closeModal;
 }
 
 export type ToastProps = {

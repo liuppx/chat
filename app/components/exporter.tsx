@@ -529,7 +529,7 @@ export function ImagePreviewer(props: {
           <div>
             <div className={styles["main-title"]}>Chat</div>
             <div className={styles["sub-title"]}>
-              github.com/ChatGPTNextWeb/ChatGPT-Next-Web
+              github.com/yeying-community/chat
             </div>
             <div className={styles["icons"]}>
               <MaskAvatar avatar={config.avatar} />

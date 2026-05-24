@@ -5,7 +5,7 @@ import homeStyles from "@/app/components/home.module.scss";
 import { IconButton } from "@/app/components/button";
 import ReturnIcon from "@/app/icons/return.svg";
 import Locale from "@/app/locales";
-import { Path } from "@/app/constant";
+import { Path, CACHE_URL_PREFIX } from "@/app/constant";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   copyToClipboard,
@@ -35,8 +35,8 @@ import {
 import { removeImage } from "@/app/utils/chat";
 import { SideBar } from "./sd-sidebar";
 import { WindowContent } from "@/app/components/home";
-import { params } from "./sd-panel";
 import clsx from "clsx";
+import { getParamDisplayValue, getParamLabel } from "./image-param-display";
 
 function getSdTaskStatus(item: any) {
   let s: string;
@@ -127,7 +127,9 @@ export function Sd() {
                 chatStyles["chat-body-title"],
               )}
             >
-              <div className={`window-header-main-title`}>Stability AI</div>
+              <div className={`window-header-main-title`}>
+                {Locale.Sd.Title}
+              </div>
               <div className="window-header-sub-title">
                 {Locale.Sd.SubTitle(sdImages.length || 0)}
               </div>
@@ -213,6 +215,9 @@ export function Sd() {
                           </span>
                         </p>
                         <p>
+                          {Locale.SdPanel.Provider}: {item.provider_name}
+                        </p>
+                        <p>
                           {Locale.SdPanel.AIModel}: {item.model_name}
                         </p>
                         {getSdTaskStatus(item)}
@@ -228,41 +233,13 @@ export function Sd() {
                                   children: (
                                     <div style={{ userSelect: "text" }}>
                                       {Object.keys(item.params).map((key) => {
-                                        let label = key;
-                                        let value = item.params[key];
-                                        switch (label) {
-                                          case "prompt":
-                                            label = Locale.SdPanel.Prompt;
-                                            break;
-                                          case "negative_prompt":
-                                            label =
-                                              Locale.SdPanel.NegativePrompt;
-                                            break;
-                                          case "aspect_ratio":
-                                            label = Locale.SdPanel.AspectRatio;
-                                            break;
-                                          case "seed":
-                                            label = "Seed";
-                                            value = value || 0;
-                                            break;
-                                          case "output_format":
-                                            label = Locale.SdPanel.OutFormat;
-                                            value = value?.toUpperCase();
-                                            break;
-                                          case "style":
-                                            label = Locale.SdPanel.ImageStyle;
-                                            value = params
-                                              .find(
-                                                (item) =>
-                                                  item.value === "style",
-                                              )
-                                              ?.options?.find(
-                                                (item) => item.value === value,
-                                              )?.name;
-                                            break;
-                                          default:
-                                            break;
-                                        }
+                                        const label = getParamLabel(key);
+                                        const value = getParamDisplayValue(
+                                          item.model,
+                                          key,
+                                          item.params[key],
+                                          item.params,
+                                        );
 
                                         return (
                                           <div
@@ -296,6 +273,9 @@ export function Sd() {
                               icon={<ResetIcon />}
                               onClick={() => {
                                 const reqData = {
+                                  provider: item.provider,
+                                  provider_name: item.provider_name,
+                                  endpoint_type: item.endpoint_type,
                                   model: item.model,
                                   model_name: item.model_name,
                                   status: "wait",
@@ -313,8 +293,12 @@ export function Sd() {
                                 if (
                                   await showConfirm(Locale.Sd.Danger.Delete)
                                 ) {
-                                  // remove img_data + remove item in list
-                                  removeImage(item.img_data).finally(() => {
+                                  const cleanup =
+                                    typeof item.img_data === "string" &&
+                                    item.img_data.includes(CACHE_URL_PREFIX)
+                                      ? removeImage(item.img_data)
+                                      : Promise.resolve();
+                                  cleanup.finally(() => {
                                     sdStore.draw = sdImages.filter(
                                       (i: any) => i.id !== item.id,
                                     );

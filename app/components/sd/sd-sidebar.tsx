@@ -36,12 +36,23 @@ export function SideBar(props: { className?: string }) {
   const { onDragStart, shouldNarrow } = useDragSideBar();
   const navigate = useNavigate();
   const sdStore = useSdStore();
+  const currentMode = sdStore.currentMode;
+  const editSourceImage = sdStore.editSourceImage;
+  const editMaskImage = sdStore.editMaskImage;
   const currentModel = sdStore.currentModel;
   const params = sdStore.currentParams;
   const setParams = sdStore.setCurrentParams;
 
   const handleSubmit = () => {
     const columns = getParams?.(currentModel, params);
+    if (!currentModel.value || columns.length === 0) {
+      showToast(Locale.Sd.EmptyRecord);
+      return;
+    }
+    if (currentMode === "editing" && !editSourceImage) {
+      showToast(Locale.Sd.SelectImageFirst);
+      return;
+    }
     const reqParams: any = {};
     for (let i = 0; i < columns.length; i++) {
       const item = columns[i];
@@ -54,16 +65,21 @@ export function SideBar(props: { className?: string }) {
       }
     }
     let data: any = {
+      provider: currentModel.provider || "",
+      provider_name: currentModel.providerName || "",
+      endpoint_type: currentModel.endpointType || "",
       model: currentModel.value,
       model_name: currentModel.name,
       status: "wait",
+      source_image: currentMode === "editing" ? editSourceImage : "",
+      mask_image: currentMode === "editing" ? editMaskImage : "",
       params: reqParams,
       created_at: new Date().toLocaleString(),
       img_data: "",
     };
     sdStore.sendTask(data, () => {
       setParams(getModelParamBasicData(columns, params, true));
-      navigate(Path.SdNew);
+      navigate(Path.Sd);
     });
   };
 
