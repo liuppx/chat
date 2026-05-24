@@ -10,6 +10,7 @@ import {
   getImageEndpointSchema,
   ImageFormMode,
 } from "@/app/components/sd/image-endpoint-schemas";
+import { resolveStoredImageUrl } from "@/app/components/sd/image-result";
 import { getDefaultImageModel } from "@/app/components/sd/image-registry";
 import { getHeadersWithRouterUcan } from "@/app/client/platforms/openai";
 import { useAccessStore } from "./access";
@@ -174,12 +175,10 @@ export const useSdStore = createPersistStore<
               return;
             }
 
-            const imagePromise =
-              imageResult.type === "url"
-                ? Promise.resolve(imageResult.value)
-                : uploadGeneratedImageAndGetStableUrl(
-                    base64Image2Blob(imageResult.value, "image/png"),
-                  );
+            const imagePromise = resolveStoredImageUrl(imageResult, {
+              base64Image2Blob,
+              uploadGeneratedImageAndGetStableUrl,
+            });
 
             imagePromise
               .then((img_data: string) => {

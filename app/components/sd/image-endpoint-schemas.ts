@@ -1,4 +1,8 @@
 import Locale from "@/app/locales";
+import {
+  buildOpenAIImageEditFormData,
+  resolveOpenAIImageResult,
+} from "./image-endpoint-schema-utils";
 
 export type ImageEndpointType = "images-generation" | "images-edits";
 export type ImageFormMode = "generation" | "editing";
@@ -104,25 +108,7 @@ export const imageEndpointSchemas: Record<
       quality: params.quality || "standard",
       style: params.style || "vivid",
     }),
-    resolveImageResult: (response) => {
-      const b64Json = response?.data?.[0]?.b64_json;
-      if (typeof b64Json === "string" && b64Json) {
-        return {
-          type: "b64_json",
-          value: b64Json,
-        };
-      }
-
-      const url = response?.data?.[0]?.url;
-      if (typeof url === "string" && url) {
-        return {
-          type: "url",
-          value: url,
-        };
-      }
-
-      return undefined;
-    },
+    resolveImageResult: resolveOpenAIImageResult,
     resolveErrorMessage: (response) =>
       response?.error?.message ||
       response?.message ||
@@ -136,40 +122,8 @@ export const imageEndpointSchemas: Record<
       imageQualityParam,
       imageStyleParam,
     ],
-    buildRequestBody: ({ model, params, sourceImage, maskImage }) => {
-      const body = new FormData();
-      body.append("model", model);
-      body.append("prompt", params.prompt || "");
-      body.append("size", params.size || "1024x1024");
-      body.append("quality", params.quality || "standard");
-      body.append("style", params.style || "vivid");
-      if (sourceImage) {
-        body.append("image", sourceImage, "image.png");
-      }
-      if (maskImage) {
-        body.append("mask", maskImage, "mask.png");
-      }
-      return body;
-    },
-    resolveImageResult: (response) => {
-      const b64Json = response?.data?.[0]?.b64_json;
-      if (typeof b64Json === "string" && b64Json) {
-        return {
-          type: "b64_json",
-          value: b64Json,
-        };
-      }
-
-      const url = response?.data?.[0]?.url;
-      if (typeof url === "string" && url) {
-        return {
-          type: "url",
-          value: url,
-        };
-      }
-
-      return undefined;
-    },
+    buildRequestBody: buildOpenAIImageEditFormData,
+    resolveImageResult: resolveOpenAIImageResult,
     resolveErrorMessage: (response) =>
       response?.error?.message ||
       response?.message ||
