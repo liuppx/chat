@@ -1,21 +1,22 @@
-import {
-  Stability,
-  StoreKey,
-  ACCESS_CODE_PREFIX,
-  ApiPath,
-  OpenaiPath,
-  ServiceProvider,
-} from "@/app/constant";
-import { getBearerToken } from "@/app/client/api";
+import { StoreKey, ApiPath, OpenaiPath, ServiceProvider } from "@/app/constant";
 import { createPersistStore } from "@/app/utils/store";
 import { nanoid } from "nanoid";
 import { uploadImage, base64Image2Blob } from "@/app/utils/chat";
 import { getModelParamBasicData } from "@/app/components/sd/sd-panel";
+import { getImageEndpointSchema } from "@/app/components/sd/image-endpoint-schemas";
 import { getDefaultImageModel } from "@/app/components/sd/image-registry";
 import { getHeadersWithRouterUcan } from "@/app/client/platforms/openai";
 import { useAccessStore } from "./access";
 
-const defaultModel = getDefaultImageModel()!;
+const defaultModel = getDefaultImageModel() || {
+  name: "",
+  value: "",
+  provider: "",
+  providerName: "",
+  endpointType: "images-generation",
+  supportsImage: true as const,
+  params: () => [],
+};
 
 const defaultParams = getModelParamBasicData(defaultModel.params({}), {});
 
@@ -60,107 +61,21 @@ export const useSdStore = createPersistStore<
         data = { ...data, id: nanoid(), status: "running" };
         set({ draw: [data, ..._get().draw] });
         this.getNextId();
-        switch (data.endpoint_type) {
-          case "openai-image":
-            this.openaiImageRequestCall(data);
-            break;
-          case "stability":
-          default:
-            this.stabilityRequestCall(data);
-            break;
-        }
+        this.imageGenerationRequestCall(data);
         okCall?.();
       },
-      stabilityRequestCall(data: any) {
-        const accessStore = useAccessStore.getState();
-        let prefix: string = ApiPath.Stability as string;
-        let bearerToken = "";
-        if (accessStore.useCustomConfig) {
-          prefix = accessStore.stabilityUrl || (ApiPath.Stability as string);
-          bearerToken = getBearerToken(accessStore.stabilityApiKey);
-        }
-        if (!bearerToken && accessStore.enabledAccessControl()) {
-          bearerToken = getBearerToken(
-            ACCESS_CODE_PREFIX + accessStore.accessCode,
-          );
-        }
-        const headers = {
-          Accept: "application/json",
-          Authorization: bearerToken,
-        };
-        const path = `${prefix}/${Stability.GeneratePath}/${data.model}`;
-        const formData = new FormData();
-        for (let paramsKey in data.params) {
-          formData.append(paramsKey, data.params[paramsKey]);
-        }
-        fetch(path, {
-          method: "POST",
-          headers,
-          body: formData,
-        })
-          .then((response) => response.json())
-          .then((resData) => {
-            if (resData.errors && resData.errors.length > 0) {
-              this.updateDraw({
-                ...data,
-                status: "error",
-                error: resData.errors[0],
-              });
-              this.getNextId();
-              return;
-            }
-            const self = this;
-            if (resData.finish_reason === "SUCCESS") {
-              uploadImage(base64Image2Blob(resData.image, "image/png"))
-                .then((img_data) => {
-                  console.debug("uploadImage success", img_data, self);
-                  self.updateDraw({
-                    ...data,
-                    status: "success",
-                    img_data,
-                  });
-                })
-                .catch((e) => {
-                  console.error("uploadImage error", e);
-                  self.updateDraw({
-                    ...data,
-                    status: "error",
-                    error: JSON.stringify(e),
-                  });
-                });
-            } else {
-              self.updateDraw({
-                ...data,
-                status: "error",
-                error: JSON.stringify(resData),
-              });
-            }
-            this.getNextId();
-          })
-          .catch((error) => {
-            this.updateDraw({ ...data, status: "error", error: error.message });
-            console.error("Error:", error);
-            this.getNextId();
-          });
-      },
-      openaiImageRequestCall(data: any) {
+      imageGenerationRequestCall(data: any) {
         const accessStore = useAccessStore.getState();
         const prefix = (
           accessStore.useCustomConfig
             ? accessStore.openaiUrl || (ApiPath.OpenAI as string)
             : (ApiPath.OpenAI as string)
         ).replace(/\/+$/, "");
-        const requestBody: Record<string, any> = {
+        const schema = getImageEndpointSchema("images-generation");
+        const requestBody = schema.buildRequestBody({
           model: data.model,
-          prompt: data.params.prompt,
-          response_format: "b64_json",
-          n: 1,
-          size: data.params.size || "1024x1024",
-        };
-        if (data.model === "dall-e-3") {
-          requestBody.quality = data.params.quality || "standard";
-          requestBody.style = data.params.style || "vivid";
-        }
+          params: data.params,
+        });
 
         const path = `${prefix}/${OpenaiPath.ImagePath}`;
         getHeadersWithRouterUcan(path, ServiceProvider.OpenAI)
@@ -173,10 +88,7 @@ export const useSdStore = createPersistStore<
           )
           .then((response) => response.json())
           .then((resData) => {
-            const errorMessage =
-              resData?.error?.message ||
-              resData?.message ||
-              (Array.isArray(resData?.errors) ? resData.errors[0] : "");
+            const errorMessage = schema.resolveErrorMessage(resData);
             if (errorMessage) {
               this.updateDraw({
                 ...data,
@@ -187,7 +99,7 @@ export const useSdStore = createPersistStore<
               return;
             }
 
-            const imageData = resData?.data?.[0]?.b64_json;
+            const imageData = schema.resolveImageData(resData);
             if (!imageData) {
               this.updateDraw({
                 ...data,

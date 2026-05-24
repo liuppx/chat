@@ -36,7 +36,7 @@ import { removeImage } from "@/app/utils/chat";
 import { SideBar } from "./sd-sidebar";
 import { WindowContent } from "@/app/components/home";
 import clsx from "clsx";
-import { getParamDisplayValue, getParamLabel } from "./image-registry";
+import { getParamDisplayValue, getParamLabel } from "./image-param-display";
 
 function getSdTaskStatus(item: any) {
   let s: string;
