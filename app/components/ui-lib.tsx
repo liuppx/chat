@@ -9,8 +9,12 @@ import ConfirmIcon from "../icons/confirm.svg";
 import CancelIcon from "../icons/cancel.svg";
 import MaxIcon from "../icons/max.svg";
 import MinIcon from "../icons/min.svg";
+import DownloadIcon from "../icons/download.svg";
+import AddIcon from "../icons/add.svg";
+import ZoomIcon from "../icons/zoom.svg";
 
 import Locale from "../locales";
+import { isDesktopAppRuntime, saveWithDialog, writeFile } from "../tauri";
 
 import { createRoot } from "react-dom/client";
 import React, {
@@ -25,6 +29,88 @@ import React, {
 import { IconButton } from "./button";
 import { Avatar } from "./emoji";
 import clsx from "clsx";
+
+function getImageFileExtension(blob: Blob, src: string) {
+  const mimeExtension = blob.type.split("/")[1]?.split("+")[0];
+  if (mimeExtension) return mimeExtension === "jpeg" ? "jpg" : mimeExtension;
+
+  try {
+    const pathname = new URL(src).pathname;
+    const extension = pathname.split(".").pop();
+    if (extension && extension.length <= 5) return extension;
+  } catch {
+    // Ignore non-URL sources such as data URLs.
+  }
+
+  return "png";
+}
+
+async function getImageBlob(src: string) {
+  if (src.startsWith("data:")) {
+    const response = await fetch(src);
+    return await response.blob();
+  }
+
+  const response = await fetch(src);
+  if (!response.ok)
+    throw new Error(`Image download failed: ${response.status}`);
+  return await response.blob();
+}
+
+async function downloadImage(src: string) {
+  try {
+    const blob = await getImageBlob(src);
+    const extension = getImageFileExtension(blob, src);
+    const filename = `image-${Date.now()}.${extension}`;
+
+    if (isDesktopAppRuntime()) {
+      const path = await saveWithDialog({
+        defaultPath: filename,
+        filters: [
+          {
+            name: `${extension.toUpperCase()} Image`,
+            extensions: [extension],
+          },
+          {
+            name: "All Files",
+            extensions: ["*"],
+          },
+        ],
+      });
+
+      if (!path) return;
+
+      await writeFile(path, new Uint8Array(await blob.arrayBuffer()));
+      showToast(Locale.Download.Success);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(blob);
+    const element = document.createElement("a");
+    element.href = objectUrl;
+    element.download = filename;
+    element.style.display = "none";
+    document.body.appendChild(element);
+    element.click();
+    element.remove();
+    URL.revokeObjectURL(objectUrl);
+    showToast(Locale.Download.Success);
+  } catch {
+    try {
+      const element = document.createElement("a");
+      element.href = src;
+      element.download = `image-${Date.now()}.png`;
+      element.target = "_blank";
+      element.rel = "noopener noreferrer";
+      element.style.display = "none";
+      document.body.appendChild(element);
+      element.click();
+      element.remove();
+    } catch {
+      showToast(Locale.Download.Failed);
+    }
+  }
+}
 
 export function Popover(props: {
   children: React.ReactNode;
@@ -462,20 +548,114 @@ export function showImageModal(
   showModal({
     title: Locale.Export.Image.Modal,
     defaultMax: defaultMax,
-    children: (
-      <div style={{ display: "flex", justifyContent: "center", ...boxStyle }}>
+    children: <ImagePreview img={img} style={style} boxStyle={boxStyle} />,
+  });
+}
+
+function ImagePreview(props: {
+  img: string;
+  style?: CSSProperties;
+  boxStyle?: CSSProperties;
+}) {
+  const [zoom, setZoom] = useState(1);
+  const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
+  const updateZoom = useCallback((nextZoom: number) => {
+    setZoom(Math.min(5, Math.max(0.25, Number(nextZoom.toFixed(2)))));
+  }, []);
+
+  const imageWidth =
+    naturalSize.width > 0 ? naturalSize.width * zoom : undefined;
+  const imageHeight =
+    naturalSize.height > 0 ? naturalSize.height * zoom : undefined;
+
+  return (
+    <div
+      style={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", gap: 8 }}>
+          <IconButton
+            icon={<DownloadIcon />}
+            text={Locale.Export.Download}
+            bordered
+            onClick={() => void downloadImage(props.img)}
+          />
+          <IconButton
+            icon={<AddIcon />}
+            bordered
+            title="Zoom in"
+            aria="Zoom in"
+            onClick={() => updateZoom(zoom + 0.25)}
+          />
+          <IconButton
+            icon={<MinIcon />}
+            bordered
+            title="Zoom out"
+            aria="Zoom out"
+            onClick={() => updateZoom(zoom - 0.25)}
+          />
+          <IconButton
+            icon={<ZoomIcon />}
+            text={`${Math.round(zoom * 100)}%`}
+            bordered
+            title="Reset zoom"
+            onClick={() => updateZoom(1)}
+          />
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "flex-start",
+          overflow: "auto",
+          minHeight: 0,
+          flex: 1,
+          ...props.boxStyle,
+        }}
+        onWheel={(e) => {
+          if (!e.ctrlKey && !e.metaKey) return;
+          e.preventDefault();
+          updateZoom(zoom + (e.deltaY < 0 ? 0.1 : -0.1));
+        }}
+      >
         <img
-          src={img}
+          src={props.img}
           alt="preview"
-          style={
-            style ?? {
-              maxWidth: "100%",
-            }
-          }
+          draggable={false}
+          onLoad={(e) => {
+            setNaturalSize({
+              width: e.currentTarget.naturalWidth,
+              height: e.currentTarget.naturalHeight,
+            });
+          }}
+          style={{
+            ...props.style,
+            width: imageWidth,
+            height: imageHeight,
+            maxWidth: zoom === 1 ? props.style?.maxWidth : "none",
+            maxHeight: zoom === 1 ? props.style?.maxHeight : "none",
+            objectFit: "contain",
+            transition: "width 0.12s ease, height 0.12s ease",
+          }}
         ></img>
       </div>
-    ),
-  });
+    </div>
+  );
 }
 
 export function Selector<T>(props: {

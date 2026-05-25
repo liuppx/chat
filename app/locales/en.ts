@@ -130,7 +130,7 @@ const en: LocaleType = {
     },
     Image: {
       Toast: "Capturing Image...",
-      Modal: "Long press or right click to save image",
+      Modal: "View Image",
     },
     Artifacts: {
       Title: "Share Artifacts",

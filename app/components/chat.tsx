@@ -106,6 +106,7 @@ import {
   Modal,
   Selector,
   showConfirm,
+  showImageModal,
   showPrompt,
   showToast,
 } from "./ui-lib";
@@ -2083,6 +2084,9 @@ function ChatView() {
                                 className={styles["chat-message-item-image"]}
                                 src={messageImages[0]}
                                 alt=""
+                                onClick={() =>
+                                  showImageModal(messageImages[0], true)
+                                }
                               />
                             )}
                             {messageImages.length > 1 && (
@@ -2104,6 +2108,9 @@ function ChatView() {
                                       key={index}
                                       src={image}
                                       alt=""
+                                      onClick={() =>
+                                        showImageModal(image, true)
+                                      }
                                     />
                                   );
                                 })}
