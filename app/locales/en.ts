@@ -844,7 +844,7 @@ const en: LocaleType = {
     MaskBrushMode: "Brush Mode",
     MaskBrushSize: "Brush Size",
     MaskShortcutHint:
-      "Use the mouse wheel to zoom, and hold Space to pan temporarily.",
+      "Use the mouse wheel or trackpad scroll to move the view, hold Ctrl or Command while scrolling to zoom, and hold Space to pan temporarily.",
     MaskDrawSubTitle:
       "Brush over the regions to regenerate. Saving will create a transparent PNG mask.",
     MaskCloseConfirm: "This mask has unsaved changes. Close anyway?",

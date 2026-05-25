@@ -832,7 +832,8 @@ const cn = {
     ResetZoom: "重置缩放",
     MaskBrushMode: "画笔模式",
     MaskBrushSize: "画笔大小",
-    MaskShortcutHint: "滚轮可缩放，按住空格可临时拖动画布。",
+    MaskShortcutHint:
+      "滚轮或双指滚动用于移动视图，按住 Ctrl 或 Command 再滚动可缩放，按住空格可临时拖动画布。",
     MaskDrawSubTitle: "在图片上涂抹需要重绘的区域，保存后会生成透明遮罩。",
     MaskCloseConfirm: "当前遮罩尚未保存，确认关闭吗？",
     MaskInteractionModes: {

@@ -48,6 +48,66 @@ function MaskPainter(props: {
   const panEnabled =
     interactionMode === "pan" || (isStageHovered && isSpacePressed);
 
+  const clampZoom = React.useCallback((nextZoom: number) => {
+    return Number(Math.max(1, Math.min(4, nextZoom)).toFixed(2));
+  }, []);
+
+  const updateZoom = React.useCallback(
+    (
+      nextZoom: number,
+      anchor?: {
+        clientX: number;
+        clientY: number;
+      },
+    ) => {
+      const stage = stageRef.current;
+      const image = imageRef.current;
+      const currentZoom = zoom;
+      const targetZoom = clampZoom(nextZoom);
+      const anchorPoint = anchor;
+      if (targetZoom === currentZoom) {
+        return;
+      }
+
+      let anchorRatioX: number | null = null;
+      let anchorRatioY: number | null = null;
+      if (stage && image && anchorPoint) {
+        const imageRect = image.getBoundingClientRect();
+        if (imageRect.width > 0 && imageRect.height > 0) {
+          anchorRatioX =
+            (anchorPoint.clientX - imageRect.left) / imageRect.width;
+          anchorRatioY =
+            (anchorPoint.clientY - imageRect.top) / imageRect.height;
+        }
+      }
+
+      setZoom(targetZoom);
+
+      if (
+        stage &&
+        image &&
+        anchorPoint &&
+        anchorRatioX !== null &&
+        anchorRatioY !== null &&
+        Number.isFinite(anchorRatioX) &&
+        Number.isFinite(anchorRatioY)
+      ) {
+        requestAnimationFrame(() => {
+          const nextImageWidth = image.naturalWidth * targetZoom;
+          const nextImageHeight = image.naturalHeight * targetZoom;
+          const stageRect = stage.getBoundingClientRect();
+          stage.scrollLeft =
+            nextImageWidth * anchorRatioX -
+            (anchorPoint.clientX - stageRect.left);
+          stage.scrollTop =
+            nextImageHeight * anchorRatioY -
+            (anchorPoint.clientY - stageRect.top);
+        });
+      }
+    },
+    [clampZoom, zoom],
+  );
+
   const markDirty = React.useCallback(() => {
     setIsDirty((prev) => {
       if (!prev) {
@@ -266,11 +326,11 @@ function MaskPainter(props: {
             max={4}
             step={0.1}
             value={zoom}
-            onChange={(e) => setZoom(Number(e.currentTarget.value))}
+            onChange={(e) => updateZoom(Number(e.currentTarget.value))}
           />
           <span>{Math.round(zoom * 100)}%</span>
         </label>
-        <button type="button" onClick={() => setZoom(1)}>
+        <button type="button" onClick={() => updateZoom(1)}>
           {Locale.SdPanel.ResetZoom}
         </button>
         <label>
@@ -328,13 +388,13 @@ function MaskPainter(props: {
           setIsPanning(false);
         }}
         onWheel={(e) => {
+          if (!e.ctrlKey && !e.metaKey) {
+            return;
+          }
           e.preventDefault();
-          setZoom((prev) => {
-            const next = Math.max(
-              1,
-              Math.min(4, prev + (e.deltaY < 0 ? 0.1 : -0.1)),
-            );
-            return Number(next.toFixed(2));
+          updateZoom(zoom + (e.deltaY < 0 ? 0.1 : -0.1), {
+            clientX: e.clientX,
+            clientY: e.clientY,
           });
         }}
       >
