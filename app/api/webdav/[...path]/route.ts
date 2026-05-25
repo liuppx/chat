@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_noStore as noStore } from "next/cache";
 import { STORAGE_KEY, internalAllowedWebDavEndpoints } from "../../../constant";
 import { getServerSideConfig } from "@/app/config/server";
 
-export const dynamic = "force-static";
-
-export function generateStaticParams() {
-  return [];
-}
-
-const config = getServerSideConfig();
+export const dynamic = "force-dynamic";
 
 function isEnabledEnv(value?: string): boolean {
   const normalized = value?.trim().toLowerCase();
@@ -21,11 +16,6 @@ const allowLocalWebDav =
 const localAllowedWebDavEndpoints = allowLocalWebDav
   ? ["http://127.0.0.1/", "http://localhost/", "http://[::1]/"]
   : [];
-const mergedAllowedWebDavEndpoints = [
-  ...internalAllowedWebDavEndpoints,
-  ...(config.web_dav_backend_url ? [config.web_dav_backend_url] : []),
-  ...localAllowedWebDavEndpoints,
-].filter((domain) => Boolean(domain.trim()));
 
 const normalizeUrl = (url: string) => {
   try {
@@ -39,6 +29,13 @@ async function handle(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
+  noStore();
+  const config = getServerSideConfig();
+  const mergedAllowedWebDavEndpoints = [
+    ...internalAllowedWebDavEndpoints,
+    ...(config.web_dav_backend_url ? [config.web_dav_backend_url] : []),
+    ...localAllowedWebDavEndpoints,
+  ].filter((domain) => Boolean(domain.trim()));
   const resolvedParams = await params;
   if (req.method === "OPTIONS") {
     return NextResponse.json({ body: "OK" }, { status: 200 });
@@ -118,8 +115,8 @@ async function handle(
   }
 
   const allowedMethods = isPublicApiPath
-    ? new Set(["GET", "POST", "DELETE"])
-    : new Set(["MKCOL", "GET", "PUT", "DELETE"]);
+    ? new Set(["GET", "HEAD", "POST", "DELETE"])
+    : new Set(["MKCOL", "GET", "HEAD", "PUT", "DELETE"]);
   if (!allowedMethods.has(proxy_method)) {
     return NextResponse.json(
       {
@@ -167,29 +164,40 @@ async function handle(
     duplex: "half",
   };
 
-  let fetchResult;
-
   try {
-    fetchResult = await fetch(targetUrl, fetchOptions);
-  } finally {
-    console.log(
-      "[Any Proxy]",
+    const fetchResult = await fetch(targetUrl, fetchOptions);
+    const responseHeaders = new Headers(fetchResult.headers);
+    responseHeaders.set("X-Accel-Buffering", "no");
+    return new Response(fetchResult.body, {
+      status: fetchResult.status,
+      statusText: fetchResult.statusText,
+      headers: responseHeaders,
+    });
+  } catch (error) {
+    console.error("[WebDAV Proxy] request failed", {
       targetUrl,
+      method,
+      error,
+    });
+    return NextResponse.json(
       {
-        method: method,
+        error: true,
+        msg: error instanceof Error ? error.message : String(error),
       },
       {
-        status: fetchResult?.status,
-        statusText: fetchResult?.statusText,
+        status: 500,
       },
     );
+  } finally {
+    console.log("[WebDAV Proxy]", targetUrl, {
+      method,
+    });
   }
-
-  return fetchResult;
 }
 
 export const PUT = handle;
 export const GET = handle;
+export const HEAD = handle;
 export const POST = handle;
 export const DELETE = handle;
 export const OPTIONS = handle;

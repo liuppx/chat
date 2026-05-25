@@ -280,6 +280,8 @@ export function Sd() {
                                   model: item.model,
                                   model_name: item.model_name,
                                   status: "wait",
+                                  source_image: item.source_image || "",
+                                  mask_image: item.mask_image || "",
                                   params: { ...item.params },
                                   created_at: new Date().toLocaleString(),
                                   img_data: "",
