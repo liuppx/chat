@@ -847,6 +847,19 @@ const en: LocaleType = {
       "Use the mouse wheel or trackpad scroll to move the view, hold Ctrl or Command while scrolling to zoom, and hold Space to pan temporarily.",
     MaskDrawSubTitle:
       "Brush over the regions to regenerate. Saving will create a transparent PNG mask.",
+    ModelSelectorTitle: "Select Image Model",
+    ModelSelectorSearch: "Search model or provider",
+    ModelSelectorAction: "Change",
+    SubmitSummaryGenerate:
+      "Generate a new image with the current prompt and parameters.",
+    SubmitSummaryReady:
+      "Source image and mask are ready. Editing will focus on the masked area.",
+    SubmitSummaryNoMask:
+      "A source image is selected, but no mask is attached. Some models may edit the full image.",
+    HistorySelectorSearch: "Search history images",
+    HistorySelectorAction: "Browse",
+    HistorySelectorHint: (count: number) =>
+      `Choose from ${count} previous images`,
     MaskCloseConfirm: "This mask has unsaved changes. Close anyway?",
     MaskInteractionModes: {
       Draw: "Draw",

@@ -2,7 +2,7 @@ import { IconButton } from "@/app/components/button";
 import GithubIcon from "@/app/icons/github.svg";
 import SDIcon from "@/app/icons/sd.svg";
 import ReturnIcon from "@/app/icons/return.svg";
-import HistoryIcon from "@/app/icons/history.svg";
+import styles from "./sd-sidebar.module.scss";
 import Locale from "@/app/locales";
 
 import { Path, REPO_URL } from "@/app/constant";
@@ -13,7 +13,6 @@ import {
   SideBarContainer,
   SideBarBody,
   SideBarHeader,
-  SideBarTail,
   useDragSideBar,
   useHotKey,
 } from "@/app/components/sidebar";
@@ -42,6 +41,23 @@ export function SideBar(props: { className?: string }) {
   const currentModel = sdStore.currentModel;
   const params = sdStore.currentParams;
   const setParams = sdStore.setCurrentParams;
+  const currentModeLabel =
+    currentMode === "editing"
+      ? Locale.SdPanel.Modes.Editing
+      : Locale.SdPanel.Modes.Generation;
+  const paramColumns = getParams?.(currentModel, params) || [];
+  const hasModelSelection = !!currentModel.value && paramColumns.length > 0;
+  const canSubmit =
+    hasModelSelection &&
+    (currentMode !== "editing" || Boolean(editSourceImage));
+  const footerSummary =
+    currentMode === "editing"
+      ? editSourceImage
+        ? editMaskImage
+          ? Locale.SdPanel.SubmitSummaryReady
+          : Locale.SdPanel.SubmitSummaryNoMask
+        : Locale.Sd.SelectImageFirst
+      : Locale.SdPanel.SubmitSummaryGenerate;
 
   const handleSubmit = () => {
     const columns = getParams?.(currentModel, params);
@@ -111,19 +127,15 @@ export function SideBar(props: { className?: string }) {
           </div>
           <SDIcon width={50} height={50} />
           <div className="window-actions">
-            <div className="window-action-button">
-              <IconButton
-                icon={<HistoryIcon />}
-                bordered
-                title={Locale.Sd.Actions.History}
-                onClick={() => navigate(Path.SdNew)}
-              />
-            </div>
+            <div className="window-action-button"></div>
           </div>
         </div>
       ) : (
         <SideBarHeader
-          title={
+          title={Locale.Sd.Title}
+          subTitle={currentModel.name || currentModeLabel}
+          logo={<SDIcon width={38} height={"100%"} />}
+          extra={
             <IconButton
               icon={<ReturnIcon />}
               bordered
@@ -131,27 +143,54 @@ export function SideBar(props: { className?: string }) {
               onClick={() => navigate(Path.Home)}
             />
           }
-          logo={<SDIcon width={38} height={"100%"} />}
         ></SideBarHeader>
       )}
       <SideBarBody>
         <SdPanel />
       </SideBarBody>
-      <SideBarTail
-        primaryAction={
-          <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
-            <IconButton icon={<GithubIcon />} shadow />
-          </a>
-        }
-        secondaryAction={
+      <div className={styles["sidebar-tail"]}>
+        <div className={styles["submit-card"]}>
+          <div className={styles["submit-card-header"]}>
+            <div className={styles["submit-card-title"]}>
+              {Locale.SdPanel.Submit}
+            </div>
+            <div className={styles["submit-card-badge"]}>
+              {currentModeLabel}
+            </div>
+          </div>
+          <div className={styles["submit-card-summary"]}>{footerSummary}</div>
+          <div className={styles["submit-card-meta"]}>
+            {currentModel.name && (
+              <span className={styles["submit-card-chip"]}>
+                {currentModel.name}
+              </span>
+            )}
+            {currentMode === "editing" && editSourceImage && (
+              <span className={styles["submit-card-chip"]}>
+                {Locale.SdPanel.SourceType}
+              </span>
+            )}
+            {currentMode === "editing" && editMaskImage && (
+              <span className={styles["submit-card-chip"]}>
+                {Locale.SdPanel.MaskImage}
+              </span>
+            )}
+          </div>
           <IconButton
             text={Locale.SdPanel.Submit}
             type="primary"
             shadow
+            className={styles["submit-primary"]}
+            disabled={!canSubmit}
             onClick={handleSubmit}
           ></IconButton>
-        }
-      />
+        </div>
+        <div className={styles["submit-secondary"]}>
+          <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
+            <IconButton icon={<GithubIcon />} text="GitHub" bordered />
+          </a>
+        </div>
+      </div>
     </SideBarContainer>
   );
 }

@@ -17,11 +17,11 @@ import { useAppConfig } from "@/app/store";
 import MinIcon from "@/app/icons/min.svg";
 import MaxIcon from "@/app/icons/max.svg";
 import { getClientConfig } from "@/app/config/client";
-import { ChatAction } from "@/app/components/chat";
 import DeleteIcon from "@/app/icons/clear.svg";
 import CopyIcon from "@/app/icons/copy.svg";
 import PromptIcon from "@/app/icons/prompt.svg";
 import ResetIcon from "@/app/icons/reload.svg";
+import EditIcon from "@/app/icons/edit.svg";
 import { useSdStore } from "@/app/store/sd";
 import LoadingIcon from "@/app/icons/three-dots.svg";
 import ErrorIcon from "@/app/icons/delete.svg";
@@ -62,13 +62,15 @@ function getSdTaskStatus(item: any) {
       s = item.status.toUpperCase();
   }
   return (
-    <p className={styles["line-1"]} title={item.error} style={{ color: color }}>
-      <span>
-        {Locale.Sd.Status.Name}: {s}
-      </span>
+    <div
+      className={styles["status-chip"]}
+      title={item.error}
+      style={{ color: color }}
+    >
+      <span>{s}</span>
       {item.status === "error" && (
         <span
-          className="clickable"
+          className={clsx("clickable", styles["status-chip-detail"])}
           onClick={() => {
             showModal({
               title: Locale.Sd.Detail,
@@ -80,10 +82,10 @@ function getSdTaskStatus(item: any) {
             });
           }}
         >
-          - {item.error}
+          {item.error}
         </span>
       )}
-    </p>
+    </div>
   );
 }
 
@@ -157,184 +159,186 @@ export function Sd() {
             <div className={styles["sd-img-list"]}>
               {sdImages.length > 0 ? (
                 sdImages.map((item: any) => {
+                  const prompt = item.params?.prompt || "";
                   return (
-                    <div
-                      key={item.id}
-                      style={{ display: "flex" }}
-                      className={styles["sd-img-item"]}
-                    >
-                      {item.status === "success" ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          className={styles["img"]}
-                          src={item.img_data}
-                          alt={item.id}
-                          onClick={(e) =>
-                            showImageModal(
-                              item.img_data,
-                              true,
-                              isMobileScreen
-                                ? { width: "100%", height: "fit-content" }
-                                : { maxWidth: "100%", maxHeight: "100%" },
-                              isMobileScreen
-                                ? { width: "100%", height: "fit-content" }
-                                : { width: "100%", height: "100%" },
-                            )
-                          }
-                        />
-                      ) : item.status === "error" ? (
-                        <div className={styles["pre-img"]}>
-                          <ErrorIcon />
-                        </div>
-                      ) : (
-                        <div className={styles["pre-img"]}>
-                          <LoadingIcon />
-                        </div>
-                      )}
-                      <div
-                        style={{ marginLeft: "10px" }}
-                        className={styles["sd-img-item-info"]}
-                      >
-                        <p className={styles["line-1"]}>
-                          {Locale.SdPanel.Prompt}:{" "}
-                          <span
-                            className="clickable"
-                            title={item.params.prompt}
-                            onClick={() => {
-                              showModal({
-                                title: Locale.Sd.Detail,
-                                children: (
-                                  <div style={{ userSelect: "text" }}>
-                                    {item.params.prompt}
-                                  </div>
-                                ),
-                              });
-                            }}
-                          >
-                            {item.params.prompt}
-                          </span>
-                        </p>
-                        <p>
-                          {Locale.SdPanel.Provider}: {item.provider_name}
-                        </p>
-                        <p>
-                          {Locale.SdPanel.AIModel}: {item.model_name}
-                        </p>
-                        {getSdTaskStatus(item)}
-                        <p>{item.created_at}</p>
-                        <div className={chatStyles["chat-message-actions"]}>
-                          <div className={chatStyles["chat-input-actions"]}>
-                            <ChatAction
-                              text={Locale.Sd.Actions.Params}
-                              icon={<PromptIcon />}
+                    <div key={item.id} className={styles["sd-img-item"]}>
+                      <div className={styles["sd-img-preview"]}>
+                        {item.status === "success" ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            className={styles["img"]}
+                            src={item.img_data}
+                            alt={item.id}
+                            onClick={() =>
+                              showImageModal(
+                                item.img_data,
+                                true,
+                                isMobileScreen
+                                  ? { width: "100%", height: "fit-content" }
+                                  : { maxWidth: "100%", maxHeight: "100%" },
+                                isMobileScreen
+                                  ? { width: "100%", height: "fit-content" }
+                                  : { width: "100%", height: "100%" },
+                              )
+                            }
+                          />
+                        ) : item.status === "error" ? (
+                          <div className={styles["pre-img"]}>
+                            <ErrorIcon />
+                          </div>
+                        ) : (
+                          <div className={styles["pre-img"]}>
+                            <LoadingIcon />
+                          </div>
+                        )}
+                      </div>
+                      <div className={styles["sd-img-item-info"]}>
+                        <div className={styles["sd-img-item-header"]}>
+                          <div className={styles["sd-img-item-title-block"]}>
+                            <button
+                              type="button"
+                              className={styles["prompt-link"]}
+                              title={prompt}
                               onClick={() => {
                                 showModal({
-                                  title: Locale.Sd.GenerateParams,
+                                  title: Locale.Sd.Detail,
                                   children: (
                                     <div style={{ userSelect: "text" }}>
-                                      {Object.keys(item.params).map((key) => {
-                                        const label = getParamLabel(key);
-                                        const value = getParamDisplayValue(
-                                          item.model,
-                                          key,
-                                          item.params[key],
-                                          item.params,
-                                        );
-
-                                        return (
-                                          <div
-                                            key={key}
-                                            style={{ margin: "10px" }}
-                                          >
-                                            <strong>{label}: </strong>
-                                            {value}
-                                          </div>
-                                        );
-                                      })}
+                                      {prompt}
                                     </div>
                                   ),
                                 });
                               }}
-                            />
-                            <ChatAction
-                              text={Locale.Sd.Actions.Copy}
-                              icon={<CopyIcon />}
-                              onClick={() =>
-                                copyToClipboard(
-                                  getMessageTextContent({
-                                    role: "user",
-                                    content: item.params.prompt,
-                                  }),
-                                )
-                              }
-                            />
-                            <ChatAction
-                              text={Locale.Sd.Actions.Retry}
-                              icon={<ResetIcon />}
+                            >
+                              {prompt}
+                            </button>
+                            <div className={styles["sd-img-sub-meta"]}>
+                              <span>{item.model_name}</span>
+                              <span>{item.provider_name}</span>
+                            </div>
+                          </div>
+                          {getSdTaskStatus(item)}
+                        </div>
+                        <div className={styles["sd-img-meta"]}>
+                          <span>{item.created_at}</span>
+                          {item.endpoint_type && (
+                            <span>{item.endpoint_type}</span>
+                          )}
+                        </div>
+                        <div className={styles["sd-img-actions"]}>
+                          <IconButton
+                            icon={<PromptIcon />}
+                            bordered
+                            title={Locale.Sd.Actions.Params}
+                            onClick={() => {
+                              showModal({
+                                title: Locale.Sd.GenerateParams,
+                                children: (
+                                  <div style={{ userSelect: "text" }}>
+                                    {Object.keys(item.params).map((key) => {
+                                      const label = getParamLabel(key);
+                                      const value = getParamDisplayValue(
+                                        item.model,
+                                        key,
+                                        item.params[key],
+                                        item.params,
+                                      );
+
+                                      return (
+                                        <div
+                                          key={key}
+                                          style={{ margin: "10px" }}
+                                        >
+                                          <strong>{label}: </strong>
+                                          {value}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ),
+                              });
+                            }}
+                          />
+                          <IconButton
+                            icon={<CopyIcon />}
+                            bordered
+                            title={Locale.Sd.Actions.Copy}
+                            onClick={() =>
+                              copyToClipboard(
+                                getMessageTextContent({
+                                  role: "user",
+                                  content: item.params.prompt,
+                                }),
+                              )
+                            }
+                          />
+                          <IconButton
+                            icon={<ResetIcon />}
+                            bordered
+                            title={Locale.Sd.Actions.Retry}
+                            onClick={() => {
+                              const reqData = {
+                                provider: item.provider,
+                                provider_name: item.provider_name,
+                                endpoint_type: item.endpoint_type,
+                                model_def: item.model_def,
+                                model: item.model,
+                                model_name: item.model_name,
+                                status: "wait",
+                                source_image: item.source_image || "",
+                                mask_image: item.mask_image || "",
+                                params: { ...item.params },
+                                created_at: new Date().toLocaleString(),
+                                img_data: "",
+                              };
+                              sdStore.sendTask(reqData);
+                            }}
+                          />
+                          {item.status === "success" && !!item.img_data && (
+                            <IconButton
+                              icon={<EditIcon />}
+                              bordered
+                              title={Locale.Sd.Actions.EditAgain}
                               onClick={() => {
-                                const reqData = {
-                                  provider: item.provider,
-                                  provider_name: item.provider_name,
-                                  endpoint_type: item.endpoint_type,
-                                  model_def: item.model_def,
-                                  model: item.model,
-                                  model_name: item.model_name,
-                                  status: "wait",
-                                  source_image: item.source_image || "",
-                                  mask_image: item.mask_image || "",
-                                  params: { ...item.params },
-                                  created_at: new Date().toLocaleString(),
-                                  img_data: "",
-                                };
-                                sdStore.sendTask(reqData);
-                              }}
-                            />
-                            {item.status === "success" && !!item.img_data && (
-                              <ChatAction
-                                text={Locale.Sd.Actions.EditAgain}
-                                icon={<PromptIcon />}
-                                onClick={() => {
-                                  sdStore.setCurrentMode("editing");
-                                  sdStore.setEditSourceType("history");
-                                  if (item.model_def) {
-                                    sdStore.setCurrentModel(item.model_def);
-                                  }
-                                  if (item.params) {
-                                    sdStore.setCurrentParams({
-                                      ...item.params,
-                                    });
-                                  }
-                                  sdStore.setEditSourceImage(
-                                    item.img_data,
-                                    `${item.model_name} · ${item.created_at}`,
-                                  );
-                                  sdStore.setEditMaskImage("", "");
-                                  navigate(Path.Sd);
-                                }}
-                              />
-                            )}
-                            <ChatAction
-                              text={Locale.Sd.Actions.Delete}
-                              icon={<DeleteIcon />}
-                              onClick={async () => {
-                                if (
-                                  await showConfirm(Locale.Sd.Danger.Delete)
-                                ) {
-                                  const cleanup =
-                                    typeof item.img_data === "string" &&
-                                    item.img_data.includes(CACHE_URL_PREFIX)
-                                      ? removeImage(item.img_data)
-                                      : Promise.resolve();
-                                  cleanup.finally(() => {
-                                    sdStore.draw = sdImages.filter(
-                                      (i: any) => i.id !== item.id,
-                                    );
-                                    sdStore.getNextId();
+                                sdStore.setCurrentMode("editing");
+                                sdStore.setEditSourceType("history");
+                                if (item.model_def) {
+                                  sdStore.setCurrentModel(item.model_def);
+                                }
+                                if (item.params) {
+                                  sdStore.setCurrentParams({
+                                    ...item.params,
                                   });
                                 }
+                                sdStore.setEditSourceImage(
+                                  item.img_data,
+                                  `${item.model_name} · ${item.created_at}`,
+                                );
+                                sdStore.setEditMaskImage("", "");
+                                navigate(Path.Sd);
                               }}
                             />
-                          </div>
+                          )}
+                          <IconButton
+                            icon={<DeleteIcon />}
+                            bordered
+                            title={Locale.Sd.Actions.Delete}
+                            onClick={async () => {
+                              if (await showConfirm(Locale.Sd.Danger.Delete)) {
+                                const cleanup =
+                                  typeof item.img_data === "string" &&
+                                  item.img_data.includes(CACHE_URL_PREFIX)
+                                    ? removeImage(item.img_data)
+                                    : Promise.resolve();
+                                cleanup.finally(() => {
+                                  sdStore.draw = sdImages.filter(
+                                    (i: any) => i.id !== item.id,
+                                  );
+                                  sdStore.getNextId();
+                                });
+                              }
+                            }}
+                          />
                         </div>
                       </div>
                     </div>

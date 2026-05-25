@@ -14,6 +14,11 @@ import { resolveImageModels } from "./image-registry";
 import { ImageFormMode } from "./image-endpoint-schemas";
 import { IconButton } from "@/app/components/button";
 import DeleteIcon from "@/app/icons/delete.svg";
+import EyeIcon from "@/app/icons/eye.svg";
+import EyeOffIcon from "@/app/icons/eye-off.svg";
+import EditIcon from "@/app/icons/edit.svg";
+import DragIcon from "@/app/icons/drag.svg";
+import ResetIcon from "@/app/icons/reload.svg";
 
 function MaskPainter(props: {
   sourceImage: string;
@@ -271,109 +276,131 @@ function MaskPainter(props: {
   return (
     <div className={styles["mask-editor"]}>
       <div className={styles["mask-editor-toolbar"]}>
-        <label>
-          {Locale.SdPanel.MaskOverlay}
-          <Select
-            aria-label={Locale.SdPanel.MaskOverlay}
-            value={showOverlay ? "show" : "hide"}
-            onChange={(e) => setShowOverlay(e.currentTarget.value === "show")}
-          >
-            <option value="show">{Locale.SdPanel.MaskOverlayModes.Show}</option>
-            <option value="hide">{Locale.SdPanel.MaskOverlayModes.Hide}</option>
-          </Select>
-        </label>
-        <label>
-          {Locale.SdPanel.MaskInteractionMode}
-          <Select
-            aria-label={Locale.SdPanel.MaskInteractionMode}
-            value={interactionMode}
-            onChange={(e) =>
-              setInteractionMode(e.currentTarget.value as "draw" | "pan")
-            }
-          >
-            <option value="draw">
-              {Locale.SdPanel.MaskInteractionModes.Draw}
-            </option>
-            <option value="pan">
-              {Locale.SdPanel.MaskInteractionModes.Pan}
-            </option>
-          </Select>
-        </label>
-        <div className={styles["ctrl-param-item-sub-title"]}>
-          {Locale.SdPanel.MaskShortcutHint}
-        </div>
-        <label>
-          {Locale.SdPanel.MaskBrushMode}
-          <Select
-            aria-label={Locale.SdPanel.MaskBrushMode}
-            value={brushMode}
-            disabled={panEnabled}
-            onChange={(e) =>
-              setBrushMode(e.currentTarget.value as "erase" | "restore")
-            }
-          >
-            <option value="erase">{Locale.SdPanel.MaskBrushModes.Erase}</option>
-            <option value="restore">
+        <div className={styles["mask-toolbar-row"]}>
+          <div className={styles["mask-toolbar-group"]}>
+            <IconButton
+              icon={showOverlay ? <EyeIcon /> : <EyeOffIcon />}
+              bordered
+              title={Locale.SdPanel.MaskOverlay}
+              onClick={() => setShowOverlay((prev) => !prev)}
+            />
+            <IconButton
+              icon={<EditIcon />}
+              bordered
+              title={Locale.SdPanel.MaskInteractionModes.Draw}
+              type={interactionMode === "draw" ? "primary" : null}
+              onClick={() => setInteractionMode("draw")}
+            />
+            <IconButton
+              icon={<DragIcon />}
+              bordered
+              title={Locale.SdPanel.MaskInteractionModes.Pan}
+              type={interactionMode === "pan" ? "primary" : null}
+              onClick={() => setInteractionMode("pan")}
+            />
+          </div>
+          <div className={styles["mask-toolbar-group"]}>
+            <button
+              type="button"
+              className={clsx(styles["compact-toggle"], {
+                [styles["compact-toggle-active"]]: brushMode === "erase",
+              })}
+              disabled={panEnabled}
+              onClick={() => setBrushMode("erase")}
+            >
+              {Locale.SdPanel.MaskBrushModes.Erase}
+            </button>
+            <button
+              type="button"
+              className={clsx(styles["compact-toggle"], {
+                [styles["compact-toggle-active"]]: brushMode === "restore",
+              })}
+              disabled={panEnabled}
+              onClick={() => setBrushMode("restore")}
+            >
               {Locale.SdPanel.MaskBrushModes.Restore}
-            </option>
-          </Select>
-        </label>
-        <label>
-          {Locale.SdPanel.MaskZoom}
-          <input
-            type="range"
-            min={1}
-            max={4}
-            step={0.1}
-            value={zoom}
-            onChange={(e) => updateZoom(Number(e.currentTarget.value))}
+            </button>
+          </div>
+        </div>
+        <div className={styles["mask-toolbar-row"]}>
+          <label className={styles["mask-slider-control"]}>
+            <span>{Locale.SdPanel.MaskZoom}</span>
+            <div className={styles["mask-slider-main"]}>
+              <input
+                type="range"
+                min={1}
+                max={4}
+                step={0.1}
+                value={zoom}
+                onChange={(e) => updateZoom(Number(e.currentTarget.value))}
+              />
+              <span>{Math.round(zoom * 100)}%</span>
+            </div>
+          </label>
+          <IconButton
+            icon={<ResetIcon />}
+            bordered
+            title={Locale.SdPanel.ResetZoom}
+            onClick={() => updateZoom(1)}
           />
-          <span>{Math.round(zoom * 100)}%</span>
-        </label>
-        <button type="button" onClick={() => updateZoom(1)}>
-          {Locale.SdPanel.ResetZoom}
-        </button>
-        <label>
-          {Locale.SdPanel.MaskBrushSize}
-          <input
-            type="range"
-            min={8}
-            max={120}
-            step={2}
-            value={brushSize}
-            disabled={panEnabled}
-            onChange={(e) => setBrushSize(Number(e.currentTarget.value))}
-          />
-          <span>{brushSize}px</span>
-        </label>
-        <button
-          type="button"
-          onClick={() => {
-            const overlayCanvas = overlayCanvasRef.current;
-            const maskCanvas = maskCanvasRef.current;
-            const overlayCtx = overlayCanvas?.getContext("2d");
-            const maskCtx = maskCanvas?.getContext("2d");
-            if (!overlayCanvas || !maskCanvas || !overlayCtx || !maskCtx) {
-              return;
-            }
-            overlayCtx.clearRect(
-              0,
-              0,
-              overlayCanvas.width,
-              overlayCanvas.height,
-            );
-            maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-            if (isDirty) {
-              props.onDirtyChange?.(true);
-            }
-            setIsDirty(true);
-          }}
-        >
-          {Locale.SdPanel.ClearMask}
-        </button>
-        <button type="button" onClick={exportMask}>
-          {Locale.SdPanel.SaveMask}
-        </button>
+        </div>
+        <div className={styles["mask-toolbar-row"]}>
+          <label className={styles["mask-slider-control"]}>
+            <span>{Locale.SdPanel.MaskBrushSize}</span>
+            <div className={styles["mask-slider-main"]}>
+              <input
+                type="range"
+                min={8}
+                max={120}
+                step={2}
+                value={brushSize}
+                disabled={panEnabled}
+                onChange={(e) => setBrushSize(Number(e.currentTarget.value))}
+              />
+              <span>{brushSize}px</span>
+            </div>
+          </label>
+        </div>
+        <div className={styles["mask-toolbar-row"]}>
+          <div className={styles["ctrl-param-item-sub-title"]}>
+            {Locale.SdPanel.MaskShortcutHint}
+          </div>
+        </div>
+        <div className={styles["mask-toolbar-row"]}>
+          <button
+            type="button"
+            className={styles["danger-inline-button"]}
+            onClick={() => {
+              const overlayCanvas = overlayCanvasRef.current;
+              const maskCanvas = maskCanvasRef.current;
+              const overlayCtx = overlayCanvas?.getContext("2d");
+              const maskCtx = maskCanvas?.getContext("2d");
+              if (!overlayCanvas || !maskCanvas || !overlayCtx || !maskCtx) {
+                return;
+              }
+              overlayCtx.clearRect(
+                0,
+                0,
+                overlayCanvas.width,
+                overlayCanvas.height,
+              );
+              maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+              if (isDirty) {
+                props.onDirtyChange?.(true);
+              }
+              setIsDirty(true);
+            }}
+          >
+            {Locale.SdPanel.ClearMask}
+          </button>
+          <button
+            type="button"
+            className={styles["primary-inline-button"]}
+            onClick={exportMask}
+          >
+            {Locale.SdPanel.SaveMask}
+          </button>
+        </div>
       </div>
       <div
         ref={stageRef}
@@ -487,19 +514,34 @@ export function ControlParamItem(props: {
   required?: boolean;
   children?: React.ReactNode;
   className?: string;
+  compact?: boolean;
+  hideTitle?: boolean;
 }) {
   return (
-    <div className={clsx(styles["ctrl-param-item"], props.className)}>
-      <div className={styles["ctrl-param-item-header"]}>
-        <div className={styles["ctrl-param-item-title"]}>
-          <div>
-            {props.title}
-            {props.required && <span style={{ color: "red" }}>*</span>}
+    <div
+      className={clsx(
+        styles["ctrl-param-item"],
+        {
+          [styles["ctrl-param-item-compact"]]: props.compact,
+        },
+        props.className,
+      )}
+    >
+      {!props.hideTitle && (
+        <div className={styles["ctrl-param-item-header"]}>
+          <div
+            className={styles["ctrl-param-item-title"]}
+            title={props.subTitle || props.title}
+          >
+            <div>
+              {props.title}
+              {props.required && <span style={{ color: "red" }}>*</span>}
+            </div>
           </div>
         </div>
-      </div>
+      )}
       {props.children}
-      {props.subTitle && (
+      {props.subTitle && !props.compact && (
         <div className={styles["ctrl-param-item-sub-title"]}>
           {props.subTitle}
         </div>
@@ -508,15 +550,172 @@ export function ControlParamItem(props: {
   );
 }
 
+function ModelSelectorPanel(props: {
+  models: any[];
+  currentValue: string;
+  onSelect: (model: any) => void;
+}) {
+  const [query, setQuery] = React.useState("");
+  const filteredModels = React.useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    if (!keyword) return props.models;
+    return props.models.filter((item) => {
+      return [item.name, item.providerName, item.value]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(keyword));
+    });
+  }, [props.models, query]);
+
+  return (
+    <div className={styles["model-selector-panel"]}>
+      <input
+        className={styles["model-selector-search"]}
+        type="text"
+        value={query}
+        placeholder={Locale.SdPanel.ModelSelectorSearch}
+        onChange={(e) => setQuery(e.currentTarget.value)}
+      />
+      <div className={styles["model-selector-list"]}>
+        {filteredModels.map((item) => {
+          const selected = item.value === props.currentValue;
+          return (
+            <button
+              key={item.value}
+              type="button"
+              className={clsx(styles["model-selector-item"], {
+                [styles["model-selector-item-active"]]: selected,
+              })}
+              onClick={() => props.onSelect(item)}
+            >
+              <div className={styles["model-selector-item-main"]}>
+                <div className={styles["model-selector-item-title"]}>
+                  {item.name}
+                </div>
+                <div className={styles["model-selector-item-sub-title"]}>
+                  {item.providerName || item.provider || item.value}
+                </div>
+              </div>
+              {selected && <span className={styles["model-selector-dot"]} />}
+            </button>
+          );
+        })}
+        {filteredModels.length === 0 && (
+          <div className={styles["model-selector-empty"]}>
+            {Locale.Sd.EmptyRecord}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HistoryImageSelectorPanel(props: {
+  items: Array<{
+    value: string;
+    name: string;
+    image: string;
+  }>;
+  currentImage: string;
+  onSelect: (item: { value: string; name: string; image: string }) => void;
+}) {
+  const [query, setQuery] = React.useState("");
+  const filteredItems = React.useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    if (!keyword) return props.items;
+    return props.items.filter((item) =>
+      item.name.toLowerCase().includes(keyword),
+    );
+  }, [props.items, query]);
+
+  return (
+    <div className={styles["history-selector-panel"]}>
+      <input
+        className={styles["history-selector-search"]}
+        type="text"
+        value={query}
+        placeholder={Locale.SdPanel.HistorySelectorSearch}
+        onChange={(e) => setQuery(e.currentTarget.value)}
+      />
+      <div className={styles["history-selector-grid"]}>
+        {filteredItems.map((item) => {
+          const active = item.image === props.currentImage;
+          return (
+            <button
+              key={item.value}
+              type="button"
+              className={clsx(styles["history-selector-item"], {
+                [styles["history-selector-item-active"]]: active,
+              })}
+              onClick={() => props.onSelect(item)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={item.image}
+                alt={item.name}
+                className={styles["history-selector-item-image"]}
+              />
+              <div className={styles["history-selector-item-title"]}>
+                {item.name}
+              </div>
+            </button>
+          );
+        })}
+        {filteredItems.length === 0 && (
+          <div className={styles["history-selector-empty"]}>
+            {Locale.Sd.EmptyRecord}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PanelSection(props: {
+  title: string;
+  subTitle?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <section className={styles["panel-section"]}>
+      <div className={styles["panel-section-header"]}>
+        <div className={styles["panel-section-title"]}>{props.title}</div>
+        {props.subTitle && (
+          <div className={styles["panel-section-sub-title"]}>
+            {props.subTitle}
+          </div>
+        )}
+      </div>
+      <div className={styles["panel-section-body"]}>{props.children}</div>
+    </section>
+  );
+}
+
 export function ControlParam(props: {
   columns: any[];
   data: any;
   onChange: (field: string, val: any) => void;
+  compact?: boolean;
 }) {
   return (
-    <>
+    <div
+      className={clsx({
+        [styles["control-param-grid"]]: props.compact,
+      })}
+    >
       {props.columns?.map((item) => {
         let element: null | React.ReactNode;
+        const compactSelectRowFields = ["size", "quality", "style"];
+        const hideCompactTitle =
+          props.compact &&
+          item.type === "select" &&
+          compactSelectRowFields.includes(item.value);
+        const compactItemClass = props.compact
+          ? item.type === "textarea"
+            ? styles["control-param-span-full"]
+            : hideCompactTitle
+              ? styles["control-param-span-third"]
+              : styles["control-param-span-half"]
+          : undefined;
         switch (item.type) {
           case "textarea":
             element = (
@@ -524,6 +723,8 @@ export function ControlParam(props: {
                 title={item.name}
                 subTitle={item.sub}
                 required={item.required}
+                compact={props.compact}
+                hideTitle={hideCompactTitle}
               >
                 <textarea
                   rows={item.rows || 3}
@@ -543,10 +744,13 @@ export function ControlParam(props: {
                 title={item.name}
                 subTitle={item.sub}
                 required={item.required}
+                compact={props.compact}
+                hideTitle={hideCompactTitle}
               >
                 <Select
                   aria-label={item.name}
                   value={props.data[item.value]}
+                  title={item.name}
                   onChange={(e) => {
                     props.onChange(item.value, e.currentTarget.value);
                   }}
@@ -568,6 +772,8 @@ export function ControlParam(props: {
                 title={item.name}
                 subTitle={item.sub}
                 required={item.required}
+                compact={props.compact}
+                hideTitle={hideCompactTitle}
               >
                 <input
                   aria-label={item.name}
@@ -588,6 +794,8 @@ export function ControlParam(props: {
                 title={item.name}
                 subTitle={item.sub}
                 required={item.required}
+                compact={props.compact}
+                hideTitle={hideCompactTitle}
               >
                 <input
                   aria-label={item.name}
@@ -601,9 +809,13 @@ export function ControlParam(props: {
               </ControlParamItem>
             );
         }
-        return <div key={item.value}>{element}</div>;
+        return (
+          <div key={item.value} className={compactItemClass}>
+            {element}
+          </div>
+        );
       })}
-    </>
+    </div>
   );
 }
 
@@ -663,6 +875,29 @@ export function SdPanel() {
     [runtimeModels, currentMode],
   );
   const hasImageModels = imageModels.length > 0;
+  const modelParams = React.useMemo(
+    () => (getParams?.(currentModel, params) as any[]) || [],
+    [currentModel, params],
+  );
+  const orderedModelParams = React.useMemo(() => {
+    const selectorFields = ["size", "quality", "style"];
+    const selectors = selectorFields
+      .map((field) => modelParams.find((item) => item.value === field))
+      .filter(Boolean);
+    const promptField = modelParams.find((item) => item.value === "prompt");
+    const rest = modelParams.filter(
+      (item) => item.value !== "prompt" && !selectorFields.includes(item.value),
+    );
+    return [
+      ...selectors,
+      ...(promptField ? [promptField] : []),
+      ...rest,
+    ] as any[];
+  }, [modelParams]);
+  const currentModeLabel =
+    currentMode === "editing"
+      ? Locale.SdPanel.Modes.Editing
+      : Locale.SdPanel.Modes.Generation;
 
   React.useEffect(() => {
     if (imageModels.length === 0) return;
@@ -741,188 +976,249 @@ export function SdPanel() {
       ),
     });
   };
+  const openModelSelector = () => {
+    let closeModal = async () => {};
+    closeModal = showModal({
+      title: Locale.SdPanel.ModelSelectorTitle,
+      children: (
+        <ModelSelectorPanel
+          models={imageModels}
+          currentValue={currentModel.value}
+          onSelect={(model) => {
+            handleModelChange(model);
+            void closeModal();
+          }}
+        />
+      ),
+    });
+  };
+  const openHistorySelector = () => {
+    let closeModal = async () => {};
+    closeModal = showModal({
+      title: Locale.SdPanel.SelectHistory,
+      children: (
+        <HistoryImageSelectorPanel
+          items={successfulImages}
+          currentImage={editSourceImage}
+          onSelect={(item) => {
+            setEditSourceImage(item.image, item.name);
+            void closeModal();
+          }}
+        />
+      ),
+    });
+  };
 
   return (
     <>
-      <ControlParamItem title={Locale.SdPanel.Mode}>
-        <Select
-          aria-label={Locale.SdPanel.Mode}
-          value={currentMode}
-          onChange={(e) =>
-            handleModeChange(e.currentTarget.value as ImageFormMode)
-          }
-        >
-          <option value="generation">{Locale.SdPanel.Modes.Generation}</option>
-          <option value="editing">{Locale.SdPanel.Modes.Editing}</option>
-        </Select>
-      </ControlParamItem>
-      <ControlParamItem title={Locale.SdPanel.AIModel}>
-        <Select
-          aria-label={Locale.SdPanel.AIModel}
-          value={currentModel.value}
+      <PanelSection title={Locale.SdPanel.Mode}>
+        <div className={styles["segmented-control"]}>
+          <button
+            type="button"
+            className={clsx({
+              [styles["segmented-control-active"]]:
+                currentMode === "generation",
+            })}
+            onClick={() => handleModeChange("generation")}
+          >
+            {Locale.SdPanel.Modes.Generation}
+          </button>
+          <button
+            type="button"
+            className={clsx({
+              [styles["segmented-control-active"]]: currentMode === "editing",
+            })}
+            onClick={() => handleModeChange("editing")}
+          >
+            {Locale.SdPanel.Modes.Editing}
+          </button>
+        </div>
+        <button
+          type="button"
+          className={styles["model-selector-trigger"]}
+          onClick={openModelSelector}
           disabled={!hasImageModels}
-          onChange={(e) => {
-            const model = imageModels.find(
-              (item) => item.value === e.currentTarget.value,
-            );
-            if (model) {
-              handleModelChange(model);
-            }
-          }}
         >
-          {hasImageModels ? (
-            imageModels.map((item) => (
-              <option value={item.value} key={item.value}>
-                {item.name}
-              </option>
-            ))
-          ) : (
-            <option value="">{Locale.Sd.EmptyRecord}</option>
-          )}
-        </Select>
-      </ControlParamItem>
+          <div className={styles["model-selector-trigger-main"]}>
+            <div className={styles["model-selector-trigger-title"]}>
+              {currentModel.name || Locale.Sd.EmptyRecord}
+            </div>
+            <div className={styles["model-selector-trigger-sub-title"]}>
+              {currentModel.providerName || currentModel.provider || ""}
+            </div>
+          </div>
+          <div className={styles["model-selector-trigger-action"]}>
+            {Locale.SdPanel.ModelSelectorAction}
+          </div>
+        </button>
+      </PanelSection>
       {currentMode === "editing" && (
-        <ControlParamItem title={Locale.SdPanel.SourceType}>
-          <Select
-            aria-label={Locale.SdPanel.SourceType}
-            value={editSourceType}
-            onChange={(e) =>
-              setEditSourceType(e.currentTarget.value as "history" | "upload")
-            }
-          >
-            <option value="history">
-              {Locale.SdPanel.SourceTypes.History}
-            </option>
-            <option value="upload">{Locale.SdPanel.SourceTypes.Upload}</option>
-          </Select>
-        </ControlParamItem>
-      )}
-      {currentMode === "editing" && editSourceType === "history" && (
-        <ControlParamItem title={Locale.SdPanel.SelectHistory}>
-          <Select
-            aria-label={Locale.SdPanel.SelectHistory}
-            value={
-              successfulImages.find((item) => item.image === editSourceImage)
-                ?.value || ""
-            }
-            onChange={(e) => {
-              const selected = successfulImages.find(
-                (item) => item.value === e.currentTarget.value,
-              );
-              if (selected) {
-                setEditSourceImage(selected.image, selected.name);
-              }
-            }}
-          >
-            <option value="">{Locale.Sd.SelectImageFirst}</option>
-            {successfulImages.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.name}
-              </option>
-            ))}
-          </Select>
-        </ControlParamItem>
-      )}
-      {currentMode === "editing" && editSourceType === "upload" && (
-        <ControlParamItem title={Locale.SdPanel.UploadImage}>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleUploadImage(e.target.files?.[0])}
-          />
-        </ControlParamItem>
-      )}
-      {currentMode === "editing" && editSourceImage && (
-        <ControlParamItem title={editSourceName || Locale.SdPanel.UploadImage}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={editSourceImage}
-            alt={editSourceName || "edit-source"}
-            style={{
-              width: "100%",
-              maxHeight: 180,
-              objectFit: "contain",
-              borderRadius: 8,
-              border: "var(--border-in-light)",
-            }}
-          />
-        </ControlParamItem>
-      )}
-      {currentMode === "editing" && (
-        <ControlParamItem
-          title={Locale.SdPanel.MaskImage}
+        <PanelSection
+          title={Locale.SdPanel.SourceType}
           subTitle={Locale.SdPanel.MaskImageSubTitle}
         >
-          <input
-            ref={maskFileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleUploadMask(e.target.files?.[0])}
-          />
-          <div className={styles["mask-actions"]}>
-            <button type="button" onClick={openMaskPainter}>
-              {Locale.SdPanel.DrawMask}
+          <div className={styles["segmented-control"]}>
+            <button
+              type="button"
+              className={clsx({
+                [styles["segmented-control-active"]]:
+                  editSourceType === "history",
+              })}
+              onClick={() => setEditSourceType("history")}
+            >
+              {Locale.SdPanel.SourceTypes.History}
             </button>
-            {editMaskImage && (
+            <button
+              type="button"
+              className={clsx({
+                [styles["segmented-control-active"]]:
+                  editSourceType === "upload",
+              })}
+              onClick={() => setEditSourceType("upload")}
+            >
+              {Locale.SdPanel.SourceTypes.Upload}
+            </button>
+          </div>
+          {editSourceType === "history" && (
+            <ControlParamItem title={Locale.SdPanel.SelectHistory}>
               <button
                 type="button"
-                onClick={() => {
-                  setEditMaskImage("", "");
-                  if (maskFileInputRef.current) {
-                    maskFileInputRef.current.value = "";
-                  }
-                }}
+                className={styles["history-selector-trigger"]}
+                onClick={openHistorySelector}
               >
-                {Locale.SdPanel.ClearMask}
-              </button>
-            )}
-          </div>
-          {editMaskImage && (
-            <div className={styles["mask-preview"]}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={editMaskImage} alt={editMaskName || "edit-mask"} />
-              <div
-                style={{
-                  marginTop: 8,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  alignItems: "center",
-                }}
-              >
-                <div className={styles["ctrl-param-item-sub-title"]}>
-                  {editMaskName || Locale.SdPanel.MaskImage}
+                <div className={styles["history-selector-trigger-main"]}>
+                  <div className={styles["history-selector-trigger-title"]}>
+                    {editSourceName || Locale.Sd.SelectImageFirst}
+                  </div>
+                  <div className={styles["history-selector-trigger-sub-title"]}>
+                    {successfulImages.length > 0
+                      ? Locale.SdPanel.HistorySelectorHint(
+                          successfulImages.length,
+                        )
+                      : Locale.Sd.EmptyRecord}
+                  </div>
                 </div>
-                <IconButton
-                  icon={<DeleteIcon />}
-                  bordered
-                  title={Locale.Sd.Actions.Delete}
+                <div className={styles["history-selector-trigger-action"]}>
+                  {Locale.SdPanel.HistorySelectorAction}
+                </div>
+              </button>
+            </ControlParamItem>
+          )}
+          {editSourceType === "upload" && (
+            <ControlParamItem title={Locale.SdPanel.UploadImage}>
+              <input
+                ref={fileInputRef}
+                className={styles["hidden-file-input"]}
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleUploadImage(e.target.files?.[0])}
+              />
+              <button
+                type="button"
+                className={styles["secondary-action-button"]}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {Locale.SdPanel.UploadImage}
+              </button>
+            </ControlParamItem>
+          )}
+          {editSourceImage && (
+            <div className={styles["asset-preview"]}>
+              <div className={styles["asset-preview-header"]}>
+                <div className={styles["asset-preview-title"]}>
+                  {editSourceName || Locale.SdPanel.UploadImage}
+                </div>
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={editSourceImage}
+                alt={editSourceName || "edit-source"}
+                className={styles["asset-preview-image"]}
+              />
+            </div>
+          )}
+          <ControlParamItem
+            title={Locale.SdPanel.MaskImage}
+            subTitle={Locale.SdPanel.MaskImageSubTitle}
+          >
+            <input
+              ref={maskFileInputRef}
+              className={styles["hidden-file-input"]}
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleUploadMask(e.target.files?.[0])}
+            />
+            <div className={styles["mask-actions"]}>
+              <button
+                type="button"
+                className={styles["secondary-action-button"]}
+                onClick={() => maskFileInputRef.current?.click()}
+              >
+                {Locale.SdPanel.MaskImage}
+              </button>
+              <button
+                type="button"
+                className={styles["primary-inline-button"]}
+                onClick={openMaskPainter}
+              >
+                {Locale.SdPanel.DrawMask}
+              </button>
+              {editMaskImage && (
+                <button
+                  type="button"
+                  className={styles["danger-inline-button"]}
                   onClick={() => {
                     setEditMaskImage("", "");
                     if (maskFileInputRef.current) {
                       maskFileInputRef.current.value = "";
                     }
                   }}
-                />
-              </div>
+                >
+                  {Locale.SdPanel.ClearMask}
+                </button>
+              )}
             </div>
-          )}
-        </ControlParamItem>
+            {editMaskImage && (
+              <div className={styles["mask-preview"]}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={editMaskImage} alt={editMaskName || "edit-mask"} />
+                <div className={styles["mask-preview-meta"]}>
+                  <div className={styles["ctrl-param-item-sub-title"]}>
+                    {editMaskName || Locale.SdPanel.MaskImage}
+                  </div>
+                  <IconButton
+                    icon={<DeleteIcon />}
+                    bordered
+                    title={Locale.Sd.Actions.Delete}
+                    onClick={() => {
+                      setEditMaskImage("", "");
+                      if (maskFileInputRef.current) {
+                        maskFileInputRef.current.value = "";
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </ControlParamItem>
+        </PanelSection>
       )}
       {!hasImageModels && (
-        <ControlParamItem title={Locale.Sd.NoModelsTitle}>
+        <PanelSection title={Locale.Sd.NoModelsTitle}>
           <div className={styles["ctrl-param-item-sub-title"]}>
             {Locale.Sd.NoModelsDesc}
           </div>
-        </ControlParamItem>
+        </PanelSection>
       )}
       {hasImageModels && (
-        <ControlParam
-          columns={getParams?.(currentModel, params) as any[]}
-          data={params}
-          onChange={handleValueChange}
-        ></ControlParam>
+        <PanelSection title={Locale.Sd.GenerateParams}>
+          <ControlParam
+            columns={orderedModelParams}
+            data={params}
+            onChange={handleValueChange}
+            compact
+          ></ControlParam>
+        </PanelSection>
       )}
     </>
   );
