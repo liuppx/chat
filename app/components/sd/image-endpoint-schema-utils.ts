@@ -1,5 +1,22 @@
 import type { ImageEndpointSchema } from "./image-endpoint-schemas";
 
+function isGptImageModel(model: string) {
+  return model.toLowerCase().startsWith("gpt-image");
+}
+
+function getDefaultQuality(model: string) {
+  return isGptImageModel(model) ? "auto" : "standard";
+}
+
+function resolveImageQuality(model: string, quality?: string) {
+  const values = isGptImageModel(model)
+    ? ["auto", "low", "medium", "high"]
+    : ["standard", "hd"];
+  return quality && values.includes(quality)
+    ? quality
+    : getDefaultQuality(model);
+}
+
 export type ResolvedImageResult = NonNullable<
   ReturnType<ImageEndpointSchema["resolveImageResult"]>
 >;
@@ -14,7 +31,7 @@ export function buildOpenAIImageEditFormData(data: {
   body.append("model", data.model);
   body.append("prompt", data.params.prompt || "");
   body.append("size", data.params.size || "1024x1024");
-  body.append("quality", data.params.quality || "standard");
+  body.append("quality", resolveImageQuality(data.model, data.params.quality));
   body.append("style", data.params.style || "vivid");
   if (data.sourceImage) {
     body.append("image", data.sourceImage, "image.png");

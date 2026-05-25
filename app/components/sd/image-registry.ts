@@ -65,7 +65,11 @@ function buildRuntimeImageModelForMode(
     providerName,
     endpointType,
     supportsImage: true,
-    params: (data: any) => getImageEndpointSchema(endpointType).params(data),
+    params: (data: any) =>
+      getImageEndpointSchema(endpointType).params({
+        ...data,
+        model: model.name,
+      }),
   };
 }
 

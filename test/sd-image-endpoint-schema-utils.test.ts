@@ -38,6 +38,32 @@ describe("image endpoint schema utils", () => {
     expect(maskFile.size).toBe(maskImage.size);
   });
 
+  test("uses gpt-image quality defaults for edits", () => {
+    const sourceImage = new Blob(["source"], { type: "image/png" });
+
+    const body = buildOpenAIImageEditFormData({
+      model: "gpt-image-2",
+      params: {
+        prompt: "edit this image",
+      },
+      sourceImage,
+    });
+
+    expect(body.get("quality")).toBe("auto");
+  });
+
+  test("ignores stale dall-e quality for gpt-image edits", () => {
+    const body = buildOpenAIImageEditFormData({
+      model: "gpt-image-2",
+      params: {
+        prompt: "edit this image",
+        quality: "standard",
+      },
+    });
+
+    expect(body.get("quality")).toBe("auto");
+  });
+
   test("prefers b64_json when present", () => {
     expect(
       resolveOpenAIImageResult({

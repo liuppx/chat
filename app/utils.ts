@@ -371,6 +371,10 @@ export function isDalle3(model: string) {
   return "dall-e-3" === model;
 }
 
+export function isGptImageModel(model: string) {
+  return model.toLowerCase().startsWith("gpt-image");
+}
+
 export function getTimeoutMSByModel(model: string) {
   model = model.toLowerCase();
   if (
@@ -388,7 +392,7 @@ export function getTimeoutMSByModel(model: string) {
 }
 
 export function getModelSizes(model: string): ModelSize[] {
-  if (isDalle3(model)) {
+  if (isDalle3(model) || isGptImageModel(model)) {
     return ["1024x1024", "1792x1024", "1024x1792"];
   }
   if (model.toLowerCase().includes("cogview")) {

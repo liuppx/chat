@@ -10,6 +10,8 @@ export interface RequestMessage {
 
 export type DalleSize = "1024x1024" | "1792x1024" | "1024x1792";
 export type DalleQuality = "standard" | "hd";
+export type GptImageQuality = "auto" | "low" | "medium" | "high";
+export type ImageQuality = DalleQuality | GptImageQuality;
 export type DalleStyle = "vivid" | "natural";
 
 export type ModelSize =

@@ -24,7 +24,7 @@ import {
   streamWithThink,
 } from "@/app/utils/chat";
 import { cloudflareAIGatewayUrl } from "@/app/utils/cloudflare";
-import { ModelSize, DalleQuality, DalleStyle } from "@/app/typing";
+import { DalleStyle, ImageQuality, ModelSize } from "@/app/typing";
 
 import {
   ChatOptions,
@@ -68,6 +68,7 @@ import {
   getMessageTextContent,
   isVisionModel,
   isDalle3 as _isDalle3,
+  isGptImageModel,
   getTimeoutMSByModel,
 } from "@/app/utils";
 import { fetch } from "@/app/utils/stream";
@@ -102,8 +103,21 @@ export interface DalleRequestPayload {
   response_format: "url" | "b64_json";
   n: number;
   size: ModelSize;
-  quality: DalleQuality;
+  quality: ImageQuality;
   style: DalleStyle;
+}
+
+const dalleQualityValues = ["standard", "hd"];
+const gptImageQualityValues = ["auto", "low", "medium", "high"];
+
+function resolveImageQuality(model: string, quality?: ImageQuality) {
+  if (_isDalle3(model)) {
+    return dalleQualityValues.includes(quality ?? "") ? quality : "standard";
+  }
+  if (isGptImageModel(model)) {
+    return gptImageQualityValues.includes(quality ?? "") ? quality : "auto";
+  }
+  return quality;
 }
 
 const ROUTER_HOST = "llm.yeying.pub";
@@ -954,8 +968,16 @@ export class ChatGPTApi implements LLMApi {
           size: options.config?.size ?? "1024x1024",
         };
         if (isDalle3) {
-          imagePayload.quality = options.config?.quality ?? "standard";
+          imagePayload.quality = resolveImageQuality(
+            resolvedModel,
+            options.config?.quality,
+          );
           imagePayload.style = options.config?.style ?? "vivid";
+        } else if (isGptImageModel(resolvedModel)) {
+          imagePayload.quality = resolveImageQuality(
+            resolvedModel,
+            options.config?.quality,
+          );
         }
         requestPayload = imagePayload;
       } else {

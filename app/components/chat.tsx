@@ -70,6 +70,7 @@ import {
   getMessageImages,
   getMessageTextContent,
   isDalle3,
+  isGptImageModel,
   isVisionModel,
   safeLocalStorage,
   getModelSizes,
@@ -86,7 +87,13 @@ import { getCurrentAccount } from "../plugins/wallet";
 import dynamic from "next/dynamic";
 
 import { ChatControllerPool } from "../client/controller";
-import { DalleQuality, DalleStyle, ModelSize } from "../typing";
+import {
+  DalleQuality,
+  DalleStyle,
+  GptImageQuality,
+  ImageQuality,
+  ModelSize,
+} from "../typing";
 import { Prompt, usePromptStore } from "../store/prompt";
 import Locale from "../locales";
 
@@ -604,10 +611,25 @@ export function ChatActions(props: {
   const [showStyleSelector, setShowStyleSelector] = useState(false);
   const modelSizes = getModelSizes(currentModel);
   const dalle3Qualitys: DalleQuality[] = ["standard", "hd"];
+  const gptImageQualitys: GptImageQuality[] = ["auto", "high", "medium", "low"];
   const dalle3Styles: DalleStyle[] = ["vivid", "natural"];
   const currentSize =
     session.mask.modelConfig?.size ?? ("1024x1024" as ModelSize);
-  const currentQuality = session.mask.modelConfig?.quality ?? "standard";
+  const qualityOptions: ImageQuality[] = isDalle3(currentModel)
+    ? dalle3Qualitys
+    : isGptImageModel(currentModel)
+      ? gptImageQualitys
+      : [];
+  const defaultQuality: ImageQuality = isDalle3(currentModel)
+    ? "standard"
+    : "auto";
+  const storedQuality = session.mask.modelConfig?.quality as
+    | ImageQuality
+    | undefined;
+  const currentQuality =
+    storedQuality && qualityOptions.includes(storedQuality)
+      ? storedQuality
+      : defaultQuality;
   const currentStyle = session.mask.modelConfig?.style ?? "vivid";
 
   const isMobileScreen = useMobileScreen();
@@ -750,6 +772,11 @@ export function ChatActions(props: {
                 session.mask.modelConfig.model = model as ModelType;
                 session.mask.modelConfig.providerName =
                   providerName as ServiceProvider;
+                session.mask.modelConfig.quality = isGptImageModel(model)
+                  ? "auto"
+                  : isDalle3(model)
+                    ? "standard"
+                    : session.mask.modelConfig.quality;
                 session.mask.syncGlobalConfig = false;
               });
               if (providerName == ServiceProvider.Volcengine) {
@@ -793,7 +820,7 @@ export function ChatActions(props: {
           />
         )}
 
-        {isDalle3(currentModel) && (
+        {qualityOptions.length > 0 && (
           <ChatAction
             onClick={() => setShowQualitySelector(true)}
             text={currentQuality}
@@ -804,14 +831,14 @@ export function ChatActions(props: {
         {showQualitySelector && (
           <Selector
             defaultSelectedValue={currentQuality}
-            items={dalle3Qualitys.map((m) => ({
+            items={qualityOptions.map((m) => ({
               title: m,
               value: m,
             }))}
             onClose={() => setShowQualitySelector(false)}
             onSelection={(q) => {
               if (q.length === 0) return;
-              const quality = q[0];
+              const quality = q[0] as ImageQuality;
               chatStore.updateTargetSession(session, (session) => {
                 session.mask.modelConfig.quality = quality;
               });
