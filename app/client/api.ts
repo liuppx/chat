@@ -246,9 +246,18 @@ export function selectPreferredTextEndpoint(
 ): string | undefined {
   const normalized = normalizeSupportedEndpoints(endpoints);
   if (normalized.length === 0) return undefined;
-  const order = options?.preferResponses
-    ? [SupportedTextEndpoint.Responses, SupportedTextEndpoint.ChatCompletions]
-    : [SupportedTextEndpoint.ChatCompletions, SupportedTextEndpoint.Responses];
+  const order =
+    options?.preferResponses !== false
+      ? [
+          SupportedTextEndpoint.Responses,
+          SupportedTextEndpoint.Messages,
+          SupportedTextEndpoint.ChatCompletions,
+        ]
+      : [
+          SupportedTextEndpoint.ChatCompletions,
+          SupportedTextEndpoint.Responses,
+          SupportedTextEndpoint.Messages,
+        ];
   for (const endpoint of order) {
     if (normalized.includes(endpoint)) return endpoint;
   }

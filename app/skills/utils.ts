@@ -1,9 +1,9 @@
 import { Lang } from "../locales";
 import { type ModelConfig } from "../store";
 import { type ChatMessage } from "../store/chat";
-import { type BuiltinMask } from "./typing";
+import { type BuiltinSkill } from "./typing";
 
-type BuiltinMaskInput = {
+type BuiltinSkillInput = {
   avatar: string;
   name: string;
   description?: string;
@@ -25,7 +25,7 @@ const DEFAULT_MODEL_CONFIG: Partial<ModelConfig> = {
   compressMessageLengthThreshold: 2000,
 };
 
-export function createBuiltinMask(input: BuiltinMaskInput): BuiltinMask {
+export function createBuiltinSkill(input: BuiltinSkillInput): BuiltinSkill {
   return {
     ...input,
     builtin: true,
@@ -37,3 +37,5 @@ export function createBuiltinMask(input: BuiltinMaskInput): BuiltinMask {
     },
   };
 }
+
+export const createBuiltinMask = createBuiltinSkill;

@@ -48,7 +48,7 @@ import {
 import { Updater } from "../typing";
 import { ModelConfigList } from "./model-config";
 import { FileName, Path } from "../constant";
-import { BUILTIN_MASK_STORE } from "../masks";
+import { BUILTIN_SKILL_STORE } from "../skills";
 import {
   DragDropContext,
   Droppable,
@@ -625,11 +625,14 @@ export function MaskPage() {
 
   const [editingMaskId, setEditingMaskId] = useState<string | undefined>();
   const editingMask =
-    maskStore.get(editingMaskId) ?? BUILTIN_MASK_STORE.get(editingMaskId);
+    maskStore.get(editingMaskId) ?? BUILTIN_SKILL_STORE.get(editingMaskId);
   const closeMaskModal = () => setEditingMaskId(undefined);
 
   const downloadAll = () => {
-    downloadAs(JSON.stringify(masks.filter((v) => !v.builtin)), FileName.Masks);
+    downloadAs(
+      JSON.stringify(masks.filter((v) => !v.builtin)),
+      FileName.Skills,
+    );
   };
 
   const importFromFile = () => {
@@ -867,7 +870,7 @@ export function MaskPage() {
                 bordered
                 text={Locale.Mask.EditModal.Clone}
                 onClick={() => {
-                  navigate(Path.Masks);
+                  navigate(Path.Skills);
                   maskStore.create(editingMask);
                   setEditingMaskId(undefined);
                 }}

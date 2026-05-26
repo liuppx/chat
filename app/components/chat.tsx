@@ -212,7 +212,7 @@ export function SessionConfigModel(props: { onClose: () => void }) {
             bordered
             text={Locale.Chat.Config.SaveAs}
             onClick={() => {
-              navigate(Path.Masks);
+              navigate(Path.Skills);
               setTimeout(() => {
                 maskStore.create(session.mask);
               }, 500);
@@ -734,7 +734,7 @@ export function ChatActions(props: {
 
         <ChatAction
           onClick={() => {
-            navigate(Path.Masks);
+            navigate(Path.Skills);
           }}
           text={Locale.Chat.InputActions.Masks}
           icon={<MaskIcon />}

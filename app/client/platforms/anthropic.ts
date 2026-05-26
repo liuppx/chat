@@ -10,9 +10,12 @@ import {
   useAccessStore,
   useAppConfig,
   useChatStore,
-  usePluginStore,
   ChatMessageTool,
 } from "@/app/store";
+import {
+  getNativeToolBundle,
+  shouldUseNativeMcpTools,
+} from "@/app/store/native-tools";
 import { getClientConfig } from "@/app/config/client";
 import { ANTHROPIC_BASE_URL } from "@/app/constant";
 import { getCachedUcanSession } from "@/app/plugins/ucan-session";
@@ -128,7 +131,9 @@ const ROUTER_BACKEND_HOST = (() => {
 function isRouterUrl(url: string): boolean {
   try {
     const base =
-      typeof window === "undefined" ? "http://localhost" : window.location.origin;
+      typeof window === "undefined"
+        ? "http://localhost"
+        : window.location.origin;
     const parsed = new URL(url, base);
     return (
       parsed.host.includes(ROUTER_HOST) ||
@@ -167,7 +172,9 @@ function decodeBase64Url(input: string): string | null {
   }
 }
 
-function decodeUcanPayload(token: string): { exp?: number; nbf?: number } | null {
+function decodeUcanPayload(
+  token: string,
+): { exp?: number; nbf?: number } | null {
   const parts = token.split(".");
   if (parts.length < 2) return null;
   const decoded = decodeBase64Url(parts[1]);
@@ -235,9 +242,28 @@ function getBaseGatewayHeaders() {
     accessStore.enabledAccessControl() &&
     accessStore.accessCode.trim().length > 0
   ) {
-    headers["Authorization"] = `Bearer ${ACCESS_CODE_PREFIX}${accessStore.accessCode.trim()}`;
+    headers["Authorization"] =
+      `Bearer ${ACCESS_CODE_PREFIX}${accessStore.accessCode.trim()}`;
   }
   return headers;
+}
+
+function toAnthropicTools(tools: any[]) {
+  return (tools || [])
+    .map((tool) => {
+      const fn = tool?.function;
+      if (!fn?.name) return null;
+      return {
+        name: fn.name,
+        description: fn.description,
+        input_schema: fn.parameters || {
+          type: "object",
+          properties: {},
+          required: [],
+        },
+      };
+    })
+    .filter(Boolean);
 }
 
 async function getHeadersWithRouterUcan(url: string) {
@@ -473,7 +499,9 @@ export class ClaudeApi implements LLMApi {
       top_k: 5,
     };
 
-    const endpointPath = normalizeModelEndpointPath(options.config.endpointPath);
+    const endpointPath = normalizeModelEndpointPath(
+      options.config.endpointPath,
+    );
     const chatEndpointPath =
       endpointPath === SupportedTextEndpoint.Messages
         ? endpointPath.replace(/^\//, "")
@@ -486,21 +514,20 @@ export class ClaudeApi implements LLMApi {
 
     if (shouldStream) {
       let index = -1;
-      const [tools, funcs] = usePluginStore
-        .getState()
-        .getAsTools(
-          useChatStore.getState().currentSession().mask?.plugin || [],
-        );
+      const [tools, funcs] = await getNativeToolBundle(
+        useChatStore.getState().currentSession().mask?.plugin || [],
+        {
+          includeMcp: shouldUseNativeMcpTools({
+            providerName: options.config.providerName,
+            endpointPath: chatEndpointPath,
+          }),
+        },
+      );
       return stream(
         path,
         requestBody,
         requestHeaders,
-        // @ts-ignore
-        tools.map((tool) => ({
-          name: tool?.function?.name,
-          description: tool?.function?.description,
-          input_schema: tool?.function?.parameters,
-        })),
+        toAnthropicTools(tools),
         funcs,
         controller,
         // parseSSE
@@ -509,7 +536,11 @@ export class ClaudeApi implements LLMApi {
           let chunkJson:
             | undefined
             | {
-                type: "content_block_delta" | "content_block_stop" | "message_delta" | "message_stop";
+                type:
+                  | "content_block_delta"
+                  | "content_block_stop"
+                  | "message_delta"
+                  | "message_stop";
                 content_block?: {
                   type: "tool_use";
                   id: string;
@@ -528,8 +559,11 @@ export class ClaudeApi implements LLMApi {
           // Handle refusal stop reason in message_delta
           if (chunkJson?.delta?.stop_reason === "refusal") {
             // Return a message to display to the user
-            const refusalMessage = "\n\n[Assistant refused to respond. Please modify your request and try again.]";
-            options.onError?.(new Error("Content policy violation: " + refusalMessage));
+            const refusalMessage =
+              "\n\n[Assistant refused to respond. Please modify your request and try again.]";
+            options.onError?.(
+              new Error("Content policy violation: " + refusalMessage),
+            );
             return refusalMessage;
           }
 

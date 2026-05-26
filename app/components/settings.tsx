@@ -1097,11 +1097,11 @@ export function Settings() {
               <input
                 aria-label={Locale.Settings.Mask.Builtin.Title}
                 type="checkbox"
-                checked={config.hideBuiltinMasks}
+                checked={config.hideBuiltinSkills}
                 onChange={(e) =>
                   updateConfig(
                     (config) =>
-                      (config.hideBuiltinMasks = e.currentTarget.checked),
+                      (config.hideBuiltinSkills = e.currentTarget.checked),
                   )
                 }
               ></input>

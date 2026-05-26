@@ -1,8 +1,8 @@
-import { BuiltinMask } from "./typing";
-import { createBuiltinMask } from "./utils";
+import { BuiltinSkill } from "./typing";
+import { createBuiltinSkill } from "./utils";
 
-export const CN_MASKS: BuiltinMask[] = [
-  createBuiltinMask({
+export const CN_SKILLS: BuiltinSkill[] = [
+  createBuiltinSkill({
     avatar: "26a1",
     name: "直接对话",
     description: "没有固定套路，适合日常问答、临时想法和快速处理。",
@@ -28,7 +28,7 @@ export const CN_MASKS: BuiltinMask[] = [
       historyMessageCount: 12,
     },
   }),
-  createBuiltinMask({
+  createBuiltinSkill({
     avatar: "1f50d",
     name: "网页研究",
     description: "搜索网页、抓取来源、对比总结，适合需要最新资料的问题。",
@@ -55,7 +55,7 @@ export const CN_MASKS: BuiltinMask[] = [
       historyMessageCount: 10,
     },
   }),
-  createBuiltinMask({
+  createBuiltinSkill({
     avatar: "1f4c4",
     name: "阅读总结",
     description: "读取网页、文档或长文本，提炼摘要、结构和行动项。",
@@ -82,7 +82,7 @@ export const CN_MASKS: BuiltinMask[] = [
       historyMessageCount: 8,
     },
   }),
-  createBuiltinMask({
+  createBuiltinSkill({
     avatar: "2696-fe0f",
     name: "方案对比",
     description: "把多个产品、技术或决策选项放在同一标准下比较。",

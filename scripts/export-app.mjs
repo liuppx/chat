@@ -87,7 +87,7 @@ const renamedFiles = await disableRoutes(routeFiles);
 const restoreMcpActions = await swapMcpActions();
 
 try {
-  await run("npm", ["run", "mask"]);
+  await run("npm", ["run", "skill"]);
   await run(
     "npx",
     ["cross-env", "BUILD_MODE=export", "BUILD_APP=1", "next", "build", "--webpack"],

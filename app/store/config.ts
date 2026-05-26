@@ -58,8 +58,8 @@ export const createDefaultConfig = () => {
 
     disablePromptHint: false,
 
-    dontShowMaskSplashScreen: false, // dont show splash screen when create chat
-    hideBuiltinMasks: false, // dont add builtin masks
+    dontShowMaskSplashScreen: false, // dont show skill picker when create chat
+    hideBuiltinSkills: false, // dont add builtin skills
 
     customModels: "",
     models: [] as LLMModel[],
@@ -254,7 +254,12 @@ export const useAppConfig = createPersistStore(
         state.modelConfig.top_p = 1;
         state.modelConfig.template = DEFAULT_INPUT_TEMPLATE;
         state.dontShowMaskSplashScreen = false;
-        state.hideBuiltinMasks = false;
+        state.hideBuiltinSkills = false;
+      }
+
+      const legacyState = state as ChatConfig & { hideBuiltinMasks?: boolean };
+      if (legacyState.hideBuiltinSkills === undefined) {
+        legacyState.hideBuiltinSkills = legacyState.hideBuiltinMasks ?? false;
       }
 
       if (version < 3.5) {

@@ -1,4 +1,4 @@
-import { BUILTIN_MASKS, BuiltinMask } from "../masks";
+import { BUILTIN_SKILLS, BuiltinSkill } from "../skills";
 import { getLang, Lang } from "../locales";
 import { ModelCandidate } from "../client/api";
 import { DEFAULT_TOPIC, ChatMessage } from "./chat";
@@ -96,16 +96,16 @@ export const useMaskStore = createPersistStore(
         (a, b) => b.createdAt - a.createdAt,
       );
       const config = useAppConfig.getState();
-      if (config.hideBuiltinMasks) return userMasks;
+      if (config.hideBuiltinSkills) return userMasks;
       // 根据当前环境设置的语言过滤出对应的内置技能
-      // BUILTIN_MASKS.filter()
+      // BUILTIN_SKILLS.filter()
       // const DEFAULT_LANG = "en"; 默认语言是英文，可以在设置里修改语言
       const lang = getLang();
       // lang=cn
-      const currentMasks = BUILTIN_MASKS.filter((item) => item.lang === lang);
+      const currentSkills = BUILTIN_SKILLS.filter((item) => item.lang === lang);
 
       // 去除重复
-      const uniqueCurrentMasks = currentMasks.reduce<BuiltinMask[]>(
+      const uniqueCurrentSkills = currentSkills.reduce<BuiltinSkill[]>(
         (mask, current) => {
           const exists = mask.some((m) => m.name === current.name);
           if (!exists) {
@@ -116,7 +116,7 @@ export const useMaskStore = createPersistStore(
         [],
       );
 
-      const buildinMasks = uniqueCurrentMasks.map(
+      const buildinSkills = uniqueCurrentSkills.map(
         (m) =>
           ({
             ...m,
@@ -126,7 +126,7 @@ export const useMaskStore = createPersistStore(
             },
           }) as Mask,
       );
-      return userMasks.concat(buildinMasks);
+      return userMasks.concat(buildinSkills);
     },
     search(text: string) {
       return Object.values(get().masks);

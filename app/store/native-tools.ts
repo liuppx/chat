@@ -18,8 +18,13 @@ export function shouldUseNativeMcpTools(config: {
   endpointPath?: string;
 }) {
   const endpointPath = normalizeModelEndpointPath(config.endpointPath);
-  if (config.providerName !== ServiceProvider.OpenAI) return false;
-  return endpointPath !== SupportedTextEndpoint.Messages;
+  if (config.providerName === ServiceProvider.OpenAI) {
+    return endpointPath !== SupportedTextEndpoint.Messages;
+  }
+  if (config.providerName === ServiceProvider.Anthropic) {
+    return endpointPath === SupportedTextEndpoint.Messages;
+  }
+  return false;
 }
 
 function createMcpToolFunctionName(clientId: string, toolName: string) {

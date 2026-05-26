@@ -167,7 +167,7 @@ async function buildDmg() {
   }
 }
 
-await run("npm", ["run", "mask"]);
+await run("npm", ["run", "skill"]);
 
 if (releaseMode) {
   const signingKeySource = validateReleaseSigningEnv();

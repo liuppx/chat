@@ -47,6 +47,7 @@ export enum Path {
   Settings = "/settings",
   Centers = "/my-center",
   NewChat = "/new-chat",
+  Skills = "/skills",
   Masks = "/masks",
   Plugins = "/plugins",
   Auth = "/auth",
@@ -84,7 +85,8 @@ export enum SlotID {
 }
 
 export enum FileName {
-  Masks = "masks.json",
+  Skills = "skills.json",
+  Masks = "skills.json",
   Prompts = "prompts.json",
 }
 

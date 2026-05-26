@@ -1,8 +1,8 @@
-import { BuiltinMask } from "./typing";
-import { createBuiltinMask } from "./utils";
+import { BuiltinSkill } from "./typing";
+import { createBuiltinSkill } from "./utils";
 
-export const EN_MASKS: BuiltinMask[] = [
-  createBuiltinMask({
+export const EN_SKILLS: BuiltinSkill[] = [
+  createBuiltinSkill({
     avatar: "26a1",
     name: "Direct Chat",
     description:
@@ -29,7 +29,7 @@ export const EN_MASKS: BuiltinMask[] = [
       historyMessageCount: 12,
     },
   }),
-  createBuiltinMask({
+  createBuiltinSkill({
     avatar: "1f50d",
     name: "Web Research",
     description:
@@ -57,7 +57,7 @@ export const EN_MASKS: BuiltinMask[] = [
       historyMessageCount: 10,
     },
   }),
-  createBuiltinMask({
+  createBuiltinSkill({
     avatar: "1f4c4",
     name: "Read and Summarize",
     description:
@@ -85,7 +85,7 @@ export const EN_MASKS: BuiltinMask[] = [
       historyMessageCount: 8,
     },
   }),
-  createBuiltinMask({
+  createBuiltinSkill({
     avatar: "2696-fe0f",
     name: "Compare Options",
     description:

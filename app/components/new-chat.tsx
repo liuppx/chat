@@ -13,7 +13,7 @@ import { useAppConfig, useChatStore } from "../store";
 import { MaskAvatar } from "./mask";
 import { useCommand } from "../command";
 import { showConfirm } from "./ui-lib";
-import { BUILTIN_MASK_STORE } from "../masks";
+import { BUILTIN_SKILL_STORE } from "../skills";
 import clsx from "clsx";
 
 function MaskItem(props: {
@@ -78,7 +78,7 @@ export function NewChat() {
   useCommand({
     mask: (id) => {
       try {
-        const mask = maskStore.get(id) ?? BUILTIN_MASK_STORE.get(id);
+        const mask = maskStore.get(id) ?? BUILTIN_SKILL_STORE.get(id);
         startChat(mask ?? undefined);
       } catch {
         console.error("[New Chat] failed to create chat from mask id=", id);
@@ -114,7 +114,7 @@ export function NewChat() {
       <div className={styles["actions"]}>
         <IconButton
           text={Locale.NewChat.More}
-          onClick={() => navigate(Path.Masks)}
+          onClick={() => navigate(Path.Skills)}
           icon={<EyeIcon />}
           bordered
           shadow
