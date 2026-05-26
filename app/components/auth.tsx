@@ -2,15 +2,13 @@ import styles from "./auth.module.scss";
 import { IconButton } from "./button";
 import { useState, useEffect, useRef, type FocusEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Path, SAAS_CHAT_URL } from "../constant";
+import { Path } from "../constant";
 import Locale from "../locales";
 import Delete from "../icons/close.svg";
-import Arrow from "../icons/arrow.svg";
 import Logo from "../icons/yeying.svg";
 import { useMobileScreen } from "@/app/utils";
 import { getClientConfig } from "../config/client";
 import { safeLocalStorage } from "@/app/utils";
-import { trackSettingsPageGuideToCPaymentClick } from "../utils/auth-settings-events";
 import clsx from "clsx";
 import {
   UCAN_AUTH_EVENT,
@@ -106,7 +104,9 @@ function getCentralRedirectUri() {
 }
 
 function getUcanLoginForceMode(): UcanLoginForceMode {
-  const mode = (getClientConfig()?.ucanLoginForceMode || "").trim().toLowerCase();
+  const mode = (getClientConfig()?.ucanLoginForceMode || "")
+    .trim()
+    .toLowerCase();
   if (mode === "wallet" || mode === "central") {
     return mode;
   }
@@ -310,7 +310,9 @@ export function AuthPage() {
   };
 
   const isWalletConnectDisabled = ucanStatus === "authorized" || centralLoading;
-  const normalizedSelectedWalletAccount = normalizeAccount(selectedWalletAccount);
+  const normalizedSelectedWalletAccount = normalizeAccount(
+    selectedWalletAccount,
+  );
   const walletAccountInputValue = isWalletAccountFocused
     ? selectedWalletAccount
     : formatAccountPreview(selectedWalletAccount);
@@ -439,19 +441,7 @@ function TopBanner() {
     >
       <div className={clsx(styles["top-banner-inner"], "no-dark")}>
         <Logo className={styles["top-banner-logo"]}></Logo>
-        <span>
-          {Locale.Auth.TopTips}
-          <a
-            href={SAAS_CHAT_URL}
-            rel="stylesheet"
-            onClick={() => {
-              trackSettingsPageGuideToCPaymentClick();
-            }}
-          >
-            {Locale.Settings.Access.SaasStart.ChatNow}
-            <Arrow style={{ marginLeft: "4px" }} />
-          </a>
-        </span>
+        <span>{Locale.Auth.TopTips}</span>
       </div>
       {(isHovered || isMobile) && (
         <Delete className={styles["top-banner-close"]} onClick={handleClose} />
