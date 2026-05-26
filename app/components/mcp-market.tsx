@@ -39,6 +39,10 @@ interface ConfigProperty {
   description?: string;
   required?: boolean;
   minItems?: number;
+  itemLabel?: string;
+  addButtonText?: string;
+  helpUrl?: string;
+  helpLabel?: string;
 }
 
 export function McpMarketPage() {
@@ -327,19 +331,36 @@ export function McpMarketPage() {
     const preset = presetServers.find((s) => s.id === editingServerId);
     if (!preset?.configSchema) return null;
 
+    const renderPropertyDescription = (prop: ConfigProperty) => {
+      if (!prop.description && !prop.helpUrl) return undefined;
+
+      return (
+        <>
+          {prop.description}
+          {prop.helpUrl && (
+            <>
+              {prop.description ? " " : ""}
+              <a href={prop.helpUrl} target="_blank" rel="noopener noreferrer">
+                {prop.helpLabel || "Open Link"}
+              </a>
+            </>
+          )}
+        </>
+      );
+    };
+
     return Object.entries(preset.configSchema.properties).map(
       ([key, prop]: [string, ConfigProperty]) => {
         if (prop.type === "array") {
           const currentValue = userConfig[key as keyof typeof userConfig] || [];
-          const itemLabel = (prop as any).itemLabel || key;
-          const addButtonText =
-            (prop as any).addButtonText || `Add ${itemLabel}`;
+          const itemLabel = prop.itemLabel || key;
+          const addButtonText = prop.addButtonText || `Add ${itemLabel}`;
 
           return (
             <ListItem
               key={key}
               title={key}
-              subTitle={prop.description}
+              subTitle={renderPropertyDescription(prop)}
               vertical
             >
               <div className={styles["path-list"]}>
@@ -384,7 +405,11 @@ export function McpMarketPage() {
         } else if (prop.type === "string") {
           const currentValue = userConfig[key as keyof typeof userConfig] || "";
           return (
-            <ListItem key={key} title={key} subTitle={prop.description}>
+            <ListItem
+              key={key}
+              title={key}
+              subTitle={renderPropertyDescription(prop)}
+            >
               <input
                 aria-label={key}
                 type="text"

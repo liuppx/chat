@@ -5,6 +5,34 @@ const OFFICIAL_REPO_BASE =
 
 export const OFFICIAL_MCP_PRESET_SERVERS: PresetServer[] = [
   {
+    id: "brave-search",
+    name: "Brave Search",
+    description:
+      "Official Brave MCP server for web search using the Brave Search API.",
+    repo: "https://github.com/brave/brave-search-mcp-server",
+    tags: ["official", "search", "web"],
+    command: "npx",
+    baseArgs: ["-y", "@brave/brave-search-mcp-server", "--transport", "stdio"],
+    configurable: true,
+    configSchema: {
+      properties: {
+        braveApiKey: {
+          type: "string",
+          description: "Brave Search API Key.",
+          required: true,
+          helpUrl: "https://api-dashboard.search.brave.com/login",
+          helpLabel: "Get API Key",
+        },
+      },
+    },
+    argsMapping: {
+      braveApiKey: {
+        type: "env",
+        key: "BRAVE_API_KEY",
+      },
+    },
+  },
+  {
     id: "fetch",
     name: "Fetch",
     description: "Official MCP server for fetching and converting web content.",
