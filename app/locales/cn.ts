@@ -679,6 +679,8 @@ const cn = {
       Installed: "已安装",
       Configurable: "可配置",
       Unavailable: "不可用",
+      Paused: "已暂停",
+      Error: "异常",
     },
     Pricing: {
       free: "免费",
@@ -707,6 +709,7 @@ const cn = {
     DefaultModelDesc: "可用于聊天、工具调用或多模态任务的模型。",
     ToolMcpTitle: "工具连接器",
     ToolMcpDesc: "连接搜索、抓取、文件、Git、时间等 MCP 工具。",
+    ToolApiTitle: "API 工具",
     ToolApiDesc: "通过 API 集成为模型提供外部操作能力。",
   },
   Mcp: {

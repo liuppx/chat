@@ -688,6 +688,8 @@ const en: LocaleType = {
       Installed: "Installed",
       Configurable: "Configurable",
       Unavailable: "Unavailable",
+      Paused: "Paused",
+      Error: "Error",
     },
     Pricing: {
       free: "Free",
@@ -719,6 +721,7 @@ const en: LocaleType = {
     ToolMcpTitle: "Tool Connectors",
     ToolMcpDesc:
       "Connect MCP tools such as search, fetch, filesystem, git, and time.",
+    ToolApiTitle: "API Tools",
     ToolApiDesc: "Expose external actions to models through API integrations.",
   },
   Mcp: {

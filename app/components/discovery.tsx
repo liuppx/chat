@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 
 import { Path } from "../constant";
 import Locale, { getLang } from "../locales";
+import { getClientsStatus, getMcpConfigFromFile } from "../mcp/actions";
+import { OFFICIAL_MCP_PRESET_SERVERS } from "../mcp/preset-servers";
+import { McpConfigData, ServerStatusResponse } from "../mcp/types";
 import { BUILTIN_SKILLS } from "../skills";
 import { useAppConfig } from "../store";
 import { useSkillStore } from "../store/skill";
@@ -63,6 +66,31 @@ export function DiscoveryPage() {
   const models = useAppConfig((state) => state.models);
   const hideBuiltinSkills = useAppConfig((state) => state.hideBuiltinSkills);
   const modelConfig = useAppConfig((state) => state.modelConfig);
+  const [mcpConfig, setMcpConfig] = useState<McpConfigData>();
+  const [mcpStatuses, setMcpStatuses] = useState<
+    Record<string, ServerStatusResponse>
+  >({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadMcpState = async () => {
+      try {
+        const [config, statuses] = await Promise.all([
+          getMcpConfigFromFile(),
+          getClientsStatus(),
+        ]);
+        if (cancelled) return;
+        setMcpConfig(config);
+        setMcpStatuses(statuses);
+      } catch (error) {
+        console.warn("[Discovery] failed to load MCP state", error);
+      }
+    };
+    loadMcpState();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const skills = useMemo(() => {
     const userSkills = Object.values(skillRecords).sort(
@@ -109,33 +137,67 @@ export function DiscoveryPage() {
       installed: !skill.builtin,
     }));
 
+    const mcpToolItems: Capability[] = OFFICIAL_MCP_PRESET_SERVERS.map(
+      (server) => {
+        const serverConfig = mcpConfig?.mcpServers[server.id];
+        const serverStatus = mcpStatuses[server.id]?.status;
+        const installed = Boolean(serverConfig);
+        const status =
+          serverStatus === "active"
+            ? Locale.Discovery.Status.Enabled
+            : serverStatus === "error"
+              ? Locale.Discovery.Status.Error
+              : serverStatus === "paused"
+                ? Locale.Discovery.Status.Paused
+                : installed
+                  ? Locale.Discovery.Status.Installed
+                  : Locale.Discovery.Status.Configurable;
+
+        return {
+          id: `tool:mcp:${server.id}`,
+          type: "tool",
+          title: server.name,
+          description: server.description,
+          status,
+          pricing: "free",
+          runtime: server.tags.includes("local") ? "local" : "both",
+          source: Locale.Discovery.Source.Official,
+          path: Path.McpMarket,
+          installed,
+        };
+      },
+    );
+
+    const pluginToolItems: Capability[] = plugins.map((plugin) => ({
+      id: `tool:${plugin.id}`,
+      type: "tool" as const,
+      title: plugin.title || Locale.Plugin.Name,
+      description: Locale.Discovery.ToolApiDesc,
+      status: Locale.Discovery.Status.Installed,
+      pricing: "free" as const,
+      runtime: "cloud" as const,
+      source: plugin.builtin
+        ? Locale.Discovery.Source.Official
+        : Locale.Discovery.Source.Custom,
+      path: Path.Plugins,
+      installed: true,
+    }));
+
     const toolItems: Capability[] = [
+      ...mcpToolItems,
       {
-        id: "tool:mcp",
+        id: "tool:plugins",
         type: "tool",
-        title: Locale.Discovery.ToolMcpTitle,
-        description: Locale.Discovery.ToolMcpDesc,
+        title: Locale.Discovery.ToolApiTitle,
+        description: Locale.Discovery.ToolApiDesc,
         status: Locale.Discovery.Status.Configurable,
         pricing: "free",
-        runtime: "both",
+        runtime: "cloud",
         source: Locale.Discovery.Source.Official,
-        path: Path.McpMarket,
+        path: Path.Plugins,
         installed: false,
       },
-      ...plugins.map((plugin) => ({
-        id: `tool:${plugin.id}`,
-        type: "tool" as const,
-        title: plugin.title || Locale.Plugin.Name,
-        description: Locale.Discovery.ToolApiDesc,
-        status: Locale.Discovery.Status.Installed,
-        pricing: "free" as const,
-        runtime: "cloud" as const,
-        source: plugin.builtin
-          ? Locale.Discovery.Source.Official
-          : Locale.Discovery.Source.Custom,
-        path: Path.Plugins,
-        installed: true,
-      })),
+      ...pluginToolItems,
     ];
 
     const modelItems = models.slice(0, 60).map((model) => ({
@@ -157,7 +219,7 @@ export function DiscoveryPage() {
     }));
 
     return [...skillItems, ...toolItems, ...modelItems];
-  }, [models, plugins, skills]);
+  }, [mcpConfig?.mcpServers, mcpStatuses, models, plugins, skills]);
 
   const visibleCapabilities = capabilities.filter((item) => {
     const keyword = searchText.trim().toLowerCase();
