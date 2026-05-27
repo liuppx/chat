@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 
 import { Path } from "../constant";
@@ -34,10 +34,29 @@ type Capability = {
 
 const typeOrder: CapabilityType[] = ["all", "skill", "tool", "model"];
 
+function getInitialType(search: string): CapabilityType {
+  const type = new URLSearchParams(search).get("type");
+  if (type === "skill" || type === "tool" || type === "model") return type;
+  return "all";
+}
+
+function getInitialView(search: string): DiscoveryView {
+  return new URLSearchParams(search).get("view") === "mine" ? "mine" : "market";
+}
+
+function getDiscoveryPath(view: DiscoveryView, type: CapabilityType) {
+  const params = new URLSearchParams();
+  if (view === "mine") params.set("view", view);
+  if (type !== "all") params.set("type", type);
+  const query = params.toString();
+  return query ? `${Path.Discovery}?${query}` : Path.Discovery;
+}
+
 export function DiscoveryPage() {
   const navigate = useNavigate();
-  const [view, setView] = useState<DiscoveryView>("market");
-  const [activeType, setActiveType] = useState<CapabilityType>("all");
+  const location = useLocation();
+  const view = getInitialView(location.search);
+  const activeType = getInitialType(location.search);
   const [searchText, setSearchText] = useState("");
   const skillRecords = useSkillStore((state) => state.skills);
   const pluginRecords = usePluginStore((state) => state.plugins);
@@ -174,7 +193,14 @@ export function DiscoveryPage() {
                     : Locale.Discovery.BackToMarket
                 }
                 bordered
-                onClick={() => setView(view === "market" ? "mine" : "market")}
+                onClick={() =>
+                  navigate(
+                    getDiscoveryPath(
+                      view === "market" ? "mine" : "market",
+                      activeType,
+                    ),
+                  )
+                }
               />
             </div>
             <div className="window-action-button">
@@ -208,7 +234,7 @@ export function DiscoveryPage() {
                     styles.filter,
                     activeType === type && styles["filter-active"],
                   )}
-                  onClick={() => setActiveType(type)}
+                  onClick={() => navigate(getDiscoveryPath(view, type))}
                 >
                   {Locale.Discovery.Types[type]}
                 </button>

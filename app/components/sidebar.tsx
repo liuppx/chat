@@ -355,7 +355,9 @@ export function SideBar(props: { className?: string }) {
               text={shouldNarrow ? undefined : Locale.Mcp.Name}
               className={styles["sidebar-bar-button"]}
               onClick={() => {
-                navigate(Path.McpMarket, { state: { fromHome: true } });
+                navigate(`${Path.Discovery}?type=tool`, {
+                  state: { fromHome: true },
+                });
               }}
               shadow
             />
