@@ -681,7 +681,7 @@ const en: LocaleType = {
       all: "All",
       skill: "Skills",
       tool: "Tools",
-      provider: "Providers",
+      provider: "Model Services",
     },
     Status: {
       Enabled: "Enabled",
@@ -704,21 +704,25 @@ const en: LocaleType = {
     Source: {
       Official: "Official",
       Custom: "Custom",
-      Provider: "Model Provider",
+      Provider: "Model Service",
     },
     SourceLabel: "Source",
     Manage: "Manage",
     Enable: "Enable",
+    Use: "Start",
     MyCapabilities: "My Capabilities",
     BackToMarket: "Back to Market",
-    SearchMarket: "Search skills, tools, and providers",
+    SearchMarket: "Search skills, tools, and model services",
     SearchMine: "Search my capabilities",
     Empty: "No matching capabilities",
+    ResetFilters: "Clear filters",
     DefaultSkillDesc:
       "A task-oriented workflow that can bind models, prompts, and tools.",
+    SkillStarters: (count: number) => `${count} starters`,
+    SkillTools: (count: number) => `${count} bound tools`,
     RouterProviderTitle: "Community Router",
     RouterProviderDesc:
-      "Default model provider for accessing community-available models.",
+      "Default model service for accessing community-available models.",
     ProviderDesc: (available: number, total: number, tags: string[]) =>
       tags.length > 0
         ? `${available}/${total} models available · ${tags.join(" / ")}`
@@ -728,6 +732,7 @@ const en: LocaleType = {
       "Connect MCP tools such as search, fetch, filesystem, git, and time.",
     ToolApiTitle: "API Tools",
     ToolApiDesc: "Expose external actions to models through API integrations.",
+    ToolApiHighlight: "OpenAPI",
   },
   Mcp: {
     Name: "Tools",

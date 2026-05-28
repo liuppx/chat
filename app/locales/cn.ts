@@ -672,7 +672,7 @@ const cn = {
       all: "全部",
       skill: "技能",
       tool: "工具",
-      provider: "供应商",
+      provider: "模型服务商",
     },
     Status: {
       Enabled: "已启用",
@@ -695,19 +695,23 @@ const cn = {
     Source: {
       Official: "官方",
       Custom: "自定义",
-      Provider: "模型服务",
+      Provider: "模型服务商",
     },
     SourceLabel: "来源",
     Manage: "管理",
     Enable: "启用",
+    Use: "开始使用",
     MyCapabilities: "我的能力",
     BackToMarket: "返回市场",
-    SearchMarket: "搜索技能、工具、供应商",
+    SearchMarket: "搜索技能、工具、模型服务商",
     SearchMine: "搜索我的能力",
     Empty: "没有找到匹配的能力",
+    ResetFilters: "清空筛选",
     DefaultSkillDesc: "面向任务的工作方式，可绑定模型、提示词和工具。",
+    SkillStarters: (count: number) => `${count} 个开场白`,
+    SkillTools: (count: number) => `${count} 个绑定工具`,
     RouterProviderTitle: "社区 Router",
-    RouterProviderDesc: "默认模型供应商，统一接入社区可用模型。",
+    RouterProviderDesc: "默认模型服务商，统一接入社区可用模型。",
     ProviderDesc: (available: number, total: number, tags: string[]) =>
       tags.length > 0
         ? `${available}/${total} 个模型可用 · ${tags.join(" / ")}`
@@ -716,6 +720,7 @@ const cn = {
     ToolMcpDesc: "连接搜索、抓取、文件、Git、时间等 MCP 工具。",
     ToolApiTitle: "API 工具",
     ToolApiDesc: "通过 API 集成为模型提供外部操作能力。",
+    ToolApiHighlight: "OpenAPI",
   },
   Mcp: {
     Name: "工具",
