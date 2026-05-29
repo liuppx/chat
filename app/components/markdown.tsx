@@ -37,6 +37,59 @@ async function loadMermaid(): Promise<MermaidApi> {
   return mermaidPromise;
 }
 
+function isMindmapCode(code: string) {
+  const lines = code.split("\n");
+  const firstContentLine = lines
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith("%%"));
+
+  return firstContentLine === "mindmap";
+}
+
+function normalizeMindmapTextParens(code: string) {
+  if (!isMindmapCode(code)) return code;
+
+  return code
+    .split("\n")
+    .map((line) => {
+      const text = line.trim();
+      if (
+        !text ||
+        text === "mindmap" ||
+        text.startsWith("%%") ||
+        text.startsWith("::")
+      ) {
+        return line;
+      }
+
+      const explicitShapeWithQuotedText =
+        /^\s*[A-Za-z_][\w-]*\s*(?:\("|\["|\["`|\{\{")/.test(line);
+      const rootShape = /^\s*root\s*(?:\(\(|\(|\[|\{\{)/.test(line);
+
+      if (rootShape || explicitShapeWithQuotedText) {
+        return line;
+      }
+
+      return line.replace(/\(/g, "（").replace(/\)/g, "）");
+    })
+    .join("\n");
+}
+
+function resetMermaidNode(node: HTMLDivElement, code: string) {
+  node.removeAttribute("data-processed");
+  node.innerHTML = "";
+  node.appendChild(document.createTextNode(code));
+}
+
+function shouldRetryMindmapWithTextParens(code: string, error: unknown) {
+  if (!isMindmapCode(code)) return false;
+
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("got 'SPACELIST'") || message.includes("got 'NODE_ID'")
+  );
+}
+
 const remarkPlugins: PluggableList = [RemarkMath, RemarkGfm, RemarkBreaks];
 const rehypePlugins: PluggableList = [
   RehypeKatex,
@@ -53,6 +106,7 @@ export function Mermaid(props: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const mermaidRef = useRef<MermaidApi | null>(null);
   const [error, setError] = useState("");
+  const [renderCode, setRenderCode] = useState(props.code);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,11 +120,35 @@ export function Mermaid(props: { code: string }) {
         if (cancelled || !ref.current) return;
         await mermaidRef.current.parse(props.code, { suppressErrors: false });
         if (cancelled || !ref.current) return;
+        setRenderCode(props.code);
+        resetMermaidNode(ref.current, props.code);
         await mermaidRef.current.run({
           nodes: [ref.current],
           suppressErrors: false,
         });
       } catch (e) {
+        if (
+          mermaidRef.current &&
+          ref.current &&
+          shouldRetryMindmapWithTextParens(props.code, e)
+        ) {
+          const fixedCode = normalizeMindmapTextParens(props.code);
+          try {
+            await mermaidRef.current.parse(fixedCode, {
+              suppressErrors: false,
+            });
+            if (cancelled || !ref.current) return;
+            setRenderCode(fixedCode);
+            resetMermaidNode(ref.current, fixedCode);
+            return await mermaidRef.current.run({
+              nodes: [ref.current],
+              suppressErrors: false,
+            });
+          } catch (retryError) {
+            e = retryError;
+          }
+        }
+
         const message = e instanceof Error ? e.message : String(e);
         if (!cancelled) {
           setError(message);
@@ -111,7 +189,7 @@ export function Mermaid(props: { code: string }) {
       ref={ref}
       onClick={() => viewSvgInNewWindow()}
     >
-      {props.code}
+      {renderCode}
     </div>
   );
 }
