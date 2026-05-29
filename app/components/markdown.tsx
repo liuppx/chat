@@ -52,24 +52,29 @@ const rehypePlugins: PluggableList = [
 export function Mermaid(props: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const mermaidRef = useRef<MermaidApi | null>(null);
-  const [hasError, setHasError] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     const runMermaid = async () => {
       if (!props.code || !ref.current) return;
+      setError("");
       try {
         if (!mermaidRef.current) {
           mermaidRef.current = await loadMermaid();
         }
         if (cancelled || !ref.current) return;
+        await mermaidRef.current.parse(props.code, { suppressErrors: false });
+        if (cancelled || !ref.current) return;
         await mermaidRef.current.run({
           nodes: [ref.current],
-          suppressErrors: true,
+          suppressErrors: false,
         });
       } catch (e) {
-        setHasError(true);
         const message = e instanceof Error ? e.message : String(e);
+        if (!cancelled) {
+          setError(message);
+        }
         console.error("[Mermaid] ", message);
       }
     };
@@ -87,8 +92,13 @@ export function Mermaid(props: { code: string }) {
     showImageModal(URL.createObjectURL(blob));
   }
 
-  if (hasError) {
-    return null;
+  if (error) {
+    return (
+      <div className={clsx("no-dark", "mermaid", "mermaid-error")}>
+        <div>{Locale.Error.Mermaid}</div>
+        <code>{error}</code>
+      </div>
+    );
   }
 
   return (

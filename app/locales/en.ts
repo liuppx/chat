@@ -7,6 +7,7 @@ const isApp = !!getClientConfig()?.isApp;
 const en: LocaleType = {
   WIP: "Coming Soon...",
   Error: {
+    Mermaid: "Mermaid syntax error. Source code is preserved.",
     Unauthorized: isApp
       ? `😆 Oops, there's an issue. No worries:
      \\ 1️⃣ Want zero-config access? Please use Chat AI

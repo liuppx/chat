@@ -6,6 +6,7 @@ const isApp = !!getClientConfig()?.isApp;
 const cn = {
   WIP: "该功能仍在开发中……",
   Error: {
+    Mermaid: "Mermaid 语法有误，已保留源码。",
     Unauthorized: isApp
       ? `😆 对话遇到了一些问题，不用慌:
        \\ 1️⃣ 想要零配置开箱即用，请使用 Chat AI
