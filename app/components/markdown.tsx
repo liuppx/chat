@@ -81,10 +81,39 @@ function resetMermaidNode(node: HTMLDivElement, code: string) {
   node.appendChild(document.createTextNode(code));
 }
 
+function getMermaidErrorText(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (Array.isArray(error)) return error.map(getMermaidErrorText).join("\n");
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const parts = [
+      record.message,
+      record.str,
+      record.text,
+      record.token,
+      record.hash,
+      record.error,
+    ]
+      .map(getMermaidErrorText)
+      .filter(Boolean);
+
+    if (parts.length > 0) return parts.join("\n");
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return String(error);
+    }
+  }
+
+  return String(error);
+}
+
 function shouldRetryMindmapWithTextParens(code: string, error: unknown) {
   if (!isMindmapCode(code)) return false;
 
-  const message = error instanceof Error ? error.message : String(error);
+  const message = getMermaidErrorText(error);
   return (
     message.includes("got 'SPACELIST'") || message.includes("got 'NODE_ID'")
   );
@@ -149,7 +178,7 @@ export function Mermaid(props: { code: string }) {
           }
         }
 
-        const message = e instanceof Error ? e.message : String(e);
+        const message = getMermaidErrorText(e);
         if (!cancelled) {
           setError(message);
         }
