@@ -6,7 +6,7 @@ import RemarkBreaks from "remark-breaks";
 import RehypeKatex from "rehype-katex";
 import RemarkGfm from "remark-gfm";
 import RehypeHighlight from "rehype-highlight";
-import { useRef, useState, RefObject, useEffect, useMemo } from "react";
+import { useRef, useState, RefObject, useEffect, useMemo, useId } from "react";
 import { copyToClipboard, useWindowSize } from "../utils";
 import Locale from "../locales";
 import LoadingIcon from "../icons/three-dots.svg";
@@ -75,12 +75,6 @@ function normalizeMindmapTextParens(code: string) {
     .join("\n");
 }
 
-function resetMermaidNode(node: HTMLDivElement, code: string) {
-  node.removeAttribute("data-processed");
-  node.innerHTML = "";
-  node.appendChild(document.createTextNode(code));
-}
-
 function getMermaidErrorText(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -134,31 +128,29 @@ const rehypePlugins: PluggableList = [
 export function Mermaid(props: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const mermaidRef = useRef<MermaidApi | null>(null);
+  const renderId = `mermaid-${useId().replaceAll(":", "")}`;
   const [error, setError] = useState("");
-  const [renderCode, setRenderCode] = useState(props.code);
+  const [svg, setSvg] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     const runMermaid = async () => {
-      if (!props.code || !ref.current) return;
+      if (!props.code) return;
       setError("");
+      setSvg("");
       try {
         if (!mermaidRef.current) {
           mermaidRef.current = await loadMermaid();
         }
-        if (cancelled || !ref.current) return;
+        if (cancelled) return;
         await mermaidRef.current.parse(props.code, { suppressErrors: false });
-        if (cancelled || !ref.current) return;
-        setRenderCode(props.code);
-        resetMermaidNode(ref.current, props.code);
-        await mermaidRef.current.run({
-          nodes: [ref.current],
-          suppressErrors: false,
-        });
+        const result = await mermaidRef.current.render(renderId, props.code);
+        if (!cancelled) {
+          setSvg(result.svg);
+        }
       } catch (e) {
         if (
           mermaidRef.current &&
-          ref.current &&
           shouldRetryMindmapWithTextParens(props.code, e)
         ) {
           const fixedCode = normalizeMindmapTextParens(props.code);
@@ -166,13 +158,14 @@ export function Mermaid(props: { code: string }) {
             await mermaidRef.current.parse(fixedCode, {
               suppressErrors: false,
             });
-            if (cancelled || !ref.current) return;
-            setRenderCode(fixedCode);
-            resetMermaidNode(ref.current, fixedCode);
-            return await mermaidRef.current.run({
-              nodes: [ref.current],
-              suppressErrors: false,
-            });
+            const result = await mermaidRef.current.render(
+              `${renderId}-retry`,
+              fixedCode,
+            );
+            if (!cancelled) {
+              setSvg(result.svg);
+              return;
+            }
           } catch (retryError) {
             e = retryError;
           }
@@ -189,7 +182,7 @@ export function Mermaid(props: { code: string }) {
     return () => {
       cancelled = true;
     };
-  }, [props.code]);
+  }, [props.code, renderId]);
 
   function viewSvgInNewWindow() {
     const svg = ref.current?.querySelector("svg");
@@ -217,9 +210,8 @@ export function Mermaid(props: { code: string }) {
       }}
       ref={ref}
       onClick={() => viewSvgInNewWindow()}
-    >
-      {renderCode}
-    </div>
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   );
 }
 
