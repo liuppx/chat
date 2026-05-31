@@ -848,6 +848,13 @@ const en: LocaleType = {
     Config: {
       Avatar: "Bot Avatar",
       Name: "Bot Name",
+      CandidateModels: {
+        Title: "Candidate Models",
+        SubTitle:
+          "Chat sessions created from this skill can only use these models",
+        SummaryNone: "No restriction",
+        SummarySelected: (count: number) => `${count} models selected`,
+      },
       Sync: {
         Title: "Use Global Config",
         SubTitle: "Use global config in this chat",

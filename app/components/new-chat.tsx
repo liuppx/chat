@@ -8,11 +8,11 @@ import ImageIcon from "../icons/image.svg";
 import SendWhiteIcon from "../icons/send-white.svg";
 
 import { useNavigate } from "react-router-dom";
-import { Skill, useSkillStore } from "../store/skill";
+import { getLaunchableSkills, Skill, useSkillStore } from "../store/skill";
 import Locale from "../locales";
 import { useChatStore } from "../store";
 import { useSdStore } from "../store/sd";
-import { MaskAvatar } from "./mask";
+import { SkillAvatar } from "./mask";
 import { useCommand } from "../command";
 import { BUILTIN_SKILL_STORE } from "../skills";
 import clsx from "clsx";
@@ -22,7 +22,7 @@ import { safeLocalStorage } from "../utils";
 function SkillItem(props: { skill: Skill; onClick?: () => void }) {
   return (
     <div className={styles["mask"]} onClick={props.onClick}>
-      <MaskAvatar
+      <SkillAvatar
         avatar={props.skill.avatar}
         model={props.skill.modelConfig.model}
       />
@@ -43,7 +43,10 @@ export function NewChat() {
   const sdStore = useSdStore();
   const [draft, setDraft] = useState("");
 
-  const skills = skillStore.getAll();
+  const skills = useMemo(
+    () => getLaunchableSkills(skillStore.getAll()),
+    [skillStore],
+  );
   const recentSkills = useMemo(() => {
     const seen = new Set<string>();
     return chatStore.sessions

@@ -834,6 +834,12 @@ const cn = {
     Config: {
       Avatar: "角色头像",
       Name: "角色名称",
+      CandidateModels: {
+        Title: "候选模型",
+        SubTitle: "通过这个技能创建的会话，仅可使用这些模型",
+        SummaryNone: "不限制",
+        SummarySelected: (count: number) => `已选择 ${count} 个模型`,
+      },
       Sync: {
         Title: "使用全局设置",
         SubTitle: "当前对话是否使用全局模型设置",

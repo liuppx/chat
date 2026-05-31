@@ -121,8 +121,8 @@ import {
   UNFINISHED_INPUT,
 } from "../constant";
 import { Avatar } from "./emoji";
-import { ContextPrompts, MaskAvatar, MaskConfig } from "./mask";
-import { useMaskStore } from "../store/mask";
+import { ContextPrompts, SkillAvatar, SkillConfig } from "./mask";
+import { useSkillStore } from "../store/skill";
 import { ChatCommandPrefix, useChatCommand, useCommand } from "../command";
 import { prettyObject } from "../utils/format";
 import { ExportMessageModal } from "./exporter";
@@ -182,7 +182,8 @@ const MCPAction = () => {
 export function SessionConfigModel(props: { onClose: () => void }) {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  const maskStore = useMaskStore();
+  const sessionSkill = session.mask;
+  const skillStore = useSkillStore();
   const navigate = useNavigate();
   const runtimeModels = useSessionModels();
 
@@ -214,26 +215,26 @@ export function SessionConfigModel(props: { onClose: () => void }) {
             onClick={() => {
               navigate(Path.Skills);
               setTimeout(() => {
-                maskStore.create(session.mask);
+                skillStore.create(sessionSkill);
               }, 500);
             }}
           />,
         ]}
       >
-        <MaskConfig
-          mask={session.mask}
+        <SkillConfig
+          mask={sessionSkill}
           updateMask={(updater) => {
-            const mask = { ...session.mask };
-            updater(mask);
+            const nextSkill = { ...sessionSkill };
+            updater(nextSkill);
             chatStore.updateTargetSession(
               session,
-              (session) => (session.mask = mask),
+              (session) => (session.mask = nextSkill),
             );
           }}
           modelOptions={runtimeModels}
           shouldSyncFromGlobal
           extraListItems={
-            session.mask.modelConfig.sendMemory ? (
+            sessionSkill.modelConfig.sendMemory ? (
               <ListItem
                 className="copyable"
                 title={`${Locale.Memory.Title} (${session.lastSummarizeIndex} of ${session.messages.length})`}
@@ -243,7 +244,7 @@ export function SessionConfigModel(props: { onClose: () => void }) {
               <></>
             )
           }
-        ></MaskConfig>
+        ></SkillConfig>
       </Modal>
     </div>
   );
@@ -256,7 +257,8 @@ function PromptToast(props: {
 }) {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  const context = session.mask.context;
+  const sessionSkill = session.mask;
+  const context = sessionSkill.context;
 
   return (
     <div className={styles["prompt-toast"]} key="prompt-toast">
@@ -528,6 +530,7 @@ export function ChatActions(props: {
   const chatStore = useChatStore();
   const pluginStore = usePluginStore();
   const session = chatStore.currentSession();
+  const sessionSkill = session.mask;
   const { setAttachContents, setUploading } = props;
 
   // switch themes
@@ -546,15 +549,15 @@ export function ChatActions(props: {
   const stopAll = () => ChatControllerPool.stopAll();
 
   // switch model
-  const currentModel = session.mask.modelConfig.model;
+  const currentModel = sessionSkill.modelConfig.model;
   const currentProviderName = (normalizeProviderName(
-    session.mask.modelConfig?.providerName,
+    sessionSkill.modelConfig?.providerName,
   ) ??
-    session.mask.modelConfig?.providerName ??
+    sessionSkill.modelConfig?.providerName ??
     ServiceProvider.OpenAI) as ServiceProvider;
   const sessionCandidateModels = useMemo(
-    () => normalizeModelCandidates(session.mask.candidateModels),
-    [session.mask.candidateModels],
+    () => normalizeModelCandidates(sessionSkill.candidateModels),
+    [sessionSkill.candidateModels],
   );
   const sessionModels = useSessionModels(sessionCandidateModels);
   const hasCandidateModelRestriction = sessionCandidateModels.length > 0;
@@ -615,7 +618,7 @@ export function ChatActions(props: {
   const gptImageQualitys: GptImageQuality[] = ["auto", "high", "medium", "low"];
   const dalle3Styles: DalleStyle[] = ["vivid", "natural"];
   const currentSize =
-    session.mask.modelConfig?.size ?? ("1024x1024" as ModelSize);
+    sessionSkill.modelConfig?.size ?? ("1024x1024" as ModelSize);
   const qualityOptions: ImageQuality[] = isDalle3(currentModel)
     ? dalle3Qualitys
     : isGptImageModel(currentModel)
@@ -624,14 +627,14 @@ export function ChatActions(props: {
   const defaultQuality: ImageQuality = isDalle3(currentModel)
     ? "standard"
     : "auto";
-  const storedQuality = session.mask.modelConfig?.quality as
+  const storedQuality = sessionSkill.modelConfig?.quality as
     | ImageQuality
     | undefined;
   const currentQuality =
     storedQuality && qualityOptions.includes(storedQuality)
       ? storedQuality
       : defaultQuality;
-  const currentStyle = session.mask.modelConfig?.style ?? "vivid";
+  const currentStyle = sessionSkill.modelConfig?.style ?? "vivid";
 
   const isMobileScreen = useMobileScreen();
 
@@ -1071,14 +1074,15 @@ function ChatView() {
 
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
+  const sessionSkill = session.mask;
   const config = useAppConfig();
   const fontSize = config.fontSize;
   const fontFamily = config.fontFamily;
   const isAuthenticated = useAuth();
   const walletAddress = isAuthenticated ? getCurrentAccount() : "";
   const sessionCandidateModels = useMemo(
-    () => normalizeModelCandidates(session.mask.candidateModels),
-    [session.mask.candidateModels],
+    () => normalizeModelCandidates(sessionSkill.candidateModels),
+    [sessionSkill.candidateModels],
   );
   const sessionModels = useSessionModels(sessionCandidateModels);
   const hasCandidateModelRestriction = sessionCandidateModels.length > 0;
@@ -1209,8 +1213,8 @@ function ChatView() {
 
     const hasCurrentModel = sessionModels.some((model) =>
       matchesModelCandidate(model, {
-        model: session.mask.modelConfig.model,
-        providerName: session.mask.modelConfig.providerName,
+        model: sessionSkill.modelConfig.model,
+        providerName: sessionSkill.modelConfig.providerName,
       }),
     );
 
@@ -1255,6 +1259,7 @@ function ChatView() {
 
   useEffect(() => {
     chatStore.updateTargetSession(session, (session) => {
+      const sessionSkill = session.mask;
       const stopTiming = Date.now() - REQUEST_TIMEOUT_MS;
       session.messages.forEach((m) => {
         // check if should stop all stale messages
@@ -1276,9 +1281,9 @@ function ChatView() {
       });
 
       // auto sync mask config from global config
-      const shouldSyncFromGlobal = session.mask.syncGlobalConfig !== false;
+      const shouldSyncFromGlobal = sessionSkill.syncGlobalConfig !== false;
       if (shouldSyncFromGlobal) {
-        session.mask.modelConfig = { ...config.modelConfig };
+        sessionSkill.modelConfig = { ...config.modelConfig };
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1441,8 +1446,8 @@ function ChatView() {
   }
 
   const context: RenderMessage[] = useMemo(() => {
-    return session.mask.hideContext ? [] : session.mask.context.slice();
-  }, [session.mask.context, session.mask.hideContext]);
+    return sessionSkill.hideContext ? [] : sessionSkill.context.slice();
+  }, [sessionSkill.context, sessionSkill.hideContext]);
 
   if (
     context.length === 0 &&
@@ -1948,11 +1953,11 @@ function ChatView() {
                                   {["system"].includes(message.role) ? (
                                     <Avatar avatar="2699-fe0f" />
                                   ) : (
-                                    <MaskAvatar
-                                      avatar={session.mask.avatar}
+                                    <SkillAvatar
+                                      avatar={sessionSkill.avatar}
                                       model={
                                         message.model ||
-                                        session.mask.modelConfig.model
+                                        sessionSkill.modelConfig.model
                                       }
                                     />
                                   )}

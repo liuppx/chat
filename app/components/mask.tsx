@@ -13,7 +13,12 @@ import EyeIcon from "../icons/eye.svg";
 import CopyIcon from "../icons/copy.svg";
 import DragIcon from "../icons/drag.svg";
 
-import { DEFAULT_MASK_AVATAR, Mask, useMaskStore } from "../store/mask";
+import {
+  DEFAULT_MASK_AVATAR,
+  Mask,
+  getLaunchableSkills,
+  useSkillStore,
+} from "../store/skill";
 import {
   ChatMessage,
   createMessage,
@@ -80,7 +85,7 @@ function isEmojiUnified(avatar?: string) {
   return !!avatar && EMOJI_UNIFIED_RE.test(avatar);
 }
 
-export function MaskAvatar(props: { avatar: string; model?: ModelType }) {
+export function SkillAvatar(props: { avatar: string; model?: ModelType }) {
   const config = useAppConfig();
   const model = props.model || config.modelConfig.model;
   const useEmoji =
@@ -91,7 +96,9 @@ export function MaskAvatar(props: { avatar: string; model?: ModelType }) {
   return useEmoji ? <Avatar avatar={props.avatar} /> : <Avatar model={model} />;
 }
 
-export function MaskConfig(props: {
+export const MaskAvatar = SkillAvatar;
+
+export function SkillConfig(props: {
   mask: Mask;
   updateMask: Updater<Mask>;
   extraListItems?: ReactNode;
@@ -102,7 +109,7 @@ export function MaskConfig(props: {
   const [showPicker, setShowPicker] = useState(false);
   const [showCandidateModelSelector, setShowCandidateModelSelector] =
     useState(false);
-  const maskProviderModels = useMaskProviderModels();
+  const skillProviderModels = useMaskProviderModels();
   const selectedCandidateModels = useMemo(
     () => normalizeModelCandidates(props.mask.candidateModels),
     [props.mask.candidateModels],
@@ -114,22 +121,24 @@ export function MaskConfig(props: {
       ),
     [selectedCandidateModels],
   );
-  const baseModelOptions = props.modelOptions ?? maskProviderModels;
-  const maskModelOptions = useMemo(() => {
+  const baseModelOptions = props.modelOptions ?? skillProviderModels;
+  const skillModelOptions = useMemo(() => {
     if (selectedCandidateModels.length === 0) {
       return baseModelOptions;
     }
     return filterModelsByCandidates(baseModelOptions, selectedCandidateModels);
   }, [baseModelOptions, selectedCandidateModels]);
   const candidateModelSummary =
-    maskProviderModels.length === 0
+    skillProviderModels.length === 0
       ? Locale.SearchChat.Page.Loading
       : selectedCandidateModels.length === 0
-        ? "No restriction"
-        : `${selectedCandidateModels.length} models selected`;
+        ? Locale.Mask.Config.CandidateModels.SummaryNone
+        : Locale.Mask.Config.CandidateModels.SummarySelected(
+            selectedCandidateModels.length,
+          );
   const candidateModelSelectorItems = useMemo(
     () =>
-      maskProviderModels.map((model) => ({
+      skillProviderModels.map((model) => ({
         title: `${model.displayName}${
           model.provider?.providerName
             ? ` (${model.provider.providerName})`
@@ -140,7 +149,7 @@ export function MaskConfig(props: {
           providerName: model.provider?.id ?? model.provider?.providerName,
         }),
       })),
-    [maskProviderModels],
+    [skillProviderModels],
   );
 
   const readonlyContextMarkdown = props.mask.context
@@ -162,9 +171,9 @@ export function MaskConfig(props: {
     });
   };
 
-  const copyMaskLink = () => {
-    const maskLink = `${location.protocol}//${location.host}/#${Path.NewChat}?mask=${props.mask.id}`;
-    copyToClipboard(maskLink);
+  const copySkillLink = () => {
+    const skillLink = `${location.protocol}//${location.host}/#${Path.NewChat}?mask=${props.mask.id}`;
+    copyToClipboard(skillLink);
   };
 
   const globalConfig = useAppConfig();
@@ -235,7 +244,7 @@ export function MaskConfig(props: {
               onClick={() => setShowPicker(true)}
               style={{ cursor: "pointer" }}
             >
-              <MaskAvatar
+              <SkillAvatar
                 avatar={props.mask.avatar}
                 model={props.mask.modelConfig.model}
               />
@@ -255,11 +264,11 @@ export function MaskConfig(props: {
           ></input>
         </ListItem>
         <ListItem
-          title="Candidate Models"
-          subTitle="Only these models can be used by chat sessions created from this mask"
+          title={Locale.Mask.Config.CandidateModels.Title}
+          subTitle={Locale.Mask.Config.CandidateModels.SubTitle}
         >
           <input
-            aria-label="Candidate Models"
+            aria-label={Locale.Mask.Config.CandidateModels.Title}
             type="text"
             readOnly
             value={candidateModelSummary}
@@ -326,7 +335,7 @@ export function MaskConfig(props: {
               aria={Locale.Mask.Config.Share.Title}
               icon={<CopyIcon />}
               text={Locale.Mask.Config.Share.Action}
-              onClick={copyMaskLink}
+              onClick={copySkillLink}
             />
           </ListItem>
         ) : null}
@@ -365,7 +374,7 @@ export function MaskConfig(props: {
         <ModelConfigList
           modelConfig={{ ...props.mask.modelConfig }}
           updateConfig={updateConfig}
-          modelOptions={maskModelOptions}
+          modelOptions={skillModelOptions}
           strictModelSelection
         />
         {props.extraListItems}
@@ -396,6 +405,8 @@ export function MaskConfig(props: {
     </>
   );
 }
+
+export const MaskConfig = SkillConfig;
 
 function ContextPromptItem(props: {
   index: number;
@@ -582,32 +593,32 @@ export function ContextPrompts(props: {
 export function MaskPage() {
   const navigate = useNavigate();
 
-  const maskStore = useMaskStore();
+  const skillStore = useSkillStore();
   const chatStore = useChatStore();
 
-  const filterLang = maskStore.language;
+  const filterLang = skillStore.language;
 
-  const allMasks = maskStore
-    .getAll()
-    .filter((m) => !filterLang || m.lang === filterLang);
+  const allSkills = getLaunchableSkills(skillStore.getAll()).filter(
+    (m) => !filterLang || m.lang === filterLang,
+  );
 
   const [searchText, setSearchText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const categories = useMemo(
     () =>
       Array.from(
-        new Set(allMasks.map((m) => m.category).filter(Boolean) as string[]),
+        new Set(allSkills.map((m) => m.category).filter(Boolean) as string[]),
       ),
-    [allMasks],
+    [allSkills],
   );
   useEffect(() => {
     if (selectedCategory && !categories.includes(selectedCategory)) {
       setSelectedCategory("");
     }
   }, [categories, selectedCategory]);
-  const masks = useMemo(() => {
+  const skills = useMemo(() => {
     const keyword = searchText.trim().toLowerCase();
-    return allMasks.filter((m) => {
+    return allSkills.filter((m) => {
       const matchCategory =
         !selectedCategory || m.category === selectedCategory;
       const haystack = [
@@ -621,16 +632,16 @@ export function MaskPage() {
         .toLowerCase();
       return matchCategory && (!keyword || haystack.includes(keyword));
     });
-  }, [allMasks, searchText, selectedCategory]);
+  }, [allSkills, searchText, selectedCategory]);
 
-  const [editingMaskId, setEditingMaskId] = useState<string | undefined>();
-  const editingMask =
-    maskStore.get(editingMaskId) ?? BUILTIN_SKILL_STORE.get(editingMaskId);
-  const closeMaskModal = () => setEditingMaskId(undefined);
+  const [editingSkillId, setEditingSkillId] = useState<string | undefined>();
+  const editingSkill =
+    skillStore.get(editingSkillId) ?? BUILTIN_SKILL_STORE.get(editingSkillId);
+  const closeSkillModal = () => setEditingSkillId(undefined);
 
   const downloadAll = () => {
     downloadAs(
-      JSON.stringify(masks.filter((v) => !v.builtin)),
+      JSON.stringify(skills.filter((v) => !v.builtin)),
       FileName.Skills,
     );
   };
@@ -640,16 +651,16 @@ export function MaskPage() {
       try {
         const importMasks = JSON.parse(content);
         if (Array.isArray(importMasks)) {
-          for (const mask of importMasks) {
-            if (mask.name) {
-              maskStore.create(mask);
+          for (const skill of importMasks) {
+            if (skill.name) {
+              skillStore.create(skill);
             }
           }
           return;
         }
         //if the content is a single mask.
         if (importMasks.name) {
-          maskStore.create(importMasks);
+          skillStore.create(importMasks);
         }
       } catch {}
     });
@@ -664,7 +675,7 @@ export function MaskPage() {
               {Locale.Mask.Page.Title}
             </div>
             <div className="window-header-submai-title">
-              {Locale.Mask.Page.SubTitle(allMasks.length)}
+              {Locale.Mask.Page.SubTitle(allSkills.length)}
             </div>
           </div>
 
@@ -710,9 +721,9 @@ export function MaskPage() {
               onChange={(e) => {
                 const value = e.currentTarget.value;
                 if (value === Locale.Settings.Lang.All) {
-                  maskStore.setLanguage(undefined);
+                  skillStore.setLanguage(undefined);
                 } else {
-                  maskStore.setLanguage(value as Lang);
+                  skillStore.setLanguage(value as Lang);
                 }
               }}
             >
@@ -732,8 +743,8 @@ export function MaskPage() {
               text={Locale.Mask.Page.Create}
               bordered
               onClick={() => {
-                const createdMask = maskStore.create();
-                setEditingMaskId(createdMask.id);
+                const createdSkill = skillStore.create();
+                setEditingSkillId(createdSkill.id);
               }}
             />
           </div>
@@ -766,11 +777,14 @@ export function MaskPage() {
           )}
 
           <div className={styles["mask-grid"]}>
-            {masks.map((m) => (
+            {skills.map((m) => (
               <div className={styles["mask-item"]} key={m.id}>
                 <div className={styles["mask-header"]}>
                   <div className={styles["mask-icon"]}>
-                    <MaskAvatar avatar={m.avatar} model={m.modelConfig.model} />
+                    <SkillAvatar
+                      avatar={m.avatar}
+                      model={m.modelConfig.model}
+                    />
                   </div>
                   <div className={styles["mask-title"]}>
                     <div className={styles["mask-name"]}>{m.name}</div>
@@ -814,13 +828,13 @@ export function MaskPage() {
                     <IconButton
                       icon={<EyeIcon />}
                       text={Locale.Mask.Item.View}
-                      onClick={() => setEditingMaskId(m.id)}
+                      onClick={() => setEditingSkillId(m.id)}
                     />
                   ) : (
                     <IconButton
                       icon={<EditIcon />}
                       text={Locale.Mask.Item.Edit}
-                      onClick={() => setEditingMaskId(m.id)}
+                      onClick={() => setEditingSkillId(m.id)}
                     />
                   )}
                   {!m.builtin && (
@@ -829,7 +843,7 @@ export function MaskPage() {
                       text={Locale.Mask.Item.Delete}
                       onClick={async () => {
                         if (await showConfirm(Locale.Mask.Item.DeleteConfirm)) {
-                          maskStore.delete(m.id);
+                          skillStore.delete(m.id);
                         }
                       }}
                     />
@@ -837,7 +851,7 @@ export function MaskPage() {
                 </div>
               </div>
             ))}
-            {masks.length === 0 && (
+            {skills.length === 0 && (
               <div className={styles["mask-empty"]}>
                 {Locale.Mask.Page.Empty}
               </div>
@@ -846,11 +860,11 @@ export function MaskPage() {
         </div>
       </div>
 
-      {editingMask && (
+      {editingSkill && (
         <div className="modal-mask">
           <Modal
-            title={Locale.Mask.EditModal.Title(editingMask?.builtin)}
-            onClose={closeMaskModal}
+            title={Locale.Mask.EditModal.Title(editingSkill?.builtin)}
+            onClose={closeSkillModal}
             actions={[
               <IconButton
                 icon={<DownloadIcon />}
@@ -859,8 +873,8 @@ export function MaskPage() {
                 bordered
                 onClick={() =>
                   downloadAs(
-                    JSON.stringify(editingMask),
-                    `${editingMask.name}.json`,
+                    JSON.stringify(editingSkill),
+                    `${editingSkill.name}.json`,
                   )
                 }
               />,
@@ -871,18 +885,18 @@ export function MaskPage() {
                 text={Locale.Mask.EditModal.Clone}
                 onClick={() => {
                   navigate(Path.Skills);
-                  maskStore.create(editingMask);
-                  setEditingMaskId(undefined);
+                  skillStore.create(editingSkill);
+                  setEditingSkillId(undefined);
                 }}
               />,
             ]}
           >
-            <MaskConfig
-              mask={editingMask}
+            <SkillConfig
+              mask={editingSkill}
               updateMask={(updater) =>
-                maskStore.updateMask(editingMaskId!, updater)
+                skillStore.updateMask(editingSkillId!, updater)
               }
-              readonly={editingMask.builtin}
+              readonly={editingSkill.builtin}
             />
           </Modal>
         </div>

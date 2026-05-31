@@ -39,7 +39,7 @@ import { getClientConfig } from "../config/client";
 import { type ClientApi, getClientApi } from "../client/api";
 import { isDesktopAppRuntime, saveWithDialog, writeFile } from "../tauri";
 import { getMessageTextContent } from "../utils";
-import { MaskAvatar } from "./mask";
+import { SkillAvatar } from "./mask";
 import clsx from "clsx";
 
 const Markdown = dynamic(async () => (await import("./markdown")).Markdown, {
@@ -532,9 +532,9 @@ export function ImagePreviewer(props: {
               github.com/yeying-community/chat
             </div>
             <div className={styles["icons"]}>
-              <MaskAvatar avatar={config.avatar} />
+              <SkillAvatar avatar={config.avatar} />
               <span className={styles["icon-space"]}>&</span>
-              <MaskAvatar
+              <SkillAvatar
                 avatar={mask.avatar}
                 model={session.mask.modelConfig.model}
               />
@@ -568,7 +568,7 @@ export function ImagePreviewer(props: {
                 {m.role === "user" ? (
                   <Avatar avatar={config.avatar}></Avatar>
                 ) : (
-                  <MaskAvatar
+                  <SkillAvatar
                     avatar={session.mask.avatar}
                     model={m.model || session.mask.modelConfig.model}
                   />
