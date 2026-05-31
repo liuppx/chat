@@ -14,8 +14,8 @@ import CopyIcon from "../icons/copy.svg";
 import DragIcon from "../icons/drag.svg";
 
 import {
-  DEFAULT_MASK_AVATAR,
-  Mask,
+  DEFAULT_SKILL_AVATAR,
+  Skill,
   getLaunchableSkills,
   useSkillStore,
 } from "../store/skill";
@@ -90,7 +90,7 @@ export function SkillAvatar(props: { avatar: string; model?: ModelType }) {
   const model = props.model || config.modelConfig.model;
   const useEmoji =
     props.avatar &&
-    props.avatar !== DEFAULT_MASK_AVATAR &&
+    props.avatar !== DEFAULT_SKILL_AVATAR &&
     isEmojiUnified(props.avatar);
 
   return useEmoji ? <Avatar avatar={props.avatar} /> : <Avatar model={model} />;
@@ -99,20 +99,21 @@ export function SkillAvatar(props: { avatar: string; model?: ModelType }) {
 export const MaskAvatar = SkillAvatar;
 
 export function SkillConfig(props: {
-  mask: Mask;
-  updateMask: Updater<Mask>;
+  mask: Skill;
+  updateMask: Updater<Skill>;
   extraListItems?: ReactNode;
   readonly?: boolean;
   shouldSyncFromGlobal?: boolean;
   modelOptions?: LLMModel[];
 }) {
+  const skill = props.mask;
   const [showPicker, setShowPicker] = useState(false);
   const [showCandidateModelSelector, setShowCandidateModelSelector] =
     useState(false);
   const skillProviderModels = useMaskProviderModels();
   const selectedCandidateModels = useMemo(
-    () => normalizeModelCandidates(props.mask.candidateModels),
-    [props.mask.candidateModels],
+    () => normalizeModelCandidates(skill.candidateModels),
+    [skill.candidateModels],
   );
   const selectedCandidateValues = useMemo(
     () =>
@@ -152,7 +153,7 @@ export function SkillConfig(props: {
     [skillProviderModels],
   );
 
-  const readonlyContextMarkdown = props.mask.context
+  const readonlyContextMarkdown = skill.context
     .map((message, index) => {
       const content = getMessageTextContent(message).trim();
       return `### ${index + 1}. ${message.role}\n\n${content || "_empty_"}`;
@@ -162,7 +163,7 @@ export function SkillConfig(props: {
   const updateConfig = (updater: (config: ModelConfig) => void) => {
     if (props.readonly) return;
 
-    const config = { ...props.mask.modelConfig };
+    const config = { ...skill.modelConfig };
     updater(config);
     props.updateMask((mask) => {
       mask.modelConfig = config;
@@ -172,7 +173,7 @@ export function SkillConfig(props: {
   };
 
   const copySkillLink = () => {
-    const skillLink = `${location.protocol}//${location.host}/#${Path.NewChat}?mask=${props.mask.id}`;
+    const skillLink = `${location.protocol}//${location.host}/#${Path.NewChat}?skill=${skill.id}`;
     copyToClipboard(skillLink);
   };
 
@@ -182,25 +183,21 @@ export function SkillConfig(props: {
     <>
       {props.readonly ? (
         <List>
-          {props.mask.category && (
-            <ListItem
-              title="Category"
-              subTitle={props.mask.category}
-              vertical
-            />
+          {skill.category && (
+            <ListItem title="Category" subTitle={skill.category} vertical />
           )}
-          {props.mask.description && (
+          {skill.description && (
             <ListItem title="Description" vertical>
               <div className={styles["mask-readonly-section"]}>
-                <Markdown content={props.mask.description} />
+                <Markdown content={skill.description} />
               </div>
             </ListItem>
           )}
-          {!!props.mask.starters?.length && (
+          {!!skill.starters?.length && (
             <ListItem title="Recommended Starters" vertical>
               <div className={styles["mask-readonly-section"]}>
                 <Markdown
-                  content={props.mask.starters
+                  content={skill.starters
                     .map((starter) => `- ${starter}`)
                     .join("\n")}
                 />
@@ -215,9 +212,9 @@ export function SkillConfig(props: {
         </List>
       ) : (
         <ContextPrompts
-          context={props.mask.context}
+          context={skill.context}
           updateContext={(updater) => {
-            const context = props.mask.context.slice();
+            const context = skill.context.slice();
             updater(context);
             props.updateMask((mask) => (mask.context = context));
           }}
@@ -245,8 +242,8 @@ export function SkillConfig(props: {
               style={{ cursor: "pointer" }}
             >
               <SkillAvatar
-                avatar={props.mask.avatar}
-                model={props.mask.modelConfig.model}
+                avatar={skill.avatar}
+                model={skill.modelConfig.model}
               />
             </div>
           </Popover>
@@ -255,7 +252,7 @@ export function SkillConfig(props: {
           <input
             aria-label={Locale.Mask.Config.Name}
             type="text"
-            value={props.mask.name}
+            value={skill.name}
             onInput={(e) =>
               props.updateMask((mask) => {
                 mask.name = e.currentTarget.value;
@@ -282,7 +279,7 @@ export function SkillConfig(props: {
           <input
             aria-label={Locale.Mask.Config.HideContext.Title}
             type="checkbox"
-            checked={props.mask.hideContext}
+            checked={skill.hideContext}
             onChange={(e) => {
               props.updateMask((mask) => {
                 mask.hideContext = e.currentTarget.checked;
@@ -299,7 +296,7 @@ export function SkillConfig(props: {
             <input
               aria-label={Locale.Mask.Config.Artifacts.Title}
               type="checkbox"
-              checked={props.mask.enableArtifacts !== false}
+              checked={skill.enableArtifacts !== false}
               onChange={(e) => {
                 props.updateMask((mask) => {
                   mask.enableArtifacts = e.currentTarget.checked;
@@ -316,7 +313,7 @@ export function SkillConfig(props: {
             <input
               aria-label={Locale.Mask.Config.CodeFold.Title}
               type="checkbox"
-              checked={props.mask.enableCodeFold !== false}
+              checked={skill.enableCodeFold !== false}
               onChange={(e) => {
                 props.updateMask((mask) => {
                   mask.enableCodeFold = e.currentTarget.checked;
@@ -348,7 +345,7 @@ export function SkillConfig(props: {
             <input
               aria-label={Locale.Mask.Config.Sync.Title}
               type="checkbox"
-              checked={props.mask.syncGlobalConfig !== false}
+              checked={skill.syncGlobalConfig !== false}
               onChange={async (e) => {
                 const checked = e.currentTarget.checked;
                 if (
@@ -372,7 +369,7 @@ export function SkillConfig(props: {
 
       <List>
         <ModelConfigList
-          modelConfig={{ ...props.mask.modelConfig }}
+          modelConfig={{ ...skill.modelConfig }}
           updateConfig={updateConfig}
           modelOptions={skillModelOptions}
           strictModelSelection
