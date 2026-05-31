@@ -29,7 +29,7 @@ import { useAppConfig } from "../store/config";
 import { AuthPage } from "./auth";
 import { getClientConfig } from "../config/client";
 import { getRouterClientApi } from "../client/api";
-import { useAccessStore, useMaskProviderModelsStore } from "../store";
+import { useAccessStore, useSkillProviderModelsStore } from "../store";
 import clsx from "clsx";
 import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
 import {
@@ -343,7 +343,7 @@ function Screen() {
 
 export function useLoadData() {
   const mergeModels = useAppConfig((state) => state.mergeModels);
-  const setMaskProviderModels = useMaskProviderModelsStore(
+  const setSkillProviderModels = useSkillProviderModelsStore(
     (state) => state.setModels,
   );
   const loadModels = useCallback(async () => {
@@ -353,8 +353,8 @@ export function useLoadData() {
       api.llm.providerModels?.() ?? Promise.resolve([]),
     ]);
     mergeModels(models);
-    setMaskProviderModels(providerModels);
-  }, [mergeModels, setMaskProviderModels]);
+    setSkillProviderModels(providerModels);
+  }, [mergeModels, setSkillProviderModels]);
 
   useEffect(() => {
     loadModels().catch((error) => {
