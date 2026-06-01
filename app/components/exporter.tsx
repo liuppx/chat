@@ -39,7 +39,7 @@ import { getClientConfig } from "../config/client";
 import { type ClientApi, getClientApi } from "../client/api";
 import { isDesktopAppRuntime, saveWithDialog, writeFile } from "../tauri";
 import { getMessageTextContent } from "../utils";
-import { MaskAvatar } from "./mask";
+import { SkillAvatar } from "./mask";
 import clsx from "clsx";
 
 const Markdown = dynamic(async () => (await import("./markdown")).Markdown, {
@@ -167,18 +167,19 @@ export function MessageExporter() {
 
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
+  const sessionSkill = session.mask;
   const { selection, updateSelection } = useMessageSelector();
   const selectedMessages = useMemo(() => {
     const ret: ChatMessage[] = [];
     if (exportConfig.includeContext) {
-      ret.push(...session.mask.context);
+      ret.push(...sessionSkill.context);
     }
     ret.push(...session.messages.filter((m) => selection.has(m.id)));
     return ret;
   }, [
     exportConfig.includeContext,
     session.messages,
-    session.mask.context,
+    sessionSkill.context,
     selection,
   ]);
   function preview() {
@@ -413,7 +414,7 @@ export function ImagePreviewer(props: {
 }) {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  const mask = session.mask;
+  const sessionSkill = session.mask;
   const config = useAppConfig();
 
   const previewRef = useRef<HTMLDivElement>(null);
@@ -532,17 +533,17 @@ export function ImagePreviewer(props: {
               github.com/yeying-community/chat
             </div>
             <div className={styles["icons"]}>
-              <MaskAvatar avatar={config.avatar} />
+              <SkillAvatar avatar={config.avatar} />
               <span className={styles["icon-space"]}>&</span>
-              <MaskAvatar
-                avatar={mask.avatar}
-                model={session.mask.modelConfig.model}
+              <SkillAvatar
+                avatar={sessionSkill.avatar}
+                model={sessionSkill.modelConfig.model}
               />
             </div>
           </div>
           <div>
             <div className={styles["chat-info-item"]}>
-              {Locale.Exporter.Model}: {mask.modelConfig.model}
+              {Locale.Exporter.Model}: {sessionSkill.modelConfig.model}
             </div>
             <div className={styles["chat-info-item"]}>
               {Locale.Exporter.Messages}: {props.messages.length}
@@ -568,9 +569,9 @@ export function ImagePreviewer(props: {
                 {m.role === "user" ? (
                   <Avatar avatar={config.avatar}></Avatar>
                 ) : (
-                  <MaskAvatar
-                    avatar={session.mask.avatar}
-                    model={m.model || session.mask.modelConfig.model}
+                  <SkillAvatar
+                    avatar={sessionSkill.avatar}
+                    model={m.model || sessionSkill.modelConfig.model}
                   />
                 )}
               </div>

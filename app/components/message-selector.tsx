@@ -3,7 +3,7 @@ import { ChatMessage, useAppConfig, useChatStore } from "../store";
 import { Updater } from "../typing";
 import { IconButton } from "./button";
 import { Avatar } from "./emoji";
-import { MaskAvatar } from "./mask";
+import { SkillAvatar } from "./mask";
 import Locale from "../locales";
 
 import styles from "./message-selector.module.scss";
@@ -75,6 +75,7 @@ export function MessageSelector(props: {
   const LATEST_COUNT = 4;
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
+  const sessionSkill = session.mask;
   const isValid = (m: ChatMessage) => m.content && !m.isError && !m.streaming;
   const allMessages = useMemo(() => {
     let startIndex = Math.max(0, session.clearContextIndex ?? 0);
@@ -211,9 +212,9 @@ export function MessageSelector(props: {
                 {m.role === "user" ? (
                   <Avatar avatar={config.avatar}></Avatar>
                 ) : (
-                  <MaskAvatar
-                    avatar={session.mask.avatar}
-                    model={m.model || session.mask.modelConfig.model}
+                  <SkillAvatar
+                    avatar={sessionSkill.avatar}
+                    model={m.model || sessionSkill.modelConfig.model}
                   />
                 )}
               </div>

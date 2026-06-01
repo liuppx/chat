@@ -634,7 +634,7 @@ function SyncItems() {
       chat: sessions.length,
       message: messageCount,
       prompt: Object.keys(promptStore.prompts).length,
-      mask: Object.keys(skillStore.skills).length,
+      skill: Object.keys(skillStore.skills).length,
     };
   }, [chatStore.sessions, skillStore.skills, promptStore.prompts]);
 

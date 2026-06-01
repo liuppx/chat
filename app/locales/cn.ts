@@ -284,7 +284,8 @@ const cn = {
 
       LocalState: "本地数据",
       Overview: (overview: any) => {
-        return `${overview.chat} 次对话，${overview.message} 条消息，${overview.prompt} 条提示词，${overview.mask} 个技能`;
+        const skillCount = overview.skill ?? overview.mask ?? 0;
+        return `${overview.chat} 次对话，${overview.message} 条消息，${overview.prompt} 条提示词，${skillCount} 个技能`;
       },
       ImportFailed: "导入失败",
     },
@@ -834,6 +835,12 @@ const cn = {
     Config: {
       Avatar: "角色头像",
       Name: "角色名称",
+      CandidateModels: {
+        Title: "候选模型",
+        SubTitle: "通过这个技能创建的会话，仅可使用这些模型",
+        SummaryNone: "不限制",
+        SummarySelected: (count: number) => `已选择 ${count} 个模型`,
+      },
       Sync: {
         Title: "使用全局设置",
         SubTitle: "当前对话是否使用全局模型设置",

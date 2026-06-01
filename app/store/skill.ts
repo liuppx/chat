@@ -53,6 +53,43 @@ export const createEmptySkill = () =>
     plugin: [],
   }) as Skill;
 
+function withBuiltinSkillConfig(skill: BuiltinSkill, modelConfig: ModelConfig) {
+  return {
+    ...skill,
+    modelConfig: {
+      ...modelConfig,
+      ...skill.modelConfig,
+    },
+  } as Skill;
+}
+
+export function getBuiltinSkillsForLang(
+  lang = getLang(),
+  modelConfig = useAppConfig.getState().modelConfig,
+) {
+  const seen = new Set<string>();
+  return BUILTIN_SKILLS.filter((item) => {
+    if (item.lang !== lang || seen.has(item.name)) return false;
+    seen.add(item.name);
+    return true;
+  }).map((skill) => withBuiltinSkillConfig(skill, modelConfig));
+}
+
+export function isLaunchableSkill(skill: Skill) {
+  if (skill.builtin) return true;
+
+  return Boolean(
+    skill.description ||
+    skill.category ||
+    skill.starters?.length ||
+    skill.plugin?.length,
+  );
+}
+
+export function getLaunchableSkills(skills: Skill[]) {
+  return skills.filter(isLaunchableSkill);
+}
+
 export const useSkillStore = createPersistStore(
   { ...DEFAULT_SKILL_STATE },
 
@@ -108,36 +145,9 @@ export const useSkillStore = createPersistStore(
       );
       const config = useAppConfig.getState();
       if (config.hideBuiltinSkills) return userSkills;
-      // 根据当前环境设置的语言过滤出对应的内置技能
-      // BUILTIN_SKILLS.filter()
-      // const DEFAULT_LANG = "en"; 默认语言是英文，可以在设置里修改语言
-      const lang = getLang();
-      // lang=cn
-      const currentSkills = BUILTIN_SKILLS.filter((item) => item.lang === lang);
-
-      // 去除重复
-      const uniqueCurrentSkills = currentSkills.reduce<BuiltinSkill[]>(
-        (skills, current) => {
-          const exists = skills.some((m) => m.name === current.name);
-          if (!exists) {
-            skills.push(current);
-          }
-          return skills;
-        },
-        [],
+      return userSkills.concat(
+        getBuiltinSkillsForLang(getLang(), config.modelConfig),
       );
-
-      const buildinSkills = uniqueCurrentSkills.map(
-        (m) =>
-          ({
-            ...m,
-            modelConfig: {
-              ...config.modelConfig,
-              ...m.modelConfig,
-            },
-          }) as Skill,
-      );
-      return userSkills.concat(buildinSkills);
     },
     search(text: string) {
       return Object.values(get().skills);

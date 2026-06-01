@@ -29,7 +29,7 @@ import { useAppConfig } from "../store/config";
 import { AuthPage } from "./auth";
 import { getClientConfig } from "../config/client";
 import { getRouterClientApi } from "../client/api";
-import { useAccessStore, useMaskProviderModelsStore } from "../store";
+import { useAccessStore, useSkillProviderModelsStore } from "../store";
 import clsx from "clsx";
 import { initializeMcpSystem, isMcpEnabled } from "../mcp/actions";
 import {
@@ -108,7 +108,7 @@ const NewChat = dynamic(async () => (await import("./new-chat")).NewChat, {
   loading: () => <Loading noLogo />,
 });
 
-const MaskPage = dynamic(async () => (await import("./mask")).MaskPage, {
+const SkillPage = dynamic(async () => (await import("./mask")).SkillPage, {
   loading: () => <Loading noLogo />,
 });
 
@@ -314,8 +314,8 @@ function Screen() {
             <Routes>
               <Route path={Path.Home} element={<Chat />} />
               <Route path={Path.NewChat} element={<NewChat />} />
-              <Route path={Path.Skills} element={<MaskPage />} />
-              <Route path={Path.Masks} element={<MaskPage />} />
+              <Route path={Path.Skills} element={<SkillPage />} />
+              <Route path={Path.Masks} element={<SkillPage />} />
               <Route path={Path.Plugins} element={<PluginPage />} />
               <Route path={Path.SearchChat} element={<SearchChat />} />
               <Route path={Path.Chat} element={<Chat />} />
@@ -343,7 +343,7 @@ function Screen() {
 
 export function useLoadData() {
   const mergeModels = useAppConfig((state) => state.mergeModels);
-  const setMaskProviderModels = useMaskProviderModelsStore(
+  const setSkillProviderModels = useSkillProviderModelsStore(
     (state) => state.setModels,
   );
   const loadModels = useCallback(async () => {
@@ -353,8 +353,8 @@ export function useLoadData() {
       api.llm.providerModels?.() ?? Promise.resolve([]),
     ]);
     mergeModels(models);
-    setMaskProviderModels(providerModels);
-  }, [mergeModels, setMaskProviderModels]);
+    setSkillProviderModels(providerModels);
+  }, [mergeModels, setSkillProviderModels]);
 
   useEffect(() => {
     loadModels().catch((error) => {

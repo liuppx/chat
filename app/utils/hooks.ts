@@ -3,7 +3,7 @@ import { ModelCandidate } from "../client/api";
 import {
   useAccessStore,
   useAppConfig,
-  useMaskProviderModelsStore,
+  useSkillProviderModelsStore,
 } from "../store";
 import {
   collectModelsWithDefaultModel,
@@ -33,11 +33,13 @@ export function useAllModels() {
   ]);
 }
 
-export function useMaskProviderModels() {
-  const models = useMaskProviderModelsStore((state) => state.models);
+export function useSkillProviderModels() {
+  const models = useSkillProviderModelsStore((state) => state.models);
 
   return useMemo(() => normalizeModels(models), [models]);
 }
+
+export const useMaskProviderModels = useSkillProviderModels;
 
 export function useSessionModels(candidateModels?: readonly ModelCandidate[]) {
   const allModels = useAllModels();

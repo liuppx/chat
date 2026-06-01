@@ -114,6 +114,7 @@ export const ACCESS_CODE_PREFIX = "nk-";
 
 export const LAST_INPUT_KEY = "last-input";
 export const UNFINISHED_INPUT = (id: string) => "unfinished-input-" + id;
+export const AUTO_SUBMIT_INPUT = (id: string) => "auto-submit-input-" + id;
 
 export const STORAGE_KEY = "chatgpt-next-web";
 

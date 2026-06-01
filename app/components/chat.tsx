@@ -112,6 +112,7 @@ import {
 } from "./ui-lib";
 import { useNavigate } from "react-router-dom";
 import {
+  AUTO_SUBMIT_INPUT,
   CHAT_PAGE_SIZE,
   DEFAULT_TTS_ENGINE,
   ModelProvider,
@@ -121,8 +122,8 @@ import {
   UNFINISHED_INPUT,
 } from "../constant";
 import { Avatar } from "./emoji";
-import { ContextPrompts, MaskAvatar, MaskConfig } from "./mask";
-import { useMaskStore } from "../store/mask";
+import { ContextPrompts, SkillAvatar, SkillConfig } from "./mask";
+import { useSkillStore } from "../store/skill";
 import { ChatCommandPrefix, useChatCommand, useCommand } from "../command";
 import { prettyObject } from "../utils/format";
 import { ExportMessageModal } from "./exporter";
@@ -182,7 +183,8 @@ const MCPAction = () => {
 export function SessionConfigModel(props: { onClose: () => void }) {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  const maskStore = useMaskStore();
+  const sessionSkill = session.mask;
+  const skillStore = useSkillStore();
   const navigate = useNavigate();
   const runtimeModels = useSessionModels();
 
@@ -214,26 +216,26 @@ export function SessionConfigModel(props: { onClose: () => void }) {
             onClick={() => {
               navigate(Path.Skills);
               setTimeout(() => {
-                maskStore.create(session.mask);
+                skillStore.create(sessionSkill);
               }, 500);
             }}
           />,
         ]}
       >
-        <MaskConfig
-          mask={session.mask}
+        <SkillConfig
+          mask={sessionSkill}
           updateMask={(updater) => {
-            const mask = { ...session.mask };
-            updater(mask);
+            const nextSkill = { ...sessionSkill };
+            updater(nextSkill);
             chatStore.updateTargetSession(
               session,
-              (session) => (session.mask = mask),
+              (session) => (session.mask = nextSkill),
             );
           }}
           modelOptions={runtimeModels}
           shouldSyncFromGlobal
           extraListItems={
-            session.mask.modelConfig.sendMemory ? (
+            sessionSkill.modelConfig.sendMemory ? (
               <ListItem
                 className="copyable"
                 title={`${Locale.Memory.Title} (${session.lastSummarizeIndex} of ${session.messages.length})`}
@@ -243,7 +245,7 @@ export function SessionConfigModel(props: { onClose: () => void }) {
               <></>
             )
           }
-        ></MaskConfig>
+        ></SkillConfig>
       </Modal>
     </div>
   );
@@ -256,7 +258,8 @@ function PromptToast(props: {
 }) {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  const context = session.mask.context;
+  const sessionSkill = session.mask;
+  const context = sessionSkill.context;
 
   return (
     <div className={styles["prompt-toast"]} key="prompt-toast">
@@ -528,6 +531,7 @@ export function ChatActions(props: {
   const chatStore = useChatStore();
   const pluginStore = usePluginStore();
   const session = chatStore.currentSession();
+  const sessionSkill = session.mask;
   const { setAttachContents, setUploading } = props;
 
   // switch themes
@@ -546,15 +550,15 @@ export function ChatActions(props: {
   const stopAll = () => ChatControllerPool.stopAll();
 
   // switch model
-  const currentModel = session.mask.modelConfig.model;
+  const currentModel = sessionSkill.modelConfig.model;
   const currentProviderName = (normalizeProviderName(
-    session.mask.modelConfig?.providerName,
+    sessionSkill.modelConfig?.providerName,
   ) ??
-    session.mask.modelConfig?.providerName ??
+    sessionSkill.modelConfig?.providerName ??
     ServiceProvider.OpenAI) as ServiceProvider;
   const sessionCandidateModels = useMemo(
-    () => normalizeModelCandidates(session.mask.candidateModels),
-    [session.mask.candidateModels],
+    () => normalizeModelCandidates(sessionSkill.candidateModels),
+    [sessionSkill.candidateModels],
   );
   const sessionModels = useSessionModels(sessionCandidateModels);
   const hasCandidateModelRestriction = sessionCandidateModels.length > 0;
@@ -615,7 +619,7 @@ export function ChatActions(props: {
   const gptImageQualitys: GptImageQuality[] = ["auto", "high", "medium", "low"];
   const dalle3Styles: DalleStyle[] = ["vivid", "natural"];
   const currentSize =
-    session.mask.modelConfig?.size ?? ("1024x1024" as ModelSize);
+    sessionSkill.modelConfig?.size ?? ("1024x1024" as ModelSize);
   const qualityOptions: ImageQuality[] = isDalle3(currentModel)
     ? dalle3Qualitys
     : isGptImageModel(currentModel)
@@ -624,14 +628,14 @@ export function ChatActions(props: {
   const defaultQuality: ImageQuality = isDalle3(currentModel)
     ? "standard"
     : "auto";
-  const storedQuality = session.mask.modelConfig?.quality as
+  const storedQuality = sessionSkill.modelConfig?.quality as
     | ImageQuality
     | undefined;
   const currentQuality =
     storedQuality && qualityOptions.includes(storedQuality)
       ? storedQuality
       : defaultQuality;
-  const currentStyle = session.mask.modelConfig?.style ?? "vivid";
+  const currentStyle = sessionSkill.modelConfig?.style ?? "vivid";
 
   const isMobileScreen = useMobileScreen();
 
@@ -657,8 +661,9 @@ export function ChatActions(props: {
       // show next model to default model if exist
       let nextModel = models.find((model) => model.isDefault) || models[0];
       chatStore.updateTargetSession(session, (session) => {
-        session.mask.modelConfig.model = nextModel.name;
-        session.mask.modelConfig.providerName = nextModel?.provider
+        const sessionSkill = session.mask;
+        sessionSkill.modelConfig.model = nextModel.name;
+        sessionSkill.modelConfig.providerName = nextModel?.provider
           ?.providerName as ServiceProvider;
       });
       showToast(
@@ -770,15 +775,16 @@ export function ChatActions(props: {
               if (s.length === 0) return;
               const [model, providerName] = getModelProvider(s[0]);
               chatStore.updateTargetSession(session, (session) => {
-                session.mask.modelConfig.model = model as ModelType;
-                session.mask.modelConfig.providerName =
+                const sessionSkill = session.mask;
+                sessionSkill.modelConfig.model = model as ModelType;
+                sessionSkill.modelConfig.providerName =
                   providerName as ServiceProvider;
-                session.mask.modelConfig.quality = isGptImageModel(model)
+                sessionSkill.modelConfig.quality = isGptImageModel(model)
                   ? "auto"
                   : isDalle3(model)
                     ? "standard"
-                    : session.mask.modelConfig.quality;
-                session.mask.syncGlobalConfig = false;
+                    : sessionSkill.modelConfig.quality;
+                sessionSkill.syncGlobalConfig = false;
               });
               if (providerName == ServiceProvider.Volcengine) {
                 const selectedModel = models.find(
@@ -814,7 +820,8 @@ export function ChatActions(props: {
               if (s.length === 0) return;
               const size = s[0];
               chatStore.updateTargetSession(session, (session) => {
-                session.mask.modelConfig.size = size;
+                const sessionSkill = session.mask;
+                sessionSkill.modelConfig.size = size;
               });
               showToast(size);
             }}
@@ -841,7 +848,8 @@ export function ChatActions(props: {
               if (q.length === 0) return;
               const quality = q[0] as ImageQuality;
               chatStore.updateTargetSession(session, (session) => {
-                session.mask.modelConfig.quality = quality;
+                const sessionSkill = session.mask;
+                sessionSkill.modelConfig.quality = quality;
               });
               showToast(quality);
             }}
@@ -868,7 +876,8 @@ export function ChatActions(props: {
               if (s.length === 0) return;
               const style = s[0];
               chatStore.updateTargetSession(session, (session) => {
-                session.mask.modelConfig.style = style;
+                const sessionSkill = session.mask;
+                sessionSkill.modelConfig.style = style;
               });
               showToast(style);
             }}
@@ -1071,14 +1080,15 @@ function ChatView() {
 
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
+  const sessionSkill = session.mask;
   const config = useAppConfig();
   const fontSize = config.fontSize;
   const fontFamily = config.fontFamily;
   const isAuthenticated = useAuth();
   const walletAddress = isAuthenticated ? getCurrentAccount() : "";
   const sessionCandidateModels = useMemo(
-    () => normalizeModelCandidates(session.mask.candidateModels),
-    [session.mask.candidateModels],
+    () => normalizeModelCandidates(sessionSkill.candidateModels),
+    [sessionSkill.candidateModels],
   );
   const sessionModels = useSessionModels(sessionCandidateModels);
   const hasCandidateModelRestriction = sessionCandidateModels.length > 0;
@@ -1209,8 +1219,8 @@ function ChatView() {
 
     const hasCurrentModel = sessionModels.some((model) =>
       matchesModelCandidate(model, {
-        model: session.mask.modelConfig.model,
-        providerName: session.mask.modelConfig.providerName,
+        model: sessionSkill.modelConfig.model,
+        providerName: sessionSkill.modelConfig.providerName,
       }),
     );
 
@@ -1255,6 +1265,7 @@ function ChatView() {
 
   useEffect(() => {
     chatStore.updateTargetSession(session, (session) => {
+      const sessionSkill = session.mask;
       const stopTiming = Date.now() - REQUEST_TIMEOUT_MS;
       session.messages.forEach((m) => {
         // check if should stop all stale messages
@@ -1276,9 +1287,9 @@ function ChatView() {
       });
 
       // auto sync mask config from global config
-      const shouldSyncFromGlobal = session.mask.syncGlobalConfig !== false;
+      const shouldSyncFromGlobal = sessionSkill.syncGlobalConfig !== false;
       if (shouldSyncFromGlobal) {
-        session.mask.modelConfig = { ...config.modelConfig };
+        sessionSkill.modelConfig = { ...config.modelConfig };
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1381,9 +1392,10 @@ function ChatView() {
   };
 
   const onPinMessage = (message: ChatMessage) => {
-    chatStore.updateTargetSession(session, (session) =>
-      session.mask.context.push(message),
-    );
+    chatStore.updateTargetSession(session, (session) => {
+      const sessionSkill = session.mask;
+      sessionSkill.context.push(message);
+    });
 
     showToast(Locale.Chat.Actions.PinToastContent, {
       text: Locale.Chat.Actions.PinToastAction,
@@ -1394,6 +1406,9 @@ function ChatView() {
   };
 
   const accessStore = useAccessStore();
+  const pendingAutoSubmitInput =
+    localStorage.getItem(AUTO_SUBMIT_INPUT(session.id)) ?? "";
+  const hasPendingAutoSubmit = pendingAutoSubmitInput.length > 0;
   const [speechStatus, setSpeechStatus] = useState(false);
   const [speechLoading, setSpeechLoading] = useState(false);
 
@@ -1441,18 +1456,18 @@ function ChatView() {
   }
 
   const context: RenderMessage[] = useMemo(() => {
-    return session.mask.hideContext ? [] : session.mask.context.slice();
-  }, [session.mask.context, session.mask.hideContext]);
+    return sessionSkill.hideContext ? [] : sessionSkill.context.slice();
+  }, [sessionSkill.context, sessionSkill.hideContext]);
 
   if (
+    !hasPendingAutoSubmit &&
     context.length === 0 &&
-    session.messages.at(0)?.content !== BOT_HELLO.content
+    session.messages.length === 0 &&
+    !accessStore.isAuthorized()
   ) {
-    const copiedHello = Object.assign({}, BOT_HELLO);
-    if (!accessStore.isAuthorized()) {
-      copiedHello.content = Locale.Error.Unauthorized;
-    }
-    context.push(copiedHello);
+    const unauthorizedMessage = Object.assign({}, BOT_HELLO);
+    unauthorizedMessage.content = Locale.Error.Unauthorized;
+    context.push(unauthorizedMessage);
   }
 
   // preview messages
@@ -1604,20 +1619,29 @@ function ChatView() {
 
   // remember unfinished input
   useEffect(() => {
-    // try to load from local storage
-    const key = UNFINISHED_INPUT(session.id);
-    const mayBeUnfinishedInput = localStorage.getItem(key);
-    if (mayBeUnfinishedInput && userInput.length === 0) {
-      setUserInput(mayBeUnfinishedInput);
-      localStorage.removeItem(key);
+    const unfinishedInputKey = UNFINISHED_INPUT(session.id);
+    const autoSubmitInputKey = AUTO_SUBMIT_INPUT(session.id);
+    const pendingAutoSubmitInput = localStorage.getItem(autoSubmitInputKey);
+
+    if (pendingAutoSubmitInput) {
+      localStorage.removeItem(autoSubmitInputKey);
+      setTimeout(() => {
+        doSubmit(pendingAutoSubmitInput);
+      }, 0);
+    } else {
+      const mayBeUnfinishedInput = localStorage.getItem(unfinishedInputKey);
+      if (mayBeUnfinishedInput && userInput.length === 0) {
+        setUserInput(mayBeUnfinishedInput);
+        localStorage.removeItem(unfinishedInputKey);
+      }
     }
 
     const dom = inputRef.current;
     return () => {
-      localStorage.setItem(key, dom?.value ?? "");
+      localStorage.setItem(unfinishedInputKey, dom?.value ?? "");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [session.id]);
 
   const handlePaste = useCallback(
     async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -1927,7 +1951,8 @@ function ChatView() {
                                     chatStore.updateTargetSession(
                                       session,
                                       (session) => {
-                                        const m = session.mask.context
+                                        const sessionSkill = session.mask;
+                                        const m = sessionSkill.context
                                           .concat(session.messages)
                                           .find((m) => m.id === message.id);
                                         if (m) {
@@ -1948,11 +1973,11 @@ function ChatView() {
                                   {["system"].includes(message.role) ? (
                                     <Avatar avatar="2699-fe0f" />
                                   ) : (
-                                    <MaskAvatar
-                                      avatar={session.mask.avatar}
+                                    <SkillAvatar
+                                      avatar={sessionSkill.avatar}
                                       model={
                                         message.model ||
-                                        session.mask.modelConfig.model
+                                        sessionSkill.modelConfig.model
                                       }
                                     />
                                   )}

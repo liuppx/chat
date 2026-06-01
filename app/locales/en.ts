@@ -288,7 +288,8 @@ const en: LocaleType = {
 
       LocalState: "Local Data",
       Overview: (overview: any) => {
-        return `${overview.chat} chats，${overview.message} messages，${overview.prompt} prompts，${overview.mask} skills`;
+        const skillCount = overview.skill ?? overview.mask ?? 0;
+        return `${overview.chat} chats，${overview.message} messages，${overview.prompt} prompts，${skillCount} skills`;
       },
       ImportFailed: "Failed to import from file",
     },
@@ -848,6 +849,13 @@ const en: LocaleType = {
     Config: {
       Avatar: "Bot Avatar",
       Name: "Bot Name",
+      CandidateModels: {
+        Title: "Candidate Models",
+        SubTitle:
+          "Chat sessions created from this skill can only use these models",
+        SummaryNone: "No restriction",
+        SummarySelected: (count: number) => `${count} models selected`,
+      },
       Sync: {
         Title: "Use Global Config",
         SubTitle: "Use global config in this chat",
