@@ -938,6 +938,11 @@ const en: LocaleType = {
     ResetZoom: "Reset Zoom",
     MaskBrushMode: "Brush Mode",
     MaskBrushSize: "Brush Size",
+    MaskToolbarPaint: "Brush",
+    MaskToolbarView: "View",
+    MaskToolbarActions: "Actions",
+    MaskSaved: "Saved",
+    MaskUnsaved: "Unsaved",
     MaskShortcutHint:
       "Use the mouse wheel or trackpad scroll to move the view, hold Ctrl or Command while scrolling to zoom, and hold Space to pan temporarily.",
     MaskDrawSubTitle:

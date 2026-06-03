@@ -273,127 +273,49 @@ function MaskPainter(props: {
     setIsDirty(false);
     props.onDone?.();
   }, [props]);
+  const clearMask = React.useCallback(() => {
+    const overlayCanvas = overlayCanvasRef.current;
+    const maskCanvas = maskCanvasRef.current;
+    const overlayCtx = overlayCanvas?.getContext("2d");
+    const maskCtx = maskCanvas?.getContext("2d");
+    if (!overlayCanvas || !maskCanvas || !overlayCtx || !maskCtx) {
+      return;
+    }
+    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    markDirty();
+  }, [markDirty]);
+  const activeToolLabel = panEnabled
+    ? Locale.SdPanel.MaskInteractionModes.Pan
+    : brushMode === "erase"
+      ? Locale.SdPanel.MaskBrushModes.Erase
+      : Locale.SdPanel.MaskBrushModes.Restore;
 
   return (
     <div className={styles["mask-editor"]}>
       <div className={styles["mask-editor-toolbar"]}>
-        <div className={styles["mask-toolbar-row"]}>
-          <div className={styles["mask-toolbar-group"]}>
-            <IconButton
-              icon={showOverlay ? <EyeIcon /> : <EyeOffIcon />}
-              bordered
-              title={Locale.SdPanel.MaskOverlay}
-              onClick={() => setShowOverlay((prev) => !prev)}
-            />
-            <IconButton
-              icon={<EditIcon />}
-              bordered
-              title={Locale.SdPanel.MaskInteractionModes.Draw}
-              type={interactionMode === "draw" ? "primary" : null}
-              onClick={() => setInteractionMode("draw")}
-            />
-            <IconButton
-              icon={<DragIcon />}
-              bordered
-              title={Locale.SdPanel.MaskInteractionModes.Pan}
-              type={interactionMode === "pan" ? "primary" : null}
-              onClick={() => setInteractionMode("pan")}
-            />
-          </div>
-          <div className={styles["mask-toolbar-group"]}>
-            <button
-              type="button"
-              className={clsx(styles["compact-toggle"], {
-                [styles["compact-toggle-active"]]: brushMode === "erase",
-              })}
-              disabled={panEnabled}
-              onClick={() => setBrushMode("erase")}
-            >
-              {Locale.SdPanel.MaskBrushModes.Erase}
-            </button>
-            <button
-              type="button"
-              className={clsx(styles["compact-toggle"], {
-                [styles["compact-toggle-active"]]: brushMode === "restore",
-              })}
-              disabled={panEnabled}
-              onClick={() => setBrushMode("restore")}
-            >
-              {Locale.SdPanel.MaskBrushModes.Restore}
-            </button>
-          </div>
-        </div>
-        <div className={styles["mask-toolbar-row"]}>
-          <label className={styles["mask-slider-control"]}>
-            <span>{Locale.SdPanel.MaskZoom}</span>
-            <div className={styles["mask-slider-main"]}>
-              <input
-                type="range"
-                min={1}
-                max={4}
-                step={0.1}
-                value={zoom}
-                onChange={(e) => updateZoom(Number(e.currentTarget.value))}
+        <div className={styles["mask-toolbar-header"]}>
+          <div className={styles["mask-toolbar-heading"]}>
+            <div className={styles["mask-toolbar-title"]}>
+              {Locale.SdPanel.DrawMask}
+            </div>
+            <div className={styles["mask-toolbar-status"]}>
+              <span
+                className={clsx(styles["mask-toolbar-dot"], {
+                  [styles["mask-toolbar-dot-dirty"]]: isDirty,
+                })}
               />
+              <span>
+                {isDirty
+                  ? Locale.SdPanel.MaskUnsaved
+                  : Locale.SdPanel.MaskSaved}
+              </span>
+              <span>·</span>
+              <span>{activeToolLabel}</span>
+              <span>·</span>
               <span>{Math.round(zoom * 100)}%</span>
             </div>
-          </label>
-          <IconButton
-            icon={<ResetIcon />}
-            bordered
-            title={Locale.SdPanel.ResetZoom}
-            onClick={() => updateZoom(1)}
-          />
-        </div>
-        <div className={styles["mask-toolbar-row"]}>
-          <label className={styles["mask-slider-control"]}>
-            <span>{Locale.SdPanel.MaskBrushSize}</span>
-            <div className={styles["mask-slider-main"]}>
-              <input
-                type="range"
-                min={8}
-                max={120}
-                step={2}
-                value={brushSize}
-                disabled={panEnabled}
-                onChange={(e) => setBrushSize(Number(e.currentTarget.value))}
-              />
-              <span>{brushSize}px</span>
-            </div>
-          </label>
-        </div>
-        <div className={styles["mask-toolbar-row"]}>
-          <div className={styles["ctrl-param-item-sub-title"]}>
-            {Locale.SdPanel.MaskShortcutHint}
           </div>
-        </div>
-        <div className={styles["mask-toolbar-row"]}>
-          <button
-            type="button"
-            className={styles["danger-inline-button"]}
-            onClick={() => {
-              const overlayCanvas = overlayCanvasRef.current;
-              const maskCanvas = maskCanvasRef.current;
-              const overlayCtx = overlayCanvas?.getContext("2d");
-              const maskCtx = maskCanvas?.getContext("2d");
-              if (!overlayCanvas || !maskCanvas || !overlayCtx || !maskCtx) {
-                return;
-              }
-              overlayCtx.clearRect(
-                0,
-                0,
-                overlayCanvas.width,
-                overlayCanvas.height,
-              );
-              maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-              if (isDirty) {
-                props.onDirtyChange?.(true);
-              }
-              setIsDirty(true);
-            }}
-          >
-            {Locale.SdPanel.ClearMask}
-          </button>
           <button
             type="button"
             className={styles["primary-inline-button"]}
@@ -401,6 +323,125 @@ function MaskPainter(props: {
           >
             {Locale.SdPanel.SaveMask}
           </button>
+        </div>
+        <div className={styles["mask-toolbar-surface"]}>
+          <div className={styles["mask-toolbar-section"]}>
+            <div className={styles["mask-toolbar-section-title"]}>
+              {Locale.SdPanel.MaskInteractionMode}
+            </div>
+            <div className={styles["mask-toolbar-group"]}>
+              <IconButton
+                icon={<EditIcon />}
+                bordered
+                title={Locale.SdPanel.MaskInteractionModes.Draw}
+                type={interactionMode === "draw" ? "primary" : null}
+                onClick={() => setInteractionMode("draw")}
+              />
+              <IconButton
+                icon={<DragIcon />}
+                bordered
+                title={Locale.SdPanel.MaskInteractionModes.Pan}
+                type={interactionMode === "pan" ? "primary" : null}
+                onClick={() => setInteractionMode("pan")}
+              />
+              <IconButton
+                icon={showOverlay ? <EyeIcon /> : <EyeOffIcon />}
+                bordered
+                title={
+                  showOverlay
+                    ? Locale.SdPanel.MaskOverlayModes.Hide
+                    : Locale.SdPanel.MaskOverlayModes.Show
+                }
+                onClick={() => setShowOverlay((prev) => !prev)}
+              />
+            </div>
+          </div>
+          <div className={styles["mask-toolbar-section"]}>
+            <div className={styles["mask-toolbar-section-title"]}>
+              {Locale.SdPanel.MaskToolbarPaint}
+            </div>
+            <div className={styles["mask-toolbar-group"]}>
+              <button
+                type="button"
+                className={clsx(styles["compact-toggle"], {
+                  [styles["compact-toggle-active"]]: brushMode === "erase",
+                })}
+                disabled={panEnabled}
+                onClick={() => setBrushMode("erase")}
+              >
+                {Locale.SdPanel.MaskBrushModes.Erase}
+              </button>
+              <button
+                type="button"
+                className={clsx(styles["compact-toggle"], {
+                  [styles["compact-toggle-active"]]: brushMode === "restore",
+                })}
+                disabled={panEnabled}
+                onClick={() => setBrushMode("restore")}
+              >
+                {Locale.SdPanel.MaskBrushModes.Restore}
+              </button>
+            </div>
+          </div>
+          <div className={styles["mask-toolbar-section"]}>
+            <div className={styles["mask-toolbar-section-title"]}>
+              {Locale.SdPanel.MaskToolbarView}
+            </div>
+            <label className={styles["mask-slider-control"]}>
+              <span>{Locale.SdPanel.MaskZoom}</span>
+              <div className={styles["mask-slider-main"]}>
+                <input
+                  type="range"
+                  min={1}
+                  max={4}
+                  step={0.1}
+                  value={zoom}
+                  onChange={(e) => updateZoom(Number(e.currentTarget.value))}
+                />
+                <span>{Math.round(zoom * 100)}%</span>
+              </div>
+            </label>
+            <IconButton
+              icon={<ResetIcon />}
+              bordered
+              title={Locale.SdPanel.ResetZoom}
+              onClick={() => updateZoom(1)}
+            />
+          </div>
+          <div className={styles["mask-toolbar-section"]}>
+            <div className={styles["mask-toolbar-section-title"]}>
+              {Locale.SdPanel.MaskBrushSize}
+            </div>
+            <label className={styles["mask-slider-control"]}>
+              <div className={styles["mask-slider-main"]}>
+                <input
+                  type="range"
+                  min={8}
+                  max={120}
+                  step={2}
+                  value={brushSize}
+                  disabled={panEnabled}
+                  onChange={(e) => setBrushSize(Number(e.currentTarget.value))}
+                />
+                <span>{brushSize}px</span>
+              </div>
+            </label>
+          </div>
+          <div className={styles["mask-toolbar-section"]}>
+            <div className={styles["mask-toolbar-section-title"]}>
+              {Locale.SdPanel.MaskToolbarActions}
+            </div>
+            <button
+              type="button"
+              className={styles["danger-inline-button"]}
+              onClick={clearMask}
+            >
+              {Locale.SdPanel.ClearMask}
+            </button>
+          </div>
+        </div>
+        <div className={styles["mask-toolbar-hint"]}>
+          {Locale.SdPanel.MaskShortcutHint}
         </div>
       </div>
       <div
