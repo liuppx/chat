@@ -614,17 +614,20 @@ function PanelSection(props: {
   title: string;
   subTitle?: string;
   children?: React.ReactNode;
+  hideTitle?: boolean;
 }) {
   return (
     <section className={styles["panel-section"]}>
-      <div className={styles["panel-section-header"]}>
-        <div className={styles["panel-section-title"]}>{props.title}</div>
-        {props.subTitle && (
-          <div className={styles["panel-section-sub-title"]}>
-            {props.subTitle}
-          </div>
-        )}
-      </div>
+      {!props.hideTitle && (
+        <div className={styles["panel-section-header"]}>
+          <div className={styles["panel-section-title"]}>{props.title}</div>
+          {props.subTitle && (
+            <div className={styles["panel-section-sub-title"]}>
+              {props.subTitle}
+            </div>
+          )}
+        </div>
+      )}
       <div className={styles["panel-section-body"]}>{props.children}</div>
     </section>
   );
@@ -822,11 +825,6 @@ export function SdPanel() {
       ...rest,
     ] as any[];
   }, [modelParams]);
-  const currentModeLabel =
-    currentMode === "editing"
-      ? Locale.SdPanel.Modes.Editing
-      : Locale.SdPanel.Modes.Generation;
-
   React.useEffect(() => {
     if (imageModels.length === 0) return;
     const matched = imageModels.find(
@@ -924,7 +922,7 @@ export function SdPanel() {
 
   return (
     <>
-      <PanelSection title={Locale.SdPanel.Mode}>
+      <PanelSection title={Locale.SdPanel.Mode} hideTitle>
         <div className={styles["segmented-control"]}>
           <button
             type="button"
@@ -1069,7 +1067,7 @@ export function SdPanel() {
         </PanelSection>
       )}
       {hasImageModels && (
-        <PanelSection title={Locale.Sd.GenerateParams}>
+        <PanelSection title={Locale.Sd.GenerateParams} hideTitle>
           <ControlParam
             columns={orderedModelParams}
             data={params}
