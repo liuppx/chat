@@ -6,6 +6,7 @@ import LeftIcon from "../icons/left.svg";
 import EyeIcon from "../icons/eye.svg";
 import RobotIcon from "../icons/robot.svg";
 import SendWhiteIcon from "../icons/send-white.svg";
+import DeleteIcon from "../icons/delete.svg";
 
 import { useNavigate } from "react-router-dom";
 import { getLaunchableSkills, Skill, useSkillStore } from "../store/skill";
@@ -22,7 +23,12 @@ import { useSessionModels } from "../utils/hooks";
 import { getModelProvider, normalizeProviderName } from "../utils/model";
 import { ServiceProvider } from "../constant";
 
-function SkillItem(props: { skill: Skill; onClick?: () => void }) {
+function SkillItem(props: {
+  skill: Skill;
+  onClick?: () => void;
+  onDelete?: () => void;
+  deletable?: boolean;
+}) {
   const tooltip = props.skill.description || props.skill.name;
   return (
     <div
@@ -40,11 +46,29 @@ function SkillItem(props: { skill: Skill; onClick?: () => void }) {
           {props.skill.name}
         </div>
       </div>
+      {props.deletable && props.onDelete && (
+        <button
+          className={styles["mask-delete"]}
+          title={`删除 ${props.skill.name}`}
+          aria-label={`删除 ${props.skill.name}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            props.onDelete?.();
+          }}
+        >
+          <DeleteIcon />
+        </button>
+      )}
     </div>
   );
 }
 
 const localStorage = safeLocalStorage();
+const HIDDEN_ORPHAN_SKILL_KEYS = "hidden-orphan-skill-keys";
+
+function getSkillEntryKey(skill: Skill) {
+  return skill.id || skill.name;
+}
 
 export function NewChat() {
   const chatStore = useChatStore();
@@ -53,10 +77,24 @@ export function NewChat() {
   const config = useAppConfig();
   const [draft, setDraft] = useState("");
   const [selectedModelValue, setSelectedModelValue] = useState("");
+  const [hiddenOrphanSkillKeys, setHiddenOrphanSkillKeys] = useState(() => {
+    const raw = localStorage.getItem(HIDDEN_ORPHAN_SKILL_KEYS);
+    if (!raw) return [] as string[];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const skills = useMemo(
     () => getLaunchableSkills(skillStore.getAll()),
     [skillStore],
+  );
+  const currentSkillKeys = useMemo(
+    () => new Set(skills.map((skill) => getSkillEntryKey(skill))),
+    [skills],
   );
   const recentSkills = useMemo(() => {
     const seen = new Set<string>();
@@ -81,15 +119,17 @@ export function NewChat() {
   }, [chatStore.sessions]);
   const entrySkills = useMemo(() => {
     const seen = new Set<string>();
+    const hiddenKeys = new Set(hiddenOrphanSkillKeys);
     return [...recentSkills, ...skills]
       .filter((skill) => {
-        const key = skill.id || skill.name;
+        const key = getSkillEntryKey(skill);
         if (!key || seen.has(key)) return false;
+        if (hiddenKeys.has(key)) return false;
         seen.add(key);
         return true;
       })
       .slice(0, 8);
-  }, [recentSkills, skills]);
+  }, [hiddenOrphanSkillKeys, recentSkills, skills]);
   const availableModels = useSessionModels();
 
   const navigate = useNavigate();
@@ -176,6 +216,16 @@ export function NewChat() {
   };
 
   const startDraftChat = () => startChat(undefined, draft, activeModelValue);
+  const hideOrphanSkill = (skill: Skill) => {
+    const key = getSkillEntryKey(skill);
+    if (!key) return;
+    setHiddenOrphanSkillKeys((current) => {
+      if (current.includes(key)) return current;
+      const next = [...current, key];
+      localStorage.setItem(HIDDEN_ORPHAN_SKILL_KEYS, JSON.stringify(next));
+      return next;
+    });
+  };
   const startSkill = (skill?: Skill) => {
     if (!skill) return;
 
@@ -296,6 +346,10 @@ export function NewChat() {
             key={skill.id}
             skill={skill}
             onClick={() => startSkill(skill)}
+            deletable={
+              !skill.builtin && !currentSkillKeys.has(getSkillEntryKey(skill))
+            }
+            onDelete={() => hideOrphanSkill(skill)}
           />
         ))}
       </div>

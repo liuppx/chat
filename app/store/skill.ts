@@ -35,6 +35,8 @@ export const DEFAULT_SKILL_STATE = {
   language: undefined as Lang | undefined,
 };
 
+const LEGACY_REMOVED_SKILL_NAMES = new Set(["高效助手", "Efficient Assistant"]);
+
 export type SkillState = typeof DEFAULT_SKILL_STATE & {
   skills: Record<string, Skill>;
   language?: Lang | undefined;
@@ -163,7 +165,7 @@ export const useSkillStore = createPersistStore(
   }),
   {
     name: StoreKey.Skill,
-    version: 4,
+    version: 4.1,
 
     migrate(state, version) {
       const legacyState = JSON.parse(JSON.stringify(state)) as SkillState & {
@@ -185,6 +187,14 @@ export const useSkillStore = createPersistStore(
           updatedSkills[m.id] = m;
         });
         newState.skills = updatedSkills;
+      }
+
+      if (version < 4.1) {
+        Object.entries(newState.skills).forEach(([id, skill]) => {
+          if (LEGACY_REMOVED_SKILL_NAMES.has(skill.name)) {
+            delete newState.skills[id];
+          }
+        });
       }
 
       return newState as any;

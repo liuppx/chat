@@ -5,7 +5,7 @@ import { ServiceProvider } from "../constant";
 export const CN_SKILLS: BuiltinSkill[] = [
   createBuiltinSkill({
     avatar: "26a1",
-    name: "直接对话",
+    name: "通用问答",
     description: "没有固定套路，适合日常问答、临时想法和快速处理。",
     category: "基础",
     starters: [
@@ -31,7 +31,7 @@ export const CN_SKILLS: BuiltinSkill[] = [
   }),
   createBuiltinSkill({
     avatar: "1f50d",
-    name: "网页研究",
+    name: "网页调研",
     description: "搜索网页、抓取来源、对比总结，适合需要最新资料的问题。",
     category: "研究",
     starters: [
@@ -112,7 +112,7 @@ export const CN_SKILLS: BuiltinSkill[] = [
   }),
   createBuiltinSkill({
     avatar: "1f5bc-fe0f",
-    name: "图片创作",
+    name: "AI绘画",
     description: "围绕画面创意、提示词和生成参数来组织一次图片创作会话。",
     category: "创作",
     starters: [
