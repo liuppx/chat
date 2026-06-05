@@ -23,8 +23,14 @@ import { getModelProvider, normalizeProviderName } from "../utils/model";
 import { ServiceProvider } from "../constant";
 
 function SkillItem(props: { skill: Skill; onClick?: () => void }) {
+  const tooltip = props.skill.description || props.skill.name;
   return (
-    <div className={styles["mask"]} onClick={props.onClick}>
+    <div
+      className={styles["mask"]}
+      onClick={props.onClick}
+      title={tooltip}
+      aria-label={tooltip}
+    >
       <SkillAvatar
         avatar={props.skill.avatar}
         model={props.skill.modelConfig.model}
