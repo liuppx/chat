@@ -990,9 +990,8 @@ const cn = {
   Sd: {
     Title: "AI 绘图",
     SubTitle: (count: number) => `共 ${count} 条绘画`,
-    NoModelsTitle: "当前没有可用的图片模型",
-    NoModelsDesc:
-      "请确认已经登录 Router，并且当前分组暴露了支持 /v1/images/generations 的 image 模型。",
+    NoModelsText: "当前没有可用的图片模型，",
+    NoModelsAction: "点击购买。",
     EndpointLabel: "端点",
     SourceLabel: "来源",
     Actions: {

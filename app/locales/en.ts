@@ -1010,9 +1010,8 @@ const en: LocaleType = {
   Sd: {
     Title: "AI Images",
     SubTitle: (count: number) => `${count} images`,
-    NoModelsTitle: "No image models are currently available",
-    NoModelsDesc:
-      "Make sure Router login is active and the current group exposes image models with /v1/images/generations.",
+    NoModelsText: "No image models are currently available, ",
+    NoModelsAction: "click to buy.",
     EndpointLabel: "Endpoint",
     SourceLabel: "Source",
     Actions: {

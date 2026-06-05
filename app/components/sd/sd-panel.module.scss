@@ -118,6 +118,23 @@
   flex-direction: column;
 }
 
+.empty-model-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--black);
+  opacity: 0.75;
+}
+
+.empty-model-link {
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .segmented-control {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
