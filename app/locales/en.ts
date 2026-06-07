@@ -698,12 +698,12 @@ const en: LocaleType = {
     Name: "Discovery",
     Page: {
       Title: "Discovery",
-      SubTitle: "Browse and manage skills, tools, and model capabilities",
+      SubTitle: "Browse and manage skills, MCP, and model services",
     },
     Types: {
       all: "All",
       skill: "Skills",
-      tool: "Tools",
+      mcp: "MCP",
       provider: "Model Services",
     },
     Status: {
@@ -735,7 +735,7 @@ const en: LocaleType = {
     Use: "Start",
     MyCapabilities: "My Capabilities",
     BackToMarket: "Back to Market",
-    SearchMarket: "Search skills, tools, and model services",
+    SearchMarket: "Search skills, MCP, and model services",
     SearchMine: "Search my capabilities",
     Empty: "No matching capabilities",
     ResetFilters: "Clear filters",
@@ -753,9 +753,6 @@ const en: LocaleType = {
     ToolMcpTitle: "MCP",
     ToolMcpDesc:
       "Connect MCP tools such as search, fetch, filesystem, git, and time.",
-    ToolApiTitle: "API Tools",
-    ToolApiDesc: "Expose external actions to models through API integrations.",
-    ToolApiHighlight: "OpenAPI",
   },
   Mcp: {
     Name: "Tools",

@@ -33,7 +33,7 @@ import {
   SkillRuntimeStatus,
 } from "../skills/runtime";
 
-type CapabilityType = "all" | "skill" | "tool" | "provider";
+type CapabilityType = "all" | "skill" | "mcp" | "provider";
 type PricingType = "free" | "subscription" | "usage";
 type RuntimeType = "cloud" | "local" | "both";
 type DiscoveryView = "market" | "mine";
@@ -54,12 +54,13 @@ type Capability = {
   runtimeStatus?: SkillRuntimeStatus;
 };
 
-const typeOrder: CapabilityType[] = ["all", "skill", "tool", "provider"];
+const typeOrder: CapabilityType[] = ["all", "skill", "mcp", "provider"];
 
 function getInitialType(search: string): CapabilityType {
   const type = new URLSearchParams(search).get("type");
   if (type === "model") return "provider";
-  if (type === "skill" || type === "tool" || type === "provider") return type;
+  if (type === "tool") return "mcp";
+  if (type === "skill" || type === "mcp" || type === "provider") return type;
   return "all";
 }
 
@@ -77,7 +78,7 @@ function getDiscoveryPath(view: DiscoveryView, type: CapabilityType) {
 
 function getCapabilityIcon(type: Capability["type"]) {
   if (type === "skill") return <BrainIcon />;
-  if (type === "tool") return <ToolIcon />;
+  if (type === "mcp") return <ToolIcon />;
   return <ModelServiceIcon />;
 }
 
@@ -225,8 +226,8 @@ export function DiscoveryPage() {
                   : Locale.Discovery.Status.Configurable;
 
         return {
-          id: `tool:mcp:${server.id}`,
-          type: "tool",
+          id: `mcp:${server.id}`,
+          type: "mcp",
           title: server.name,
           description: server.description,
           highlights: server.tags.slice(0, 3),
@@ -240,39 +241,7 @@ export function DiscoveryPage() {
       },
     );
 
-    const pluginToolItems: Capability[] = plugins.map((plugin) => ({
-      id: `tool:${plugin.id}`,
-      type: "tool" as const,
-      title: plugin.title || Locale.Plugin.Name,
-      description: Locale.Discovery.ToolApiDesc,
-      highlights: [Locale.Discovery.ToolApiHighlight],
-      status: Locale.Discovery.Status.Installed,
-      pricing: "free" as const,
-      runtime: "cloud" as const,
-      source: plugin.builtin
-        ? Locale.Discovery.Source.Official
-        : Locale.Discovery.Source.Custom,
-      path: Path.Plugins,
-      installed: true,
-    }));
-
-    const toolItems: Capability[] = [
-      ...mcpToolItems,
-      {
-        id: "tool:plugins",
-        type: "tool",
-        title: Locale.Discovery.ToolApiTitle,
-        description: Locale.Discovery.ToolApiDesc,
-        highlights: [Locale.Discovery.ToolApiHighlight],
-        status: Locale.Discovery.Status.Configurable,
-        pricing: "free",
-        runtime: "cloud",
-        source: Locale.Discovery.Source.Official,
-        path: Path.Plugins,
-        installed: false,
-      },
-      ...pluginToolItems,
-    ];
+    const mcpItems: Capability[] = [...mcpToolItems];
 
     const providerMap = new Map<
       string,
@@ -343,7 +312,7 @@ export function DiscoveryPage() {
       return a.title.localeCompare(b.title);
     });
 
-    return [...skillItems, ...toolItems, ...sortedProviderItems];
+    return [...skillItems, ...mcpItems, ...sortedProviderItems];
   }, [
     accessCustomModels,
     customModels,

@@ -688,12 +688,12 @@ const cn = {
     Name: "发现",
     Page: {
       Title: "发现",
-      SubTitle: "浏览和管理技能、工具与模型能力",
+      SubTitle: "浏览和管理技能、MCP 与模型服务",
     },
     Types: {
       all: "全部",
       skill: "技能",
-      tool: "工具",
+      mcp: "MCP",
       provider: "模型服务商",
     },
     Status: {
@@ -725,7 +725,7 @@ const cn = {
     Use: "开始使用",
     MyCapabilities: "我的能力",
     BackToMarket: "返回市场",
-    SearchMarket: "搜索技能、工具、模型服务商",
+    SearchMarket: "搜索技能、MCP、模型服务商",
     SearchMine: "搜索我的能力",
     Empty: "没有找到匹配的能力",
     ResetFilters: "清空筛选",
@@ -740,9 +740,6 @@ const cn = {
         : `${available}/${total} 个模型可用`,
     ToolMcpTitle: "MCP",
     ToolMcpDesc: "连接搜索、抓取、文件、Git、时间等 MCP 工具。",
-    ToolApiTitle: "API 工具",
-    ToolApiDesc: "通过 API 集成为模型提供外部操作能力。",
-    ToolApiHighlight: "OpenAPI",
   },
   Mcp: {
     Name: "工具",

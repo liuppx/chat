@@ -173,7 +173,7 @@ const MCPAction = () => {
 
   return (
     <ChatAction
-      onClick={() => navigate(`${Path.Discovery}?type=tool`)}
+      onClick={() => navigate(`${Path.Discovery}?type=mcp`)}
       text={`${Locale.Mcp.Name}${count ? ` (${count})` : ""}`}
       icon={<McpToolIcon />}
     />
