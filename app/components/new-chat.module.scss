@@ -201,6 +201,7 @@
   .mask {
     display: flex;
     align-items: center;
+    position: relative;
     min-width: 0;
     min-height: 58px;
     padding: 10px 12px;
@@ -225,6 +226,44 @@
     .mask-name {
       font-size: 13px;
       font-weight: 600;
+    }
+
+    .mask-status {
+      margin-top: 4px;
+      font-size: 12px;
+      line-height: 1.2;
+      color: var(--black);
+      opacity: 0.55;
+    }
+  }
+
+  .mask-delete {
+    flex-shrink: 0;
+    margin-left: auto;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--black);
+    opacity: 0.5;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+      opacity ease 0.2s,
+      background-color ease 0.2s;
+
+    &:hover {
+      opacity: 1;
+      background: var(--hover-color);
+    }
+
+    svg {
+      width: 14px;
+      height: 14px;
     }
   }
 

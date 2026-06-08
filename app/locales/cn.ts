@@ -688,17 +688,18 @@ const cn = {
     Name: "发现",
     Page: {
       Title: "发现",
-      SubTitle: "浏览和管理技能、工具与模型能力",
+      SubTitle: "浏览和管理技能、MCP 与模型服务",
     },
     Types: {
       all: "全部",
       skill: "技能",
-      tool: "工具",
+      mcp: "MCP",
       provider: "模型服务商",
     },
     Status: {
       Enabled: "已启用",
       Installed: "已安装",
+      Installable: "可安装",
       Configurable: "可配置",
       Unavailable: "不可用",
       Paused: "已暂停",
@@ -716,16 +717,18 @@ const cn = {
     },
     Source: {
       Official: "官方",
+      Community: "社区",
       Custom: "自定义",
       Provider: "模型服务商",
     },
     SourceLabel: "来源",
     Manage: "管理",
     Enable: "启用",
+    Install: "安装",
     Use: "开始使用",
     MyCapabilities: "我的能力",
     BackToMarket: "返回市场",
-    SearchMarket: "搜索技能、工具、模型服务商",
+    SearchMarket: "搜索技能、MCP、模型服务商",
     SearchMine: "搜索我的能力",
     Empty: "没有找到匹配的能力",
     ResetFilters: "清空筛选",
@@ -738,11 +741,8 @@ const cn = {
       tags.length > 0
         ? `${available}/${total} 个模型可用 · ${tags.join(" / ")}`
         : `${available}/${total} 个模型可用`,
-    ToolMcpTitle: "工具连接器",
+    ToolMcpTitle: "MCP",
     ToolMcpDesc: "连接搜索、抓取、文件、Git、时间等 MCP 工具。",
-    ToolApiTitle: "API 工具",
-    ToolApiDesc: "通过 API 集成为模型提供外部操作能力。",
-    ToolApiHighlight: "OpenAPI",
   },
   Mcp: {
     Name: "工具",
@@ -766,13 +766,13 @@ const cn = {
     },
   },
   Plugin: {
-    Name: "API 集成",
+    Name: "OpenAPI 导入",
     Page: {
-      Title: "API 集成",
-      SubTitle: (count: number) => `${count} 个 API 集成`,
-      Search: "搜索 API 集成",
+      Title: "OpenAPI 导入",
+      SubTitle: (count: number) => `${count} 个 OpenAPI 接口`,
+      Search: "搜索 OpenAPI 接口",
       Create: "新建",
-      Find: "您可以在 Github 上找到优秀的 API 集成：",
+      Find: "通过 OpenAPI 描述导入 HTTP 接口，后续可适配为 MCP 工具：",
     },
     Item: {
       Info: (count: number) => `${count} 方法`,
@@ -797,7 +797,7 @@ const cn = {
     },
     EditModal: {
       Title: (readonly: boolean) =>
-        `编辑 API 集成 ${readonly ? "（只读）" : ""}`,
+        `编辑 OpenAPI 导入 ${readonly ? "（只读）" : ""}`,
       Download: "下载",
       Auth: "授权方式",
       Content: "OpenAPI Schema",
@@ -840,6 +840,18 @@ const cn = {
         SubTitle: "通过这个技能创建的会话，仅可使用这些模型",
         SummaryNone: "不限制",
         SummarySelected: (count: number) => `已选择 ${count} 个模型`,
+      },
+      Tools: {
+        SummaryNone: "未选择",
+        SummarySelected: (count: number) => `已选择 ${count} 个`,
+        BuiltIn: {
+          Title: "内置工具",
+          SubTitle: "模型平台提供的能力，例如 Web Search",
+        },
+        Mcp: {
+          Title: "MCP",
+          SubTitle: "选择这个技能可以调用的 MCP 服务",
+        },
       },
       Sync: {
         Title: "使用全局设置",
@@ -990,9 +1002,8 @@ const cn = {
   Sd: {
     Title: "AI 绘图",
     SubTitle: (count: number) => `共 ${count} 条绘画`,
-    NoModelsTitle: "当前没有可用的图片模型",
-    NoModelsDesc:
-      "请确认已经登录 Router，并且当前分组暴露了支持 /v1/images/generations 的 image 模型。",
+    NoModelsText: "当前没有可用的图片模型，",
+    NoModelsAction: "点击购买。",
     EndpointLabel: "端点",
     SourceLabel: "来源",
     Actions: {

@@ -698,17 +698,18 @@ const en: LocaleType = {
     Name: "Discovery",
     Page: {
       Title: "Discovery",
-      SubTitle: "Browse and manage skills, tools, and model capabilities",
+      SubTitle: "Browse and manage skills, MCP, and model services",
     },
     Types: {
       all: "All",
       skill: "Skills",
-      tool: "Tools",
+      mcp: "MCP",
       provider: "Model Services",
     },
     Status: {
       Enabled: "Enabled",
       Installed: "Installed",
+      Installable: "Installable",
       Configurable: "Configurable",
       Unavailable: "Unavailable",
       Paused: "Paused",
@@ -726,16 +727,18 @@ const en: LocaleType = {
     },
     Source: {
       Official: "Official",
+      Community: "Community",
       Custom: "Custom",
       Provider: "Model Service",
     },
     SourceLabel: "Source",
     Manage: "Manage",
     Enable: "Enable",
+    Install: "Install",
     Use: "Start",
     MyCapabilities: "My Capabilities",
     BackToMarket: "Back to Market",
-    SearchMarket: "Search skills, tools, and model services",
+    SearchMarket: "Search skills, MCP, and model services",
     SearchMine: "Search my capabilities",
     Empty: "No matching capabilities",
     ResetFilters: "Clear filters",
@@ -750,12 +753,9 @@ const en: LocaleType = {
       tags.length > 0
         ? `${available}/${total} models available · ${tags.join(" / ")}`
         : `${available}/${total} models available`,
-    ToolMcpTitle: "Tool Connectors",
+    ToolMcpTitle: "MCP",
     ToolMcpDesc:
       "Connect MCP tools such as search, fetch, filesystem, git, and time.",
-    ToolApiTitle: "API Tools",
-    ToolApiDesc: "Expose external actions to models through API integrations.",
-    ToolApiHighlight: "OpenAPI",
   },
   Mcp: {
     Name: "Tools",
@@ -779,13 +779,13 @@ const en: LocaleType = {
     },
   },
   Plugin: {
-    Name: "API Integration",
+    Name: "OpenAPI Import",
     Page: {
-      Title: "API Integrations",
-      SubTitle: (count: number) => `${count} API integrations`,
-      Search: "Search API Integration",
+      Title: "OpenAPI Import",
+      SubTitle: (count: number) => `${count} OpenAPI interfaces`,
+      Search: "Search OpenAPI interfaces",
       Create: "Create",
-      Find: "You can find API integrations on GitHub: ",
+      Find: "Import HTTP APIs from OpenAPI schemas. They can be adapted into MCP tools later: ",
     },
     Item: {
       Info: (count: number) => `${count} method`,
@@ -810,7 +810,7 @@ const en: LocaleType = {
     },
     EditModal: {
       Title: (readonly: boolean) =>
-        `Edit API Integration ${readonly ? "(readonly)" : ""}`,
+        `Edit OpenAPI Import ${readonly ? "(readonly)" : ""}`,
       Download: "Download",
       Auth: "Authentication Type",
       Content: "OpenAPI Schema",
@@ -855,6 +855,18 @@ const en: LocaleType = {
           "Chat sessions created from this skill can only use these models",
         SummaryNone: "No restriction",
         SummarySelected: (count: number) => `${count} models selected`,
+      },
+      Tools: {
+        SummaryNone: "None selected",
+        SummarySelected: (count: number) => `${count} selected`,
+        BuiltIn: {
+          Title: "Built-in Tools",
+          SubTitle: "Model platform capabilities such as Web Search",
+        },
+        Mcp: {
+          Title: "MCP",
+          SubTitle: "MCP services this skill can call",
+        },
       },
       Sync: {
         Title: "Use Global Config",
@@ -1010,9 +1022,8 @@ const en: LocaleType = {
   Sd: {
     Title: "AI Images",
     SubTitle: (count: number) => `${count} images`,
-    NoModelsTitle: "No image models are currently available",
-    NoModelsDesc:
-      "Make sure Router login is active and the current group exposes image models with /v1/images/generations.",
+    NoModelsText: "No image models are currently available, ",
+    NoModelsAction: "click to buy.",
     EndpointLabel: "Endpoint",
     SourceLabel: "Source",
     Actions: {

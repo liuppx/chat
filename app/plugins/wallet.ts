@@ -8,10 +8,13 @@ import {
 import {
   getProvider,
   requestAccounts,
+  getPreferredAccount,
   getChainId as getChainIdFromSdk,
   getBalance as getBalanceFromSdk,
-  onAccountsChanged,
+  watchProvider,
+  watchAccounts,
   onChainChanged,
+  classifyWalletError,
   createRootUcan,
   getStoredUcanRoot,
   clearUcanSession,
@@ -68,7 +71,8 @@ function emitAuthError(detail?: string) {
   );
 }
 
-let providerPromise: Promise<Eip1193Provider | null> | null = null;
+let currentProvider: Eip1193Provider | null = null;
+let providerWatcherCleanup: (() => void) | null = null;
 let listenersCleanup: (() => void) | null = null;
 let listenersReady = false;
 let loginInFlight = false;
@@ -194,16 +198,11 @@ async function getStoredRoot(): Promise<UcanRootProof | null> {
 async function resolveProvider(options?: {
   refresh?: boolean;
 }): Promise<Eip1193Provider | null> {
-  if (options?.refresh) {
-    providerPromise = null;
+  if (!options?.refresh && currentProvider) {
+    return currentProvider;
   }
-  if (!providerPromise) {
-    providerPromise = getProvider(providerOptions);
-  }
-  const provider = await providerPromise;
-  if (!provider) {
-    providerPromise = null;
-  }
+  const provider = await getProvider(providerOptions);
+  currentProvider = provider;
   return provider;
 }
 
@@ -215,15 +214,18 @@ async function requireProvider(): Promise<Eip1193Provider> {
   return provider;
 }
 
-export async function initWalletListeners() {
-  if (listenersReady) {
-    return listenersCleanup;
+function clearWalletAuthState(options?: { clearAccount?: boolean }) {
+  if (options?.clearAccount) {
+    localStorage.removeItem("currentAccount");
   }
-  const provider = await resolveProvider({ refresh: true });
-  if (!provider) {
-    return null;
-  }
+  localStorage.removeItem("authToken");
+  clearUcanMeta();
+  clearCachedUcanSession();
+}
 
+function bindWalletListeners(provider: Eip1193Provider) {
+  listenersCleanup?.();
+  let lastObservedAccount = getCurrentAccount();
   const handleAccountsChanged = async (accounts: string[]) => {
     if (!Array.isArray(accounts) || accounts.length === 0) {
       if (logoutInFlight) {
@@ -245,23 +247,19 @@ export async function initWalletListeners() {
         return;
       }
 
-      localStorage.removeItem("currentAccount");
       await clearUcanSession(UCAN_SESSION_ID);
-      localStorage.removeItem("authToken");
-      clearUcanMeta();
-      clearCachedUcanSession();
+      clearWalletAuthState({ clearAccount: true });
+      lastObservedAccount = "";
       emitAuthChange();
       return;
     }
 
     const nextAccount = accounts[0];
-    const prevAccount = getCurrentAccount();
-    if (nextAccount !== prevAccount) {
+    if (nextAccount !== lastObservedAccount) {
+      lastObservedAccount = nextAccount;
       localStorage.setItem("currentAccount", nextAccount);
       await clearUcanSession(UCAN_SESSION_ID);
-      localStorage.removeItem("authToken");
-      clearUcanMeta();
-      clearCachedUcanSession();
+      clearWalletAuthState();
       emitAuthChange();
       await loginWithUcan(provider, nextAccount, {
         silent: true,
@@ -274,7 +272,19 @@ export async function initWalletListeners() {
     console.info(`[Wallet] 已切换网络: ${chainId}`);
   };
 
-  const offAccounts = onAccountsChanged(provider, handleAccountsChanged);
+  const offAccounts = watchAccounts(
+    provider,
+    ({ account, accounts }) => {
+      handleAccountsChanged(
+        account
+          ? [account, ...accounts.filter((item) => item !== account)]
+          : accounts,
+      );
+    },
+    {
+      storageKey: "currentAccount",
+    },
+  );
   const offChain = onChainChanged(provider, handleChainChanged);
 
   listenersCleanup = () => {
@@ -285,6 +295,30 @@ export async function initWalletListeners() {
   };
   listenersReady = true;
   return listenersCleanup;
+}
+
+export async function initWalletListeners() {
+  if (!providerWatcherCleanup) {
+    providerWatcherCleanup = watchProvider(({ provider }) => {
+      currentProvider = provider;
+      if (!provider) {
+        listenersCleanup?.();
+        localStorage.setItem("hasConnectedWallet", "false");
+        emitAuthChange();
+        return;
+      }
+
+      localStorage.setItem("hasConnectedWallet", "true");
+      bindWalletListeners(provider);
+      emitAuthChange();
+    }, providerOptions);
+  }
+
+  const provider = await resolveProvider({ refresh: true });
+  if (!provider) {
+    return null;
+  }
+  return bindWalletListeners(provider);
 }
 
 // 等待钱包注入
@@ -298,17 +332,20 @@ export async function waitForWallet() {
 
 // 连接钱包
 export async function connectWallet(preferredAccount?: string) {
-  if (localStorage.getItem("hasConnectedWallet") === "false") {
-    notifyError("❌未检测到钱包，请先安装并连接钱包");
-    return;
-  }
   try {
     try {
       const provider = await requireProvider();
-      const accounts = await requestAccounts({ provider });
+      const accounts = await requestAccounts({ provider, dedupe: true });
       if (Array.isArray(accounts) && accounts.length > 0) {
         const preferred = preferredAccount?.trim().toLowerCase();
-        let currentAccount = accounts[0];
+        let currentAccount =
+          (
+            await getPreferredAccount({
+              provider,
+              storageKey: "currentAccount",
+              autoConnect: false,
+            })
+          ).account || accounts[0];
         if (preferred) {
           const matchedAccount = accounts.find(
             (account) => account.toLowerCase() === preferred,
@@ -345,8 +382,12 @@ export async function connectWallet(preferredAccount?: string) {
           notifyError(
             `❌会话已过期，请打开钱包插件输入密码激活钱包状态 ${error}`,
           );
-        } else if (err.code === 4001) {
+        } else if (classifyWalletError(error).type === "userRejected") {
           notifyError(`❌用户拒绝了连接请求 ${error}`);
+        } else if (classifyWalletError(error).type === "notFound") {
+          notifyError("❌未检测到钱包，请先安装并连接钱包");
+        } else if (classifyWalletError(error).type === "disconnected") {
+          notifyError("❌钱包连接已断开，请稍后重试或刷新钱包扩展");
         } else {
           console.error("❌未知连接错误:", error);
           notifyError(`❌连接失败，请检查钱包状态 ${error}`);

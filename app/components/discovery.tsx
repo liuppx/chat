@@ -2,14 +2,25 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 
-import { Path } from "../constant";
-import Locale, { getLang } from "../locales";
+import { COMMUNITY_SKILL_PACKAGE_LIST_URL, Path } from "../constant";
+import Locale, { getLang, type Lang } from "../locales";
 import { getClientsStatus, getMcpConfigFromFile } from "../mcp/actions";
 import { OFFICIAL_MCP_PRESET_SERVERS } from "../mcp/preset-servers";
 import { McpConfigData, ServerStatusResponse } from "../mcp/types";
-import { BUILTIN_SKILLS } from "../skills";
+import {
+  BUILTIN_SKILLS,
+  resolveLocalizedText,
+  type SkillPackage,
+  skillPackageToSkill,
+} from "../skills";
 import { useAppConfig, useChatStore } from "../store";
-import { Skill, useSkillStore } from "../store/skill";
+import {
+  Skill,
+  getSkillApiTools,
+  getSkillBuiltInTools,
+  getSkillMcpTools,
+  useSkillStore,
+} from "../store/skill";
 import { usePluginStore } from "../store/plugin";
 import { IconButton } from "./button";
 import { ErrorBoundary } from "./error";
@@ -19,11 +30,19 @@ import EyeIcon from "../icons/eye.svg";
 import ModelServiceIcon from "../icons/llm-icons/default.svg";
 import ToolIcon from "../icons/tool.svg";
 import styles from "./discovery.module.scss";
+import { useAccessStore } from "../store/access";
+import {
+  getSkillRuntimeIssueSummary,
+  getSkillRuntimeStatusOrder,
+  resolveSkillRuntimeStatus,
+  SkillRuntimeStatus,
+} from "../skills/runtime";
 
-type CapabilityType = "all" | "skill" | "tool" | "provider";
+type CapabilityType = "all" | "skill" | "mcp" | "provider";
 type PricingType = "free" | "subscription" | "usage";
 type RuntimeType = "cloud" | "local" | "both";
 type DiscoveryView = "market" | "mine";
+type SkillPackageList = Partial<Record<Lang, SkillPackage[]>>;
 
 type Capability = {
   id: string;
@@ -38,14 +57,18 @@ type Capability = {
   path: Path;
   installed: boolean;
   skill?: Skill;
+  skillPackage?: SkillPackage;
+  skillPackageLang?: Lang;
+  runtimeStatus?: SkillRuntimeStatus;
 };
 
-const typeOrder: CapabilityType[] = ["all", "skill", "tool", "provider"];
+const typeOrder: CapabilityType[] = ["all", "skill", "mcp", "provider"];
 
 function getInitialType(search: string): CapabilityType {
   const type = new URLSearchParams(search).get("type");
   if (type === "model") return "provider";
-  if (type === "skill" || type === "tool" || type === "provider") return type;
+  if (type === "tool") return "mcp";
+  if (type === "skill" || type === "mcp" || type === "provider") return type;
   return "all";
 }
 
@@ -63,7 +86,7 @@ function getDiscoveryPath(view: DiscoveryView, type: CapabilityType) {
 
 function getCapabilityIcon(type: Capability["type"]) {
   if (type === "skill") return <BrainIcon />;
-  if (type === "tool") return <ToolIcon />;
+  if (type === "mcp") return <ToolIcon />;
   return <ModelServiceIcon />;
 }
 
@@ -80,10 +103,15 @@ export function DiscoveryPage() {
   const models = useAppConfig((state) => state.models);
   const hideBuiltinSkills = useAppConfig((state) => state.hideBuiltinSkills);
   const modelConfig = useAppConfig((state) => state.modelConfig);
+  const customModels = useAppConfig((state) => state.customModels);
+  const accessCustomModels = useAccessStore((state) => state.customModels);
+  const defaultModel = useAccessStore((state) => state.defaultModel);
   const [mcpConfig, setMcpConfig] = useState<McpConfigData>();
   const [mcpStatuses, setMcpStatuses] = useState<
     Record<string, ServerStatusResponse>
   >({});
+  const [communitySkillPackages, setCommunitySkillPackages] =
+    useState<SkillPackageList>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +132,36 @@ export function DiscoveryPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetch(COMMUNITY_SKILL_PACKAGE_LIST_URL, {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return res.json() as Promise<SkillPackageList>;
+      })
+      .then((packages) => {
+        if (!controller.signal.aborted) {
+          setCommunitySkillPackages(packages);
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          console.warn(
+            "[Discovery] failed to load community skill package list",
+            error,
+          );
+        }
+      });
+
+    return () => controller.abort();
   }, []);
 
   const skills = useMemo(() => {
@@ -134,32 +192,141 @@ export function DiscoveryPage() {
   );
 
   const capabilities = useMemo<Capability[]>(() => {
-    const skillItems = skills.map((skill) => ({
-      id: `skill:${"id" in skill ? skill.id : skill.name}`,
-      type: "skill" as const,
-      title: skill.name,
-      description: skill.description || Locale.Discovery.DefaultSkillDesc,
-      highlights: [
-        skill.category,
-        skill.starters?.length
-          ? Locale.Discovery.SkillStarters(skill.starters.length)
-          : undefined,
-        skill.plugin?.length
-          ? Locale.Discovery.SkillTools(skill.plugin.length)
-          : undefined,
-      ].filter(Boolean) as string[],
-      status: skill.builtin
-        ? Locale.Discovery.Status.Enabled
-        : Locale.Discovery.Status.Installed,
-      pricing: "free" as const,
-      runtime: "both" as const,
-      source: skill.builtin
-        ? Locale.Discovery.Source.Official
-        : Locale.Discovery.Source.Custom,
-      path: Path.Skills,
-      installed: !skill.builtin,
-      skill: skill as Skill,
-    }));
+    const installedPluginIds = plugins.map((plugin) => plugin.id);
+    const currentLang = getLang();
+    const installedPackageIds = new Set(
+      Object.values(skillRecords)
+        .map((skill) => skill.packageId)
+        .filter(Boolean),
+    );
+    const skillItems = skills
+      .map((skill) => {
+        const runtimeSkill = skill as Skill;
+        const skillToolCount =
+          getSkillBuiltInTools(runtimeSkill).length +
+          getSkillMcpTools(runtimeSkill).length +
+          getSkillApiTools(runtimeSkill).length;
+        const runtime = resolveSkillRuntimeStatus({
+          skill: runtimeSkill,
+          models,
+          customModels,
+          accessCustomModels,
+          defaultModel,
+          globalModelConfig: modelConfig,
+          installedPluginIds,
+        });
+        const runtimeSummary = getSkillRuntimeIssueSummary(runtime);
+        return {
+          id: `skill:${"id" in skill ? skill.id : skill.name}`,
+          type: "skill" as const,
+          title: skill.name,
+          description: skill.description || Locale.Discovery.DefaultSkillDesc,
+          highlights: [
+            skill.category,
+            skill.starters?.length
+              ? Locale.Discovery.SkillStarters(skill.starters.length)
+              : undefined,
+            skillToolCount
+              ? Locale.Discovery.SkillTools(skillToolCount)
+              : undefined,
+            runtimeSummary || undefined,
+          ].filter(Boolean) as string[],
+          status:
+            runtime.status === "ready"
+              ? Locale.Discovery.Status.Enabled
+              : runtime.status === "needs_config"
+                ? Locale.Discovery.Status.Configurable
+                : Locale.Discovery.Status.Unavailable,
+          pricing: "free" as const,
+          runtime: "both" as const,
+          source: skill.builtin
+            ? Locale.Discovery.Source.Official
+            : Locale.Discovery.Source.Custom,
+          path: Path.Skills,
+          installed: !skill.builtin,
+          skill: runtimeSkill,
+          runtimeStatus: runtime.status,
+        };
+      })
+      .sort((a, b) => {
+        const statusDiff =
+          getSkillRuntimeStatusOrder(a.runtimeStatus ?? "unavailable") -
+          getSkillRuntimeStatusOrder(b.runtimeStatus ?? "unavailable");
+        if (statusDiff !== 0) return statusDiff;
+        return a.title.localeCompare(b.title);
+      });
+
+    const communitySkillItems = (communitySkillPackages[currentLang] ?? [])
+      .filter((skillPackage) => !installedPackageIds.has(skillPackage.id))
+      .map((skillPackage) => {
+        const skill = skillPackageToSkill(
+          skillPackage,
+          currentLang,
+          modelConfig,
+        );
+        skill.packageId = skillPackage.id;
+
+        const skillToolCount =
+          getSkillBuiltInTools(skill).length +
+          getSkillMcpTools(skill).length +
+          getSkillApiTools(skill).length;
+        const runtime = resolveSkillRuntimeStatus({
+          skill,
+          models,
+          customModels,
+          accessCustomModels,
+          defaultModel,
+          globalModelConfig: modelConfig,
+          installedPluginIds,
+        });
+        const runtimeSummary = getSkillRuntimeIssueSummary(runtime);
+
+        return {
+          id: `community-skill:${currentLang}:${skillPackage.id}`,
+          type: "skill" as const,
+          title: resolveLocalizedText(
+            skillPackage.name,
+            currentLang,
+            skillPackage.id,
+          ),
+          description: resolveLocalizedText(
+            skillPackage.description,
+            currentLang,
+            Locale.Discovery.DefaultSkillDesc,
+          ),
+          highlights: [
+            skillPackage.category,
+            skillPackage.starters?.length
+              ? Locale.Discovery.SkillStarters(skillPackage.starters.length)
+              : undefined,
+            skillToolCount
+              ? Locale.Discovery.SkillTools(skillToolCount)
+              : undefined,
+            runtimeSummary || undefined,
+          ].filter(Boolean) as string[],
+          status:
+            runtime.status === "ready"
+              ? Locale.Discovery.Status.Installable
+              : runtime.status === "needs_config"
+                ? Locale.Discovery.Status.Configurable
+                : Locale.Discovery.Status.Unavailable,
+          pricing: "free" as const,
+          runtime: "both" as const,
+          source: Locale.Discovery.Source.Community,
+          path: Path.Skills,
+          installed: false,
+          skillPackage,
+          skillPackageLang: currentLang,
+          runtimeStatus: runtime.status,
+        };
+      })
+      .sort((a, b) => {
+        const statusDiff =
+          getSkillRuntimeStatusOrder(a.runtimeStatus ?? "unavailable") -
+          getSkillRuntimeStatusOrder(b.runtimeStatus ?? "unavailable");
+        if (statusDiff !== 0) return statusDiff;
+        return a.title.localeCompare(b.title);
+      });
 
     const mcpToolItems: Capability[] = OFFICIAL_MCP_PRESET_SERVERS.map(
       (server) => {
@@ -178,8 +345,8 @@ export function DiscoveryPage() {
                   : Locale.Discovery.Status.Configurable;
 
         return {
-          id: `tool:mcp:${server.id}`,
-          type: "tool",
+          id: `mcp:${server.id}`,
+          type: "mcp",
           title: server.name,
           description: server.description,
           highlights: server.tags.slice(0, 3),
@@ -193,39 +360,7 @@ export function DiscoveryPage() {
       },
     );
 
-    const pluginToolItems: Capability[] = plugins.map((plugin) => ({
-      id: `tool:${plugin.id}`,
-      type: "tool" as const,
-      title: plugin.title || Locale.Plugin.Name,
-      description: Locale.Discovery.ToolApiDesc,
-      highlights: [Locale.Discovery.ToolApiHighlight],
-      status: Locale.Discovery.Status.Installed,
-      pricing: "free" as const,
-      runtime: "cloud" as const,
-      source: plugin.builtin
-        ? Locale.Discovery.Source.Official
-        : Locale.Discovery.Source.Custom,
-      path: Path.Plugins,
-      installed: true,
-    }));
-
-    const toolItems: Capability[] = [
-      ...mcpToolItems,
-      {
-        id: "tool:plugins",
-        type: "tool",
-        title: Locale.Discovery.ToolApiTitle,
-        description: Locale.Discovery.ToolApiDesc,
-        highlights: [Locale.Discovery.ToolApiHighlight],
-        status: Locale.Discovery.Status.Configurable,
-        pricing: "free",
-        runtime: "cloud",
-        source: Locale.Discovery.Source.Official,
-        path: Path.Plugins,
-        installed: false,
-      },
-      ...pluginToolItems,
-    ];
+    const mcpItems: Capability[] = [...mcpToolItems];
 
     const providerMap = new Map<
       string,
@@ -296,8 +431,25 @@ export function DiscoveryPage() {
       return a.title.localeCompare(b.title);
     });
 
-    return [...skillItems, ...toolItems, ...sortedProviderItems];
-  }, [mcpConfig?.mcpServers, mcpStatuses, models, plugins, skills]);
+    return [
+      ...skillItems,
+      ...communitySkillItems,
+      ...mcpItems,
+      ...sortedProviderItems,
+    ];
+  }, [
+    accessCustomModels,
+    communitySkillPackages,
+    customModels,
+    defaultModel,
+    mcpConfig?.mcpServers,
+    mcpStatuses,
+    modelConfig,
+    models,
+    plugins,
+    skillRecords,
+    skills,
+  ]);
 
   const visibleCapabilities = capabilities.filter((item) => {
     const keyword = deferredSearchText.trim().toLowerCase();
@@ -319,7 +471,30 @@ export function DiscoveryPage() {
   });
 
   const handleCapabilityAction = (item: Capability) => {
+    if (item.type === "skill" && item.skillPackage && item.skillPackageLang) {
+      const skill = skillPackageToSkill(
+        item.skillPackage,
+        item.skillPackageLang,
+        modelConfig,
+      );
+      skill.packageId = item.skillPackage.id;
+      const installedSkill = useSkillStore.getState().create(skill);
+
+      if (item.runtimeStatus === "ready") {
+        if (chatStore.newSession(installedSkill) !== false) {
+          navigate(Path.Chat);
+        }
+      } else {
+        navigate(Path.Skills);
+      }
+      return;
+    }
+
     if (item.type === "skill" && item.skill) {
+      if (item.runtimeStatus !== "ready") {
+        navigate(Path.Skills);
+        return;
+      }
       if (chatStore.newSession(item.skill) !== false) {
         navigate(Path.Chat);
       }
@@ -329,7 +504,12 @@ export function DiscoveryPage() {
   };
 
   const getActionText = (item: Capability) => {
-    if (item.type === "skill") return Locale.Discovery.Use;
+    if (item.type === "skill") {
+      if (item.skillPackage && !item.installed) return Locale.Discovery.Install;
+      return item.runtimeStatus === "ready"
+        ? Locale.Discovery.Use
+        : Locale.Discovery.Manage;
+    }
     if (view === "market" && !item.installed) return Locale.Discovery.Enable;
     return Locale.Discovery.Manage;
   };

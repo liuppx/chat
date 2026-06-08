@@ -603,7 +603,7 @@ function ModelSelectorPanel(props: {
 }
 
 function PanelSection(props: {
-  title: string;
+  title?: string;
   subTitle?: string;
   children?: React.ReactNode;
   hideTitle?: boolean;
@@ -1052,9 +1052,17 @@ export function SdPanel() {
         </PanelSection>
       )}
       {!hasImageModels && (
-        <PanelSection title={Locale.Sd.NoModelsTitle}>
-          <div className={styles["ctrl-param-item-sub-title"]}>
-            {Locale.Sd.NoModelsDesc}
+        <PanelSection hideTitle>
+          <div className={styles["empty-model-text"]}>
+            <span>{Locale.Sd.NoModelsText}</span>
+            <a
+              className={styles["empty-model-link"]}
+              href="https://router.yeying.pub"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {Locale.Sd.NoModelsAction}
+            </a>
           </div>
         </PanelSection>
       )}

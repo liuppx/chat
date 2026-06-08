@@ -1,5 +1,5 @@
 import { Lang } from "../locales";
-import { type ModelConfig } from "../store";
+import { type ModelConfig } from "../store/config";
 import { type ChatMessage } from "../store/chat";
 import { type BuiltinSkill } from "./typing";
 

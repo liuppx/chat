@@ -11,6 +11,9 @@ import {
 } from "@/app/constant";
 import {
   ChatMessageTool,
+  getSkillApiTools,
+  getSkillBuiltInTools,
+  getSkillMcpTools,
   useAccessStore,
   useAppConfig,
   useChatStore,
@@ -37,6 +40,7 @@ import {
   LLMUsage,
   MultimodalContent,
   normalizeModelEndpointPath,
+  normalizeSupportedEndpoints,
   SupportedEndpoint,
   SupportedTextEndpoint,
   SpeechOptions,
@@ -516,6 +520,17 @@ function toResponsesTools(tools: any[]) {
   });
 }
 
+function getBuiltInResponsesTools(toolIds: readonly string[]) {
+  return toolIds
+    .map((toolId) => {
+      if (toolId === "web_search") {
+        return { type: "web_search_preview" };
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
 function extractResponsesInstructionText(content: any): string {
   if (typeof content === "string") return content.trim();
   if (!Array.isArray(content)) return "";
@@ -745,6 +760,35 @@ function extractResponsesStreamFallbackText(payload: any): string {
   return extractResponsesTextFromOutput(payload.output);
 }
 
+function shouldFallbackResponsesToolsToChatCompletions(config: {
+  useResponsesEndpoint: boolean;
+  useImageGenerationEndpoint: boolean;
+  providerName?: string;
+  supportedEndpoints?: readonly string[];
+  tools?: Array<{ function?: { name?: string } }>;
+  hasBuiltInResponsesTools?: boolean;
+}) {
+  if (!config.useResponsesEndpoint || config.useImageGenerationEndpoint) {
+    return false;
+  }
+  if (config.providerName !== ServiceProvider.OpenAI) {
+    return false;
+  }
+  if (config.hasBuiltInResponsesTools) {
+    return false;
+  }
+  const hasMcpTools = (config.tools ?? []).some((tool) =>
+    String(tool?.function?.name || "").startsWith("mcp__"),
+  );
+  if (!hasMcpTools) {
+    return false;
+  }
+  const supportedEndpoints = normalizeSupportedEndpoints(
+    config.supportedEndpoints,
+  );
+  return supportedEndpoints.includes(SupportedTextEndpoint.ChatCompletions);
+}
+
 export class ChatGPTApi implements LLMApi {
   private disableListModels = false;
 
@@ -896,26 +940,45 @@ export class ChatGPTApi implements LLMApi {
     try {
       let tools: any[] = [];
       let funcs: Record<string, Function> = {};
+      const sessionSkill = useChatStore.getState().currentSession().mask;
+      const skillApiTools = getSkillApiTools(sessionSkill);
+      const skillMcpTools = getSkillMcpTools(sessionSkill);
+      const skillBuiltInTools = getSkillBuiltInTools(sessionSkill);
       if (shouldStream) {
-        const toolPair = (await getNativeToolBundle(
-          useChatStore.getState().currentSession().mask?.plugin || [],
-          {
-            includeMcp: shouldUseNativeMcpTools({
+        const toolPair = (await getNativeToolBundle(skillApiTools, {
+          includeMcp:
+            skillMcpTools.length > 0 &&
+            shouldUseNativeMcpTools({
               providerName: modelConfig.providerName,
               endpointPath,
             }),
-          },
-        )) as [any[], Record<string, Function>];
+          mcpClientIds: skillMcpTools,
+        })) as [any[], Record<string, Function>];
         tools = toolPair[0] ?? [];
         funcs = toolPair[1] ?? {};
       }
 
-      const useResponsesEndpoint =
+      const preferResponsesEndpoint =
         !useImageGenerationEndpoint &&
         modelConfig.providerName !== ServiceProvider.Azure &&
         (endpointPath
           ? endpointPath === SupportedTextEndpoint.Responses
           : true);
+
+      const shouldFallbackToChatCompletions =
+        shouldFallbackResponsesToolsToChatCompletions({
+          useResponsesEndpoint: preferResponsesEndpoint,
+          useImageGenerationEndpoint,
+          providerName: modelConfig.providerName,
+          supportedEndpoints: options.config.supportedEndpoints,
+          tools,
+          hasBuiltInResponsesTools: skillBuiltInTools.length > 0,
+        });
+      const useResponsesEndpoint =
+        preferResponsesEndpoint && !shouldFallbackToChatCompletions;
+      const effectiveEndpointPath = shouldFallbackToChatCompletions
+        ? SupportedTextEndpoint.ChatCompletions
+        : endpointPath;
 
       let chatPath = "";
       if (modelConfig.providerName === ServiceProvider.Azure) {
@@ -944,8 +1007,8 @@ export class ChatGPTApi implements LLMApi {
           ),
         );
       } else {
-        const textPath = endpointPath
-          ? endpointPath.replace(/^\//, "")
+        const textPath = effectiveEndpointPath
+          ? effectiveEndpointPath.replace(/^\//, "")
           : useResponsesEndpoint
             ? OpenaiPath.ResponsePath
             : OpenaiPath.ChatPath;
@@ -955,7 +1018,10 @@ export class ChatGPTApi implements LLMApi {
       }
 
       const requestTools = useResponsesEndpoint
-        ? toResponsesTools(tools)
+        ? [
+            ...getBuiltInResponsesTools(skillBuiltInTools),
+            ...toResponsesTools(tools),
+          ]
         : tools;
       let requestPayload:
         | RequestPayload
@@ -1055,6 +1121,7 @@ export class ChatGPTApi implements LLMApi {
         stream: shouldStream,
         responses: isResponsesPath(chatPath),
         tools: requestTools.length,
+        fallbackToChatCompletions: shouldFallbackToChatCompletions,
       });
 
       if (shouldStream) {

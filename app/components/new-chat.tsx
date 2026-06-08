@@ -6,6 +6,7 @@ import LeftIcon from "../icons/left.svg";
 import EyeIcon from "../icons/eye.svg";
 import RobotIcon from "../icons/robot.svg";
 import SendWhiteIcon from "../icons/send-white.svg";
+import DeleteIcon from "../icons/delete.svg";
 
 import { useNavigate } from "react-router-dom";
 import { getLaunchableSkills, Skill, useSkillStore } from "../store/skill";
@@ -21,10 +22,35 @@ import { safeLocalStorage } from "../utils";
 import { useSessionModels } from "../utils/hooks";
 import { getModelProvider, normalizeProviderName } from "../utils/model";
 import { ServiceProvider } from "../constant";
+import { useAccessStore } from "../store/access";
+import {
+  getSkillRuntimeStatusOrder,
+  resolveSkillRuntimeStatus,
+  SkillRuntimeResult,
+} from "../skills/runtime";
+import { usePluginStore } from "../store/plugin";
 
-function SkillItem(props: { skill: Skill; onClick?: () => void }) {
+function SkillItem(props: {
+  skill: Skill;
+  runtime: SkillRuntimeResult;
+  statusLabel: string;
+  onClick?: () => void;
+  onDelete?: () => void;
+  deletable?: boolean;
+}) {
+  const tooltip = [
+    props.skill.description || props.skill.name,
+    ...props.runtime.issues.map((issue) => issue.message),
+  ]
+    .filter(Boolean)
+    .join("\n");
   return (
-    <div className={styles["mask"]} onClick={props.onClick}>
+    <div
+      className={styles["mask"]}
+      onClick={props.onClick}
+      title={tooltip}
+      aria-label={tooltip}
+    >
       <SkillAvatar
         avatar={props.skill.avatar}
         model={props.skill.modelConfig.model}
@@ -33,24 +59,59 @@ function SkillItem(props: { skill: Skill; onClick?: () => void }) {
         <div className={clsx(styles["mask-name"], "one-line")}>
           {props.skill.name}
         </div>
+        <div className={styles["mask-status"]}>{props.statusLabel}</div>
       </div>
+      {props.deletable && props.onDelete && (
+        <button
+          className={styles["mask-delete"]}
+          title={`删除 ${props.skill.name}`}
+          aria-label={`删除 ${props.skill.name}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            props.onDelete?.();
+          }}
+        >
+          <DeleteIcon />
+        </button>
+      )}
     </div>
   );
 }
 
 const localStorage = safeLocalStorage();
+const HIDDEN_ORPHAN_SKILL_KEYS = "hidden-orphan-skill-keys";
+
+function getSkillEntryKey(skill: Skill) {
+  return skill.id || skill.name;
+}
 
 export function NewChat() {
   const chatStore = useChatStore();
   const skillStore = useSkillStore();
   const sdStore = useSdStore();
   const config = useAppConfig();
+  const accessStore = useAccessStore();
+  const plugins = usePluginStore((state) => state.plugins);
   const [draft, setDraft] = useState("");
   const [selectedModelValue, setSelectedModelValue] = useState("");
+  const [hiddenOrphanSkillKeys, setHiddenOrphanSkillKeys] = useState(() => {
+    const raw = localStorage.getItem(HIDDEN_ORPHAN_SKILL_KEYS);
+    if (!raw) return [] as string[];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const skills = useMemo(
     () => getLaunchableSkills(skillStore.getAll()),
     [skillStore],
+  );
+  const currentSkillKeys = useMemo(
+    () => new Set(skills.map((skill) => getSkillEntryKey(skill))),
+    [skills],
   );
   const recentSkills = useMemo(() => {
     const seen = new Set<string>();
@@ -73,17 +134,92 @@ export function NewChat() {
       })
       .slice(0, 3);
   }, [chatStore.sessions]);
+  const installedPluginIds = useMemo(() => Object.keys(plugins), [plugins]);
+  const skillRuntimeMap = useMemo(() => {
+    return new Map(
+      [...recentSkills, ...skills].map((skill) => [
+        getSkillEntryKey(skill),
+        resolveSkillRuntimeStatus({
+          skill,
+          models: config.models,
+          customModels: config.customModels,
+          accessCustomModels: accessStore.customModels,
+          defaultModel: accessStore.defaultModel,
+          globalModelConfig: config.modelConfig,
+          installedPluginIds,
+        }),
+      ]),
+    );
+  }, [
+    accessStore.customModels,
+    accessStore.defaultModel,
+    config.customModels,
+    config.modelConfig,
+    config.models,
+    installedPluginIds,
+    recentSkills,
+    skills,
+  ]);
   const entrySkills = useMemo(() => {
     const seen = new Set<string>();
+    const hiddenKeys = new Set(hiddenOrphanSkillKeys);
     return [...recentSkills, ...skills]
       .filter((skill) => {
-        const key = skill.id || skill.name;
+        const key = getSkillEntryKey(skill);
         if (!key || seen.has(key)) return false;
+        if (hiddenKeys.has(key)) return false;
         seen.add(key);
         return true;
       })
+      .sort((a, b) => {
+        const aRuntime = skillRuntimeMap.get(getSkillEntryKey(a));
+        const bRuntime = skillRuntimeMap.get(getSkillEntryKey(b));
+        const statusDiff =
+          getSkillRuntimeStatusOrder(aRuntime?.status ?? "unavailable") -
+          getSkillRuntimeStatusOrder(bRuntime?.status ?? "unavailable");
+        if (statusDiff !== 0) return statusDiff;
+        return b.createdAt - a.createdAt;
+      })
       .slice(0, 8);
-  }, [recentSkills, skills]);
+  }, [hiddenOrphanSkillKeys, recentSkills, skillRuntimeMap, skills]);
+  const entrySkillItems = useMemo(
+    () =>
+      entrySkills.map((skill) => {
+        const runtime =
+          skillRuntimeMap.get(getSkillEntryKey(skill)) ??
+          resolveSkillRuntimeStatus({
+            skill,
+            models: config.models,
+            customModels: config.customModels,
+            accessCustomModels: accessStore.customModels,
+            defaultModel: accessStore.defaultModel,
+            globalModelConfig: config.modelConfig,
+            installedPluginIds,
+          });
+        const statusLabel =
+          runtime.status === "ready"
+            ? Locale.Discovery.Status.Enabled
+            : runtime.status === "needs_config"
+              ? Locale.Discovery.Status.Configurable
+              : Locale.Discovery.Status.Unavailable;
+
+        return {
+          skill,
+          runtime,
+          statusLabel,
+        };
+      }),
+    [
+      accessStore.customModels,
+      accessStore.defaultModel,
+      config.customModels,
+      config.modelConfig,
+      config.models,
+      entrySkills,
+      installedPluginIds,
+      skillRuntimeMap,
+    ],
+  );
   const availableModels = useSessionModels();
 
   const navigate = useNavigate();
@@ -170,8 +306,23 @@ export function NewChat() {
   };
 
   const startDraftChat = () => startChat(undefined, draft, activeModelValue);
+  const hideOrphanSkill = (skill: Skill) => {
+    const key = getSkillEntryKey(skill);
+    if (!key) return;
+    setHiddenOrphanSkillKeys((current) => {
+      if (current.includes(key)) return current;
+      const next = [...current, key];
+      localStorage.setItem(HIDDEN_ORPHAN_SKILL_KEYS, JSON.stringify(next));
+      return next;
+    });
+  };
   const startSkill = (skill?: Skill) => {
     if (!skill) return;
+    const runtime = skillRuntimeMap.get(getSkillEntryKey(skill));
+    if (runtime && runtime.status !== "ready") {
+      navigate(Path.Skills);
+      return;
+    }
 
     if (skill.launch?.type === "sd") {
       const input = draft.trim();
@@ -285,11 +436,17 @@ export function NewChat() {
       </div>
 
       <div className={styles["featured-masks"]}>
-        {entrySkills.map((skill) => (
+        {entrySkillItems.map(({ skill, runtime, statusLabel }) => (
           <SkillItem
             key={skill.id}
             skill={skill}
+            runtime={runtime}
+            statusLabel={statusLabel}
             onClick={() => startSkill(skill)}
+            deletable={
+              !skill.builtin && !currentSkillKeys.has(getSkillEntryKey(skill))
+            }
+            onDelete={() => hideOrphanSkill(skill)}
           />
         ))}
       </div>

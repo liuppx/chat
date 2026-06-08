@@ -1,4 +1,4 @@
-import { ModelConfig } from "../store";
+import type { ModelConfig } from "../store/config";
 import { type Skill } from "../store/skill";
 
 export type BuiltinSkill = Omit<Skill, "id" | "modelConfig"> & {
