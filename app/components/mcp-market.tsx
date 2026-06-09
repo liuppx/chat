@@ -29,6 +29,10 @@ import {
   ServerStatusResponse,
 } from "../mcp/types";
 import { OFFICIAL_MCP_PRESET_SERVERS } from "../mcp/preset-servers";
+import {
+  fetchCommunityMcpPresetServers,
+  mergeMcpPresetServers,
+} from "../mcp/marketplace";
 import clsx from "clsx";
 import PlayIcon from "../icons/play.svg";
 import StopIcon from "../icons/pause.svg";
@@ -93,21 +97,35 @@ export function McpMarketPage() {
     return () => clearInterval(timer);
   }, [mcpEnabled, config]);
 
-  // 加载预设服务器
+  // 加载 MCP 市场服务器
   useEffect(() => {
-    const loadPresetServers = () => {
+    const controller = new AbortController();
+
+    const loadPresetServers = async () => {
       if (!mcpEnabled) return;
       try {
         setLoadingPresets(true);
-        setPresetServers(OFFICIAL_MCP_PRESET_SERVERS);
+        const communityServers = await fetchCommunityMcpPresetServers(
+          controller.signal,
+        );
+        if (controller.signal.aborted) return;
+        setPresetServers(
+          mergeMcpPresetServers(OFFICIAL_MCP_PRESET_SERVERS, communityServers),
+        );
       } catch (error) {
+        if (controller.signal.aborted) return;
         console.error("Failed to load preset servers:", error);
+        setPresetServers(OFFICIAL_MCP_PRESET_SERVERS);
         showToast("Failed to load preset servers");
       } finally {
-        setLoadingPresets(false);
+        if (!controller.signal.aborted) {
+          setLoadingPresets(false);
+        }
       }
     };
     loadPresetServers();
+
+    return () => controller.abort();
   }, [mcpEnabled]);
 
   // 加载初始状态

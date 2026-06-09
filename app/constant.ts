@@ -7,7 +7,8 @@ export const UPDATE_URL = `${REPO_URL}#keep-updated`;
 export const RELEASE_URL = `${REPO_URL}/releases`;
 export const FETCH_COMMIT_URL = `https://api.github.com/repos/${OWNER}/${REPO}/commits?per_page=1`;
 export const FETCH_TAG_URL = `https://api.github.com/repos/${OWNER}/${REPO}/tags?per_page=1`;
-export const COMMUNITY_SKILL_PACKAGE_LIST_URL = `https://raw.githubusercontent.com/${OWNER}/skills/main/packages.json`;
+export const COMMUNITY_MARKETPLACE_SKILL_PACKAGES_URL = `https://raw.githubusercontent.com/${OWNER}/marketplace/main/packages.json`;
+export const COMMUNITY_MARKETPLACE_MCP_PACKAGES_URL = `https://raw.githubusercontent.com/${OWNER}/marketplace/main/mcp/packages.json`;
 export const RUNTIME_CONFIG_DOM = "danger-runtime-config";
 
 export const STABILITY_BASE_URL = "https://api.stability.ai";

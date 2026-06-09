@@ -22,6 +22,7 @@ Chat（UCAN 定制版）
 - 容器与布局样式方案：`docs/容器与布局样式方案.md`
 - 用户登录方案：`docs/用户登录方案.md`
 - 数据同步：`docs/数据同步方案.md`
+- 技能发布、上线、配置与使用流程：`docs/技能发布上线配置使用流程.md`
 - Cloudflare Pages 部署指南：`docs/CloudflarePages部署指南.md`
 - Vercel 使用说明：`docs/Vercel使用说明.md`
 - 文生图与上传图片聊天工作流实现说明：`docs/文生图与上传图片聊天工作流实现说明.md`

@@ -17,7 +17,7 @@ import { SkillAvatar } from "./mask";
 import { useCommand } from "../command";
 import { BUILTIN_SKILL_STORE } from "../skills";
 import clsx from "clsx";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { safeLocalStorage } from "../utils";
 import { useSessionModels } from "../utils/hooks";
 import { getModelProvider, normalizeProviderName } from "../utils/model";
@@ -29,6 +29,8 @@ import {
   SkillRuntimeResult,
 } from "../skills/runtime";
 import { usePluginStore } from "../store/plugin";
+import { getMcpConfigFromFile } from "../mcp/actions";
+import { McpConfigData } from "../mcp/types";
 
 function SkillItem(props: {
   skill: Skill;
@@ -94,6 +96,7 @@ export function NewChat() {
   const plugins = usePluginStore((state) => state.plugins);
   const [draft, setDraft] = useState("");
   const [selectedModelValue, setSelectedModelValue] = useState("");
+  const [mcpConfig, setMcpConfig] = useState<McpConfigData>();
   const [hiddenOrphanSkillKeys, setHiddenOrphanSkillKeys] = useState(() => {
     const raw = localStorage.getItem(HIDDEN_ORPHAN_SKILL_KEYS);
     if (!raw) return [] as string[];
@@ -135,6 +138,28 @@ export function NewChat() {
       .slice(0, 3);
   }, [chatStore.sessions]);
   const installedPluginIds = useMemo(() => Object.keys(plugins), [plugins]);
+  const installedMcpServerIds = useMemo(
+    () => Object.keys(mcpConfig?.mcpServers ?? {}),
+    [mcpConfig?.mcpServers],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    getMcpConfigFromFile()
+      .then((config) => {
+        if (!cancelled) {
+          setMcpConfig(config);
+        }
+      })
+      .catch((error) => {
+        console.warn("[NewChat] failed to load MCP config", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const skillRuntimeMap = useMemo(() => {
     return new Map(
       [...recentSkills, ...skills].map((skill) => [
@@ -147,6 +172,7 @@ export function NewChat() {
           defaultModel: accessStore.defaultModel,
           globalModelConfig: config.modelConfig,
           installedPluginIds,
+          installedMcpServerIds,
         }),
       ]),
     );
@@ -156,6 +182,7 @@ export function NewChat() {
     config.customModels,
     config.modelConfig,
     config.models,
+    installedMcpServerIds,
     installedPluginIds,
     recentSkills,
     skills,
@@ -195,6 +222,7 @@ export function NewChat() {
             defaultModel: accessStore.defaultModel,
             globalModelConfig: config.modelConfig,
             installedPluginIds,
+            installedMcpServerIds,
           });
         const statusLabel =
           runtime.status === "ready"
@@ -216,6 +244,7 @@ export function NewChat() {
       config.modelConfig,
       config.models,
       entrySkills,
+      installedMcpServerIds,
       installedPluginIds,
       skillRuntimeMap,
     ],

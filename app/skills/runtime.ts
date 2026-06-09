@@ -1,5 +1,5 @@
 import { LLMModel } from "../client/api";
-import { Skill, getSkillApiTools } from "../store/skill";
+import { Skill, getSkillApiTools, getSkillMcpTools } from "../store/skill";
 import { ModelConfig } from "../store/config";
 import {
   collectModelsWithDefaultModel,
@@ -47,6 +47,7 @@ export function resolveSkillRuntimeStatus(params: {
   defaultModel?: string;
   globalModelConfig: ModelConfig;
   installedPluginIds?: readonly string[];
+  installedMcpServerIds?: readonly string[];
 }): SkillRuntimeResult {
   const {
     skill,
@@ -56,6 +57,7 @@ export function resolveSkillRuntimeStatus(params: {
     defaultModel,
     globalModelConfig,
     installedPluginIds,
+    installedMcpServerIds,
   } = params;
 
   const runtimeModels = collectModelsWithDefaultModel(
@@ -85,6 +87,10 @@ export function resolveSkillRuntimeStatus(params: {
   const pluginIdSet = new Set(installedPluginIds ?? []);
   const missingPluginCount = getSkillApiTools(skill).filter(
     (id) => !pluginIdSet.has(id),
+  ).length;
+  const mcpServerIdSet = new Set(installedMcpServerIds ?? []);
+  const missingMcpServerCount = getSkillMcpTools(skill).filter(
+    (id) => !mcpServerIdSet.has(id),
   ).length;
 
   const issues: SkillRuntimeIssue[] = [];
@@ -125,6 +131,16 @@ export function resolveSkillRuntimeStatus(params: {
         missingPluginCount === 1
           ? "缺少 1 个工具配置"
           : `缺少 ${missingPluginCount} 个工具配置`,
+    });
+  }
+
+  if (missingMcpServerCount > 0) {
+    issues.push({
+      type: "tool",
+      message:
+        missingMcpServerCount === 1
+          ? "缺少 1 个 MCP 配置"
+          : `缺少 ${missingMcpServerCount} 个 MCP 配置`,
     });
   }
 

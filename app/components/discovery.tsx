@@ -2,11 +2,19 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 
-import { COMMUNITY_SKILL_PACKAGE_LIST_URL, Path } from "../constant";
+import { COMMUNITY_MARKETPLACE_SKILL_PACKAGES_URL, Path } from "../constant";
 import Locale, { getLang, type Lang } from "../locales";
 import { getClientsStatus, getMcpConfigFromFile } from "../mcp/actions";
+import {
+  fetchCommunityMcpPresetServers,
+  mergeMcpPresetServers,
+} from "../mcp/marketplace";
 import { OFFICIAL_MCP_PRESET_SERVERS } from "../mcp/preset-servers";
-import { McpConfigData, ServerStatusResponse } from "../mcp/types";
+import {
+  McpConfigData,
+  PresetServer,
+  ServerStatusResponse,
+} from "../mcp/types";
 import {
   BUILTIN_SKILLS,
   resolveLocalizedText,
@@ -112,6 +120,9 @@ export function DiscoveryPage() {
   >({});
   const [communitySkillPackages, setCommunitySkillPackages] =
     useState<SkillPackageList>({});
+  const [communityMcpServers, setCommunityMcpServers] = useState<
+    PresetServer[]
+  >([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,7 +148,28 @@ export function DiscoveryPage() {
   useEffect(() => {
     const controller = new AbortController();
 
-    fetch(COMMUNITY_SKILL_PACKAGE_LIST_URL, {
+    fetchCommunityMcpPresetServers(controller.signal)
+      .then((servers) => {
+        if (!controller.signal.aborted) {
+          setCommunityMcpServers(servers);
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          console.warn(
+            "[Discovery] failed to load community MCP package list",
+            error,
+          );
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetch(COMMUNITY_MARKETPLACE_SKILL_PACKAGES_URL, {
       signal: controller.signal,
       cache: "no-store",
     })
@@ -193,6 +225,11 @@ export function DiscoveryPage() {
 
   const capabilities = useMemo<Capability[]>(() => {
     const installedPluginIds = plugins.map((plugin) => plugin.id);
+    const installedMcpServerIds = Object.keys(mcpConfig?.mcpServers ?? {});
+    const mcpPresetServers = mergeMcpPresetServers(
+      OFFICIAL_MCP_PRESET_SERVERS,
+      communityMcpServers,
+    );
     const currentLang = getLang();
     const installedPackageIds = new Set(
       Object.values(skillRecords)
@@ -214,6 +251,7 @@ export function DiscoveryPage() {
           defaultModel,
           globalModelConfig: modelConfig,
           installedPluginIds,
+          installedMcpServerIds,
         });
         const runtimeSummary = getSkillRuntimeIssueSummary(runtime);
         return {
@@ -278,6 +316,7 @@ export function DiscoveryPage() {
           defaultModel,
           globalModelConfig: modelConfig,
           installedPluginIds,
+          installedMcpServerIds,
         });
         const runtimeSummary = getSkillRuntimeIssueSummary(runtime);
 
@@ -328,37 +367,40 @@ export function DiscoveryPage() {
         return a.title.localeCompare(b.title);
       });
 
-    const mcpToolItems: Capability[] = OFFICIAL_MCP_PRESET_SERVERS.map(
-      (server) => {
-        const serverConfig = mcpConfig?.mcpServers[server.id];
-        const serverStatus = mcpStatuses[server.id]?.status;
-        const installed = Boolean(serverConfig);
-        const status =
-          serverStatus === "active"
-            ? Locale.Discovery.Status.Enabled
-            : serverStatus === "error"
-              ? Locale.Discovery.Status.Error
-              : serverStatus === "paused"
-                ? Locale.Discovery.Status.Paused
-                : installed
-                  ? Locale.Discovery.Status.Installed
-                  : Locale.Discovery.Status.Configurable;
-
-        return {
-          id: `mcp:${server.id}`,
-          type: "mcp",
-          title: server.name,
-          description: server.description,
-          highlights: server.tags.slice(0, 3),
-          status,
-          pricing: "free",
-          runtime: server.tags.includes("local") ? "local" : "both",
-          source: Locale.Discovery.Source.Official,
-          path: Path.McpMarket,
-          installed,
-        };
-      },
+    const officialMcpIds = new Set(
+      OFFICIAL_MCP_PRESET_SERVERS.map((server) => server.id),
     );
+    const mcpToolItems: Capability[] = mcpPresetServers.map((server) => {
+      const serverConfig = mcpConfig?.mcpServers[server.id];
+      const serverStatus = mcpStatuses[server.id]?.status;
+      const installed = Boolean(serverConfig);
+      const status =
+        serverStatus === "active"
+          ? Locale.Discovery.Status.Enabled
+          : serverStatus === "error"
+            ? Locale.Discovery.Status.Error
+            : serverStatus === "paused"
+              ? Locale.Discovery.Status.Paused
+              : installed
+                ? Locale.Discovery.Status.Installed
+                : Locale.Discovery.Status.Configurable;
+
+      return {
+        id: `mcp:${server.id}`,
+        type: "mcp",
+        title: server.name,
+        description: server.description,
+        highlights: server.tags.slice(0, 3),
+        status,
+        pricing: "free",
+        runtime: server.tags.includes("local") ? "local" : "both",
+        source: officialMcpIds.has(server.id)
+          ? Locale.Discovery.Source.Official
+          : Locale.Discovery.Source.Community,
+        path: Path.McpMarket,
+        installed,
+      };
+    });
 
     const mcpItems: Capability[] = [...mcpToolItems];
 
@@ -439,6 +481,7 @@ export function DiscoveryPage() {
     ];
   }, [
     accessCustomModels,
+    communityMcpServers,
     communitySkillPackages,
     customModels,
     defaultModel,
