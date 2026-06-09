@@ -212,7 +212,7 @@ function resolveRuntimeModelRouting(
   modelName: string,
   providerName: ServiceProvider,
   options?: {
-    preferResponses?: boolean;
+    requireResponses?: boolean;
   },
 ) {
   const models = useAppConfig.getState().models ?? [];
@@ -228,7 +228,7 @@ function resolveRuntimeModelRouting(
     selectedModel?.supportedEndpoints,
   );
   const endpointPath = selectPreferredRequestEndpoint(supportedEndpoints, {
-    preferResponses: options?.preferResponses,
+    requireResponses: options?.requireResponses,
     modelName,
   });
 
@@ -244,6 +244,7 @@ function resolveRuntimeModelRouting(
     endpointPath,
     supportedEndpoints,
     ownedBy: selectedModel?.ownedBy,
+    tags: selectedModel?.tags,
   };
 }
 
@@ -624,7 +625,7 @@ export const useChatStore = createPersistStore(
           modelConfig.model,
           modelConfig.providerName,
           {
-            preferResponses: hasDocumentAttachment,
+            requireResponses: hasDocumentAttachment,
           },
         );
         if (
@@ -697,6 +698,7 @@ export const useChatStore = createPersistStore(
             endpointPath: routing.endpointPath,
             supportedEndpoints: routing.supportedEndpoints,
             ownedBy: routing.ownedBy,
+            tags: routing.tags,
             stream: true,
           },
           onUpdate(message) {
@@ -804,12 +806,10 @@ export const useChatStore = createPersistStore(
           providerName: resolveRuntimeModelRouting(
             modelConfig.model,
             modelConfig.providerName,
-            { preferResponses: false },
           ).requestProvider,
           endpointPath: resolveRuntimeModelRouting(
             modelConfig.model,
             modelConfig.providerName,
-            { preferResponses: false },
           ).endpointPath,
         });
         const mcpSystemPrompt =
@@ -979,6 +979,7 @@ export const useChatStore = createPersistStore(
                 endpointPath: summarizeRouting.endpointPath,
                 supportedEndpoints: summarizeRouting.supportedEndpoints,
                 ownedBy: summarizeRouting.ownedBy,
+                tags: summarizeRouting.tags,
               },
               onFinish(message, responseRes) {
                 if (responseRes?.status === 200) {
@@ -1049,6 +1050,7 @@ export const useChatStore = createPersistStore(
               endpointPath: summarizeRouting.endpointPath,
               supportedEndpoints: summarizeRouting.supportedEndpoints,
               ownedBy: summarizeRouting.ownedBy,
+              tags: summarizeRouting.tags,
             },
             onUpdate(message) {
               session.memoryPrompt = message;

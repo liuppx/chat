@@ -40,6 +40,7 @@ import { preProcessImageContent, stream } from "@/app/utils/chat";
 import { cloudflareAIGatewayUrl } from "@/app/utils/cloudflare";
 import { RequestPayload } from "./openai";
 import { fetch } from "@/app/utils/stream";
+import { applyMessagesReasoning } from "../reasoning";
 import {
   createInvocationUcan,
   getCapabilityAction,
@@ -74,6 +75,10 @@ export interface AnthropicChatRequest {
   top_k?: number; // Only sample from the top K options for each subsequent token.
   metadata?: object; // An object describing metadata about the request.
   stream?: boolean; // Whether to incrementally stream the response using server-sent events.
+  thinking?: {
+    type: "enabled";
+    budget_tokens: number;
+  };
 }
 
 export interface ChatRequest {
@@ -498,6 +503,10 @@ export class ClaudeApi implements LLMApi {
       // top_k: modelConfig.top_k,
       top_k: 5,
     };
+    applyMessagesReasoning(requestBody as any, {
+      ...options.config,
+      ...modelConfig,
+    });
 
     const endpointPath = normalizeModelEndpointPath(
       options.config.endpointPath,

@@ -6,28 +6,29 @@ import {
 } from "../app/client/endpoints";
 
 describe("selectPreferredTextEndpoint", () => {
-  test("prefers responses by default when both endpoints are supported", () => {
+  test("selects messages for non-GPT models when messages is supported", () => {
     const endpoint = selectPreferredTextEndpoint([
       SupportedTextEndpoint.Responses,
+      SupportedTextEndpoint.Messages,
       SupportedTextEndpoint.ChatCompletions,
     ]);
+
+    expect(endpoint).toBe(SupportedTextEndpoint.Messages);
+  });
+
+  test("requires responses only for responses-only flows", () => {
+    const endpoint = selectPreferredTextEndpoint(
+      [SupportedTextEndpoint.ChatCompletions, SupportedTextEndpoint.Responses],
+      { requireResponses: true },
+    );
 
     expect(endpoint).toBe(SupportedTextEndpoint.Responses);
   });
 
-  test("prefers chat completions when explicitly requested", () => {
+  test("selects responses for gpt series when responses is supported", () => {
     const endpoint = selectPreferredTextEndpoint(
       [SupportedTextEndpoint.ChatCompletions, SupportedTextEndpoint.Responses],
-      { preferResponses: false },
-    );
-
-    expect(endpoint).toBe(SupportedTextEndpoint.ChatCompletions);
-  });
-
-  test("prefers responses for gpt series even when chat completions is requested", () => {
-    const endpoint = selectPreferredTextEndpoint(
-      [SupportedTextEndpoint.ChatCompletions, SupportedTextEndpoint.Responses],
-      { preferResponses: false, modelName: "gpt-5.4" },
+      { modelName: "gpt-5.4" },
     );
 
     expect(endpoint).toBe(SupportedTextEndpoint.Responses);

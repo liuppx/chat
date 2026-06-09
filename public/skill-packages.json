@@ -242,6 +242,73 @@
         },
         {
             "schemaVersion": "1.0",
+            "id": "builtin.cn.1700000001006",
+            "version": "1.0.0",
+            "name": {
+                "cn": "深度思考"
+            },
+            "description": {
+                "cn": "启用支持推理模型的深度思考能力，适合复杂分析、规划和高难度问题。"
+            },
+            "icon": {
+                "type": "emoji",
+                "value": "1f9e0"
+            },
+            "category": "分析",
+            "visibility": {
+                "scope": "public"
+            },
+            "launch": {
+                "type": "chat"
+            },
+            "instructions": {
+                "type": "inline",
+                "content": "你正在执行深度思考任务。先识别问题类型和关键约束，再进行结构化分析。输出时区分事实、假设、推理和结论；复杂问题需要给出取舍、风险和下一步验证。不要为了显得复杂而拉长回答，重点保证推理链条清晰、结论可执行。"
+            },
+            "starters": [
+                "深入分析这个问题，先拆解关键变量，再给结论。",
+                "请用更强推理模式解决这个复杂任务。",
+                "帮我做一次系统性推演，列出假设、推理过程和风险。"
+            ],
+            "model": {
+                "syncGlobalConfig": false,
+                "candidates": [
+                    {
+                        "capability": "reasoning"
+                    }
+                ],
+                "params": {
+                    "temperature": 0.2,
+                    "max_tokens": 8000,
+                    "presence_penalty": 0,
+                    "frequency_penalty": 0,
+                    "sendMemory": true,
+                    "historyMessageCount": 12,
+                    "compressMessageLengthThreshold": 2000,
+                    "reasoningMode": "on",
+                    "reasoningEffort": "high"
+                }
+            },
+            "tools": [],
+            "mcp": {
+                "servers": []
+            },
+            "permissions": {
+                "network": false,
+                "filesystem": false,
+                "wallet": false,
+                "externalTools": []
+            },
+            "compatibility": {
+                "appVersion": ">=0.1.0"
+            },
+            "release": {
+                "status": "published",
+                "review": "approved"
+            }
+        },
+        {
+            "schemaVersion": "1.0",
             "id": "builtin.cn.1700000001005",
             "version": "1.0.0",
             "name": {
@@ -532,6 +599,73 @@
                     "sendMemory": true,
                     "historyMessageCount": 10,
                     "compressMessageLengthThreshold": 2000
+                }
+            },
+            "tools": [],
+            "mcp": {
+                "servers": []
+            },
+            "permissions": {
+                "network": false,
+                "filesystem": false,
+                "wallet": false,
+                "externalTools": []
+            },
+            "compatibility": {
+                "appVersion": ">=0.1.0"
+            },
+            "release": {
+                "status": "published",
+                "review": "approved"
+            }
+        },
+        {
+            "schemaVersion": "1.0",
+            "id": "builtin.en.1700000002006",
+            "version": "1.0.0",
+            "name": {
+                "en": "Deep Reasoning"
+            },
+            "description": {
+                "en": "Enable deep reasoning for capable models. Best for complex analysis, planning, and difficult problems."
+            },
+            "icon": {
+                "type": "emoji",
+                "value": "1f9e0"
+            },
+            "category": "Analysis",
+            "visibility": {
+                "scope": "public"
+            },
+            "launch": {
+                "type": "chat"
+            },
+            "instructions": {
+                "type": "inline",
+                "content": "You are doing a deep reasoning task. Identify the problem type and constraints first, then analyze it structurally. Separate facts, assumptions, reasoning, and conclusions. For complex problems, include tradeoffs, risks, and next validation steps. Do not make the answer long just to appear complex; keep the reasoning clear and the conclusion actionable."
+            },
+            "starters": [
+                "Analyze this deeply: break down the variables first, then give the conclusion.",
+                "Use deeper reasoning to solve this complex task.",
+                "Run a structured analysis with assumptions, reasoning, risks, and next checks."
+            ],
+            "model": {
+                "syncGlobalConfig": false,
+                "candidates": [
+                    {
+                        "capability": "reasoning"
+                    }
+                ],
+                "params": {
+                    "temperature": 0.2,
+                    "max_tokens": 8000,
+                    "presence_penalty": 0,
+                    "frequency_penalty": 0,
+                    "sendMemory": true,
+                    "historyMessageCount": 12,
+                    "compressMessageLengthThreshold": 2000,
+                    "reasoningMode": "on",
+                    "reasoningEffort": "high"
                 }
             },
             "tools": [],

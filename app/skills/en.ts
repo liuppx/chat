@@ -115,6 +115,38 @@ export const EN_SKILLS: BuiltinSkill[] = [
     },
   }),
   createBuiltinSkill({
+    avatar: "1f9e0",
+    name: "Deep Reasoning",
+    description:
+      "Enable deep reasoning for capable models. Best for complex analysis, planning, and difficult problems.",
+    category: "Analysis",
+    starters: [
+      "Analyze this deeply: break down the variables first, then give the conclusion.",
+      "Use deeper reasoning to solve this complex task.",
+      "Run a structured analysis with assumptions, reasoning, risks, and next checks.",
+    ],
+    lang: "en",
+    createdAt: 1700000002006,
+    syncGlobalConfig: false,
+    candidateModels: [{ capability: "reasoning" }],
+    context: [
+      {
+        id: "en-deep-reasoning-0",
+        role: "system",
+        content:
+          "You are doing a deep reasoning task. Identify the problem type and constraints first, then analyze it structurally. Separate facts, assumptions, reasoning, and conclusions. For complex problems, include tradeoffs, risks, and next validation steps. Do not make the answer long just to appear complex; keep the reasoning clear and the conclusion actionable.",
+        date: "",
+      },
+    ],
+    modelConfig: {
+      reasoningMode: "on",
+      reasoningEffort: "high",
+      temperature: 0.2,
+      max_tokens: 8000,
+      historyMessageCount: 12,
+    },
+  }),
+  createBuiltinSkill({
     avatar: "1f5bc-fe0f",
     name: "Image Creation",
     description:

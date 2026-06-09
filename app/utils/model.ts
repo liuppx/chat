@@ -1,5 +1,6 @@
 import { ServiceProvider } from "../constant";
 import { LLMModel, LLMModelProvider, ModelCandidate } from "../client/api";
+import { isReasoningCapableModel } from "../client/reasoning";
 
 const CustomSeq = {
   val: -1000, //To ensure the custom model located at front, start from -1000, refer to constant.ts
@@ -178,22 +179,36 @@ export function normalizeModelCandidate(
 ): ModelCandidate | undefined {
   if (!candidate) return undefined;
   const model = candidate.model?.trim();
-  if (!model) return undefined;
   const providerName =
     normalizeProviderId(candidate.providerName) ??
     normalizeProviderName(candidate.providerName);
+  const tags = Array.isArray(candidate.tags)
+    ? candidate.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean)
+    : undefined;
+  const capability =
+    candidate.capability === "reasoning" ? candidate.capability : undefined;
+  if (!model && !providerName && !tags?.length && !capability) {
+    return undefined;
+  }
   return {
     model,
     providerName,
+    tags,
+    capability,
   };
 }
 
 export function buildModelCandidateValue(candidate: ModelCandidate): string {
   const normalized = normalizeModelCandidate(candidate);
   if (!normalized) return "";
-  return normalized.providerName
-    ? `${normalized.model}@${normalized.providerName}`
-    : normalized.model;
+  return [
+    normalized.model ? `model:${normalized.model}` : undefined,
+    normalized.providerName ? `provider:${normalized.providerName}` : undefined,
+    normalized.capability ? `capability:${normalized.capability}` : undefined,
+    ...(normalized.tags ?? []).map((tag) => `tag:${tag}`),
+  ]
+    .filter(Boolean)
+    .join("|");
 }
 
 export function normalizeModelCandidates(
@@ -212,17 +227,34 @@ export function normalizeModelCandidates(
 }
 
 export function matchesModelCandidate(
-  model: Pick<LLMModel, "name" | "provider">,
+  model: Pick<LLMModel, "name" | "provider" | "ownedBy" | "tags">,
   candidate: ModelCandidate,
 ): boolean {
   const normalized = normalizeModelCandidate(candidate);
   if (!normalized) return false;
-  if (model.name !== normalized.model) return false;
-  if (!normalized.providerName) return true;
-  return (
-    normalizeProviderId(model.provider?.id ?? model.provider?.providerName) ===
-    normalized.providerName
-  );
+  if (normalized.model && model.name !== normalized.model) return false;
+  if (normalized.providerName) {
+    const matchesProvider =
+      normalizeProviderId(
+        model.provider?.id ?? model.provider?.providerName,
+      ) === normalized.providerName;
+    if (!matchesProvider) return false;
+  }
+  if (normalized.tags?.length) {
+    const modelTags = new Set(
+      (model.tags ?? []).map((tag) => tag.toLowerCase()),
+    );
+    if (!normalized.tags.every((tag) => modelTags.has(tag))) return false;
+  }
+  if (normalized.capability === "reasoning") {
+    return isReasoningCapableModel({
+      model: model.name,
+      providerName: model.provider?.providerName,
+      ownedBy: model.ownedBy,
+      tags: model.tags,
+    });
+  }
+  return true;
 }
 
 export function filterModelsByCandidates(

@@ -79,6 +79,10 @@ import {
   getTimeoutMSByModel,
 } from "@/app/utils";
 import { fetch } from "@/app/utils/stream";
+import {
+  applyOpenAICompatibleReasoning,
+  applyOpenAIReasoning,
+} from "../reasoning";
 
 export interface OpenAIListModelResponse {
   object: string;
@@ -96,12 +100,15 @@ export interface RequestPayload {
   }[];
   stream?: boolean;
   model: string;
-  temperature: number;
-  presence_penalty: number;
-  frequency_penalty: number;
-  top_p: number;
+  temperature?: number;
+  presence_penalty?: number;
+  frequency_penalty?: number;
+  top_p?: number;
   max_tokens?: number;
   max_completion_tokens?: number;
+  reasoning?: {
+    effort: string;
+  };
 }
 
 export interface DalleRequestPayload {
@@ -958,7 +965,7 @@ export class ChatGPTApi implements LLMApi {
         funcs = toolPair[1] ?? {};
       }
 
-      const preferResponsesEndpoint =
+      const useResponsesProtocol =
         !useImageGenerationEndpoint &&
         modelConfig.providerName !== ServiceProvider.Azure &&
         (endpointPath
@@ -967,7 +974,7 @@ export class ChatGPTApi implements LLMApi {
 
       const shouldFallbackToChatCompletions =
         shouldFallbackResponsesToolsToChatCompletions({
-          useResponsesEndpoint: preferResponsesEndpoint,
+          useResponsesEndpoint: useResponsesProtocol,
           useImageGenerationEndpoint,
           providerName: modelConfig.providerName,
           supportedEndpoints: options.config.supportedEndpoints,
@@ -975,7 +982,7 @@ export class ChatGPTApi implements LLMApi {
           hasBuiltInResponsesTools: skillBuiltInTools.length > 0,
         });
       const useResponsesEndpoint =
-        preferResponsesEndpoint && !shouldFallbackToChatCompletions;
+        useResponsesProtocol && !shouldFallbackToChatCompletions;
       const effectiveEndpointPath = shouldFallbackToChatCompletions
         ? SupportedTextEndpoint.ChatCompletions
         : endpointPath;
@@ -1079,6 +1086,10 @@ export class ChatGPTApi implements LLMApi {
             responsesPayload.temperature = modelConfig.temperature;
             responsesPayload.top_p = modelConfig.top_p;
           }
+          applyOpenAIReasoning(responsesPayload, {
+            ...options.config,
+            model: resolvedModel,
+          });
           if (instructions) {
             responsesPayload.instructions = instructions;
           }
@@ -1112,6 +1123,10 @@ export class ChatGPTApi implements LLMApi {
             delete (chatPayload as any).max_tokens;
             delete (chatPayload as any).max_completion_tokens;
           }
+          applyOpenAICompatibleReasoning(chatPayload as any, {
+            ...options.config,
+            model: resolvedModel,
+          });
           requestPayload = chatPayload;
         }
       }

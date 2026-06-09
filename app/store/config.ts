@@ -15,6 +15,7 @@ import {
 } from "../constant";
 import { createPersistStore } from "../utils/store";
 import { normalizeModels, normalizeProviderName } from "../utils/model";
+import type { ReasoningEffort, ReasoningMode } from "../client/reasoning";
 import type { Voice } from "rt-client";
 
 export type ModelType = string;
@@ -72,6 +73,8 @@ export const createDefaultConfig = () => {
       max_tokens: 4000,
       presence_penalty: 0,
       frequency_penalty: 0,
+      reasoningMode: "off" as ReasoningMode,
+      reasoningEffort: "medium" as ReasoningEffort,
       sendMemory: true,
       historyMessageCount: 4,
       compressMessageLengthThreshold: 1000,

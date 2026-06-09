@@ -13,6 +13,7 @@ type BuiltinSkillInput = {
   createdAt: number;
   context: ChatMessage[];
   syncGlobalConfig?: boolean;
+  candidateModels?: BuiltinSkill["candidateModels"];
   launch?: BuiltinSkill["launch"];
   modelConfig?: Partial<ModelConfig>;
 };

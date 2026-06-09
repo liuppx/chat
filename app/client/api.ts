@@ -26,6 +26,7 @@ import { ChatGLMApi } from "./platforms/glm";
 import { SiliconflowApi } from "./platforms/siliconflow";
 import { Ai302Api } from "./platforms/ai302";
 import { RouterApi } from "./platforms/router";
+import type { ReasoningEffort, ReasoningMode } from "./reasoning";
 export {
   SupportedEndpoint,
   SupportedTextEndpoint,
@@ -88,8 +89,12 @@ export interface LLMConfig {
   endpointPath?: string;
   supportedEndpoints?: string[];
   ownedBy?: string;
+  tags?: string[];
   temperature?: number;
   top_p?: number;
+  reasoningMode?: ReasoningMode;
+  reasoningEffort?: ReasoningEffort;
+  max_tokens?: number;
   stream?: boolean;
   presence_penalty?: number;
   frequency_penalty?: number;
@@ -140,8 +145,10 @@ export interface LLMModel {
 }
 
 export interface ModelCandidate {
-  model: string;
+  model?: string;
   providerName?: string;
+  tags?: string[];
+  capability?: "reasoning";
 }
 
 export interface LLMModelProvider {

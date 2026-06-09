@@ -4,8 +4,10 @@ import { resolveStoredImageUrl } from "../app/components/sd/image-result";
 
 describe("resolveStoredImageUrl", () => {
   test("returns direct url responses without re-uploading", async () => {
-    const uploadGeneratedImageAndGetStableUrl = jest.fn();
-    const base64Image2Blob = jest.fn();
+    const uploadGeneratedImageAndGetStableUrl =
+      jest.fn<(file: Blob) => Promise<string>>();
+    const base64Image2Blob =
+      jest.fn<(base64Data: string, contentType: string) => Blob>();
 
     await expect(
       resolveStoredImageUrl(
@@ -26,10 +28,12 @@ describe("resolveStoredImageUrl", () => {
 
   test("uploads b64_json responses to stable storage", async () => {
     const blob = new Blob(["decoded"], { type: "image/png" });
-    const uploadGeneratedImageAndGetStableUrl = jest.fn().mockResolvedValue(
-      "https://stable.example.com/generated.png",
-    );
-    const base64Image2Blob = jest.fn().mockReturnValue(blob);
+    const uploadGeneratedImageAndGetStableUrl = jest
+      .fn<(file: Blob) => Promise<string>>()
+      .mockResolvedValue("https://stable.example.com/generated.png");
+    const base64Image2Blob = jest
+      .fn<(base64Data: string, contentType: string) => Blob>()
+      .mockReturnValue(blob);
 
     await expect(
       resolveStoredImageUrl(

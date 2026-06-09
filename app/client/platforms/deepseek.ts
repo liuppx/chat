@@ -24,6 +24,7 @@ import {
 } from "@/app/utils";
 import { RequestPayload } from "./openai";
 import { fetch } from "@/app/utils/stream";
+import { applyDeepSeekReasoning } from "../reasoning";
 
 export class DeepSeekApi implements LLMApi {
   private disableListModels = true;
@@ -114,6 +115,10 @@ export class DeepSeekApi implements LLMApi {
       // max_tokens: Math.max(modelConfig.max_tokens, 1024),
       // Please do not ask me why not send max_tokens, no reason, this param is just shit, I dont want to explain anymore.
     };
+    applyDeepSeekReasoning(requestPayload as any, {
+      ...options.config,
+      ...modelConfig,
+    });
 
     console.log("[Request] openai payload: ", requestPayload);
 

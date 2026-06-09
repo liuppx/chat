@@ -111,6 +111,38 @@ export const CN_SKILLS: BuiltinSkill[] = [
     },
   }),
   createBuiltinSkill({
+    avatar: "1f9e0",
+    name: "深度思考",
+    description:
+      "启用支持推理模型的深度思考能力，适合复杂分析、规划和高难度问题。",
+    category: "分析",
+    starters: [
+      "深入分析这个问题，先拆解关键变量，再给结论。",
+      "请用更强推理模式解决这个复杂任务。",
+      "帮我做一次系统性推演，列出假设、推理过程和风险。",
+    ],
+    lang: "cn",
+    createdAt: 1700000001006,
+    syncGlobalConfig: false,
+    candidateModels: [{ capability: "reasoning" }],
+    context: [
+      {
+        id: "cn-deep-reasoning-0",
+        role: "system",
+        content:
+          "你正在执行深度思考任务。先识别问题类型和关键约束，再进行结构化分析。输出时区分事实、假设、推理和结论；复杂问题需要给出取舍、风险和下一步验证。不要为了显得复杂而拉长回答，重点保证推理链条清晰、结论可执行。",
+        date: "",
+      },
+    ],
+    modelConfig: {
+      reasoningMode: "on",
+      reasoningEffort: "high",
+      temperature: 0.2,
+      max_tokens: 8000,
+      historyMessageCount: 12,
+    },
+  }),
+  createBuiltinSkill({
     avatar: "1f5bc-fe0f",
     name: "AI绘画",
     description: "围绕画面创意、提示词和生成参数来组织一次图片创作会话。",

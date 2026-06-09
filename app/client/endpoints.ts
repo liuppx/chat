@@ -58,7 +58,7 @@ export function normalizeSupportedEndpoints(
 export function selectPreferredTextEndpoint(
   endpoints?: readonly string[],
   options?: {
-    preferResponses?: boolean;
+    requireResponses?: boolean;
     modelName?: string;
   },
 ): string | undefined {
@@ -73,20 +73,17 @@ export function selectPreferredTextEndpoint(
   const supportsChatCompletions = normalized.includes(
     SupportedTextEndpoint.ChatCompletions,
   );
-  const shouldPreferResponses =
-    (isGptSeriesModel && supportsResponses && supportsChatCompletions) ||
-    options?.preferResponses !== false;
-  const order = shouldPreferResponses
-    ? [
-        SupportedTextEndpoint.Responses,
-        SupportedTextEndpoint.Messages,
-        SupportedTextEndpoint.ChatCompletions,
-      ]
-    : [
-        SupportedTextEndpoint.ChatCompletions,
-        SupportedTextEndpoint.Responses,
-        SupportedTextEndpoint.Messages,
-      ];
+  if (options?.requireResponses) {
+    return supportsResponses ? SupportedTextEndpoint.Responses : undefined;
+  }
+  if (isGptSeriesModel && supportsResponses) {
+    return SupportedTextEndpoint.Responses;
+  }
+  const order = [
+    SupportedTextEndpoint.Messages,
+    SupportedTextEndpoint.Responses,
+    SupportedTextEndpoint.ChatCompletions,
+  ];
   for (const endpoint of order) {
     if (normalized.includes(endpoint)) return endpoint;
   }
@@ -116,7 +113,7 @@ export function supportsImageEditEndpoint(
 export function selectPreferredRequestEndpoint(
   endpoints?: readonly string[],
   options?: {
-    preferResponses?: boolean;
+    requireResponses?: boolean;
     modelName?: string;
   },
 ): string | undefined {

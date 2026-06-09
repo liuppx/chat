@@ -28,6 +28,7 @@ import {
   isVisionModel,
 } from "@/app/utils";
 import { fetch } from "@/app/utils/stream";
+import { applyQwenReasoning } from "../reasoning";
 
 export interface OpenAIListModelResponse {
   object: string;
@@ -51,6 +52,7 @@ interface RequestParam {
   repetition_penalty?: number;
   top_p: number;
   max_tokens?: number;
+  enable_thinking?: boolean;
 }
 interface RequestPayload {
   model: string;
@@ -110,8 +112,8 @@ export class QwenApi implements LLMApi {
         visionModel
           ? await preProcessImageContentForAlibabaDashScope(v.content)
           : v.role === "assistant"
-          ? getMessageTextContentWithoutThinking(v)
-          : getMessageTextContent(v)
+            ? getMessageTextContentWithoutThinking(v)
+            : getMessageTextContent(v)
       ) as any;
 
       messages.push({ role: v.role, content });
@@ -131,6 +133,10 @@ export class QwenApi implements LLMApi {
         top_p: modelConfig.top_p === 1 ? 0.99 : modelConfig.top_p, // qwen top_p is should be < 1
       },
     };
+    applyQwenReasoning(requestPayload.parameters, {
+      ...options.config,
+      ...modelConfig,
+    });
 
     const controller = new AbortController();
     options.onController?.(controller);
