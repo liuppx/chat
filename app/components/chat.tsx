@@ -129,7 +129,12 @@ import { prettyObject } from "../utils/format";
 import { ExportMessageModal } from "./exporter";
 import { getClientConfig } from "../config/client";
 import { useSessionModels } from "../utils/hooks";
-import { ClientApi, MultimodalContent } from "../client/api";
+import {
+  ClientApi,
+  MultimodalContent,
+  normalizeSupportedEndpoints,
+  selectPreferredRequestEndpoint,
+} from "../client/api";
 import { createTTSPlayer } from "../utils/audio";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "../utils/ms_edge_tts";
 
@@ -655,16 +660,25 @@ export function ChatActions(props: {
         m.provider?.providerName === currentProviderName,
     );
     if (isUnavailableModel && models.length > 0) {
-      if (hasCandidateModelRestriction) {
-        return;
-      }
       // show next model to default model if exist
       let nextModel = models.find((model) => model.isDefault) || models[0];
       chatStore.updateTargetSession(session, (session) => {
         const sessionSkill = session.mask;
+        const supportedEndpoints = normalizeSupportedEndpoints(
+          nextModel.supportedEndpoints,
+        );
         sessionSkill.modelConfig.model = nextModel.name;
         sessionSkill.modelConfig.providerName = nextModel?.provider
           ?.providerName as ServiceProvider;
+        sessionSkill.modelConfig.supportedEndpoints = supportedEndpoints;
+        sessionSkill.modelConfig.endpointPath = selectPreferredRequestEndpoint(
+          supportedEndpoints,
+          {
+            modelName: nextModel.name,
+          },
+        );
+        sessionSkill.modelConfig.ownedBy = nextModel.ownedBy;
+        sessionSkill.modelConfig.tags = nextModel.tags;
       });
       showToast(
         nextModel?.provider?.providerName == ServiceProvider.Volcengine
@@ -676,7 +690,6 @@ export function ChatActions(props: {
     chatStore,
     currentProviderName,
     currentModel,
-    hasCandidateModelRestriction,
     models,
     session,
     setAttachContents,

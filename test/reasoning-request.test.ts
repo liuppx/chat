@@ -1,4 +1,5 @@
 import {
+  applyAnthropicReasoning,
   applyDeepSeekReasoning,
   applyMessagesReasoning,
   applyOpenAICompatibleReasoning,
@@ -47,6 +48,7 @@ describe("reasoning request helpers", () => {
     });
 
     expect(payload.thinking).toEqual({ type: "enabled" });
+    expect(payload.reasoning_effort).toBe("high");
     expect(payload.temperature).toBeUndefined();
     expect(payload.top_p).toBeUndefined();
     expect(payload.presence_penalty).toBeUndefined();
@@ -78,6 +80,53 @@ describe("reasoning request helpers", () => {
     });
 
     expect(parameters.enable_thinking).toBe(true);
+  });
+
+  test("uses Anthropic extended thinking budget for Claude 4 reasoning models", () => {
+    const payload: Record<string, any> = {
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 8000,
+      temperature: 0.2,
+    };
+
+    applyAnthropicReasoning(payload, {
+      model: "claude-sonnet-4-20250514",
+      providerName: ServiceProvider.Anthropic,
+      reasoningMode: "on",
+      reasoningEffort: "high",
+      max_tokens: 8000,
+    });
+
+    expect(payload.thinking).toEqual({
+      type: "enabled",
+      budget_tokens: 6400,
+    });
+    expect(payload.output_config).toBeUndefined();
+    expect(payload.temperature).toBe(0.2);
+  });
+
+  test("uses Anthropic adaptive thinking effort for newer Claude models", () => {
+    const payload: Record<string, any> = {
+      model: "claude-opus-4-7-20260101",
+      max_tokens: 8000,
+      temperature: 0.2,
+      top_p: 1,
+      top_k: 5,
+    };
+
+    applyAnthropicReasoning(payload, {
+      model: "claude-opus-4-7-20260101",
+      providerName: ServiceProvider.Anthropic,
+      reasoningMode: "on",
+      reasoningEffort: "high",
+      max_tokens: 8000,
+    });
+
+    expect(payload.thinking).toEqual({ type: "enabled" });
+    expect(payload.output_config).toEqual({ effort: "high" });
+    expect(payload.temperature).toBeUndefined();
+    expect(payload.top_p).toBeUndefined();
+    expect(payload.top_k).toBeUndefined();
   });
 
   test("uses DeepSeek thinking when OpenAI client targets a DeepSeek router model", () => {

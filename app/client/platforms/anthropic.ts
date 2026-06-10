@@ -104,6 +104,36 @@ export type ChatStreamResponse = ChatResponse & {
   log_id: string;
 };
 
+export function appendAnthropicToolRound(
+  messages: Array<Record<string, any>>,
+  toolCallMessage: { tool_calls: ChatMessageTool[] },
+  toolCallResult: Array<{ tool_call_id: string; content: string }>,
+) {
+  messages.splice(
+    messages.length,
+    0,
+    {
+      role: "assistant",
+      content: toolCallMessage.tool_calls.map((tool: ChatMessageTool) => ({
+        type: "tool_use",
+        id: tool.id,
+        name: tool?.function?.name,
+        input: tool?.function?.arguments
+          ? JSON.parse(tool?.function?.arguments)
+          : {},
+      })),
+    },
+    {
+      role: "user",
+      content: toolCallResult.map((result) => ({
+        type: "tool_result",
+        tool_use_id: result.tool_call_id,
+        content: result.content,
+      })),
+    },
+  );
+}
+
 const ClaudeMapper = {
   assistant: "assistant",
   user: "user",
@@ -607,36 +637,13 @@ export class ClaudeApi implements LLMApi {
         ) => {
           // reset index value
           index = -1;
-          // @ts-ignore
-          requestPayload?.messages?.splice(
-            // @ts-ignore
-            requestPayload?.messages?.length,
-            0,
-            {
-              role: "assistant",
-              content: toolCallMessage.tool_calls.map(
-                (tool: ChatMessageTool) => ({
-                  type: "tool_use",
-                  id: tool.id,
-                  name: tool?.function?.name,
-                  input: tool?.function?.arguments
-                    ? JSON.parse(tool?.function?.arguments)
-                    : {},
-                }),
-              ),
-            },
-            // @ts-ignore
-            ...toolCallResult.map((result) => ({
-              role: "user",
-              content: [
-                {
-                  type: "tool_result",
-                  tool_use_id: result.tool_call_id,
-                  content: result.content,
-                },
-              ],
-            })),
-          );
+          if (Array.isArray(requestPayload?.messages)) {
+            appendAnthropicToolRound(
+              requestPayload.messages as Array<Record<string, any>>,
+              toolCallMessage,
+              toolCallResult,
+            );
+          }
         },
         options,
       );

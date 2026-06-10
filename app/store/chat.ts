@@ -10,6 +10,7 @@ import { indexedDBStorage } from "@/app/utils/indexedDB-storage";
 import { nanoid } from "nanoid";
 import type {
   ClientApi,
+  LLMConfig,
   MultimodalContent,
   RequestMessage,
 } from "../client/api";
@@ -449,12 +450,13 @@ export const useChatStore = createPersistStore(
           const candidateModels = normalizeModelCandidates(
             skill.candidateModels,
           );
-          const nextModelConfig = shouldSyncFromGlobal
-            ? { ...globalModelConfig }
-            : {
-                ...globalModelConfig,
-                ...skill.modelConfig,
-              };
+          const nextModelConfig: ModelConfig & Partial<LLMConfig> =
+            shouldSyncFromGlobal
+              ? { ...globalModelConfig }
+              : {
+                  ...globalModelConfig,
+                  ...skill.modelConfig,
+                };
           const runtimeModels = collectModelsWithDefaultModel(
             config.models,
             [config.customModels, accessStore.customModels]
@@ -475,6 +477,8 @@ export const useChatStore = createPersistStore(
             return false;
           }
 
+          const preferredCandidateModel =
+            sessionModels.find((model) => model.isDefault) ?? sessionModels[0];
           const hasCurrentModel =
             !hasCandidateModelRestriction ||
             sessionModels.some((model) =>
@@ -483,6 +487,27 @@ export const useChatStore = createPersistStore(
                 providerName: nextModelConfig.providerName,
               }),
             );
+          if (hasCandidateModelRestriction && !hasCurrentModel) {
+            const providerName = preferredCandidateModel?.provider
+              ?.providerName as ServiceProvider | undefined;
+            const supportedEndpoints = normalizeSupportedEndpoints(
+              preferredCandidateModel?.supportedEndpoints,
+            );
+            const endpointPath = selectPreferredRequestEndpoint(
+              supportedEndpoints,
+              {
+                modelName: preferredCandidateModel.name,
+              },
+            );
+            nextModelConfig.model = preferredCandidateModel.name;
+            if (providerName) {
+              nextModelConfig.providerName = providerName;
+            }
+            nextModelConfig.supportedEndpoints = supportedEndpoints;
+            nextModelConfig.endpointPath = endpointPath;
+            nextModelConfig.ownedBy = preferredCandidateModel.ownedBy;
+            nextModelConfig.tags = preferredCandidateModel.tags;
+          }
 
           session.mask = {
             ...skill,
@@ -491,10 +516,6 @@ export const useChatStore = createPersistStore(
             modelConfig: nextModelConfig,
           };
           session.topic = skill.name;
-
-          if (hasCandidateModelRestriction && !hasCurrentModel) {
-            showToast("技能默认模型当前不可用，请先选择一个可用模型");
-          }
         }
 
         set((state) => ({

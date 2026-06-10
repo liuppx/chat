@@ -117,7 +117,7 @@ export function resolveSkillRuntimeStatus(params: {
     };
   }
 
-  if (!hasCurrentModel) {
+  if (!hasCandidateModelRestriction && !hasCurrentModel) {
     issues.push({
       type: "model",
       message: "默认模型需要调整",

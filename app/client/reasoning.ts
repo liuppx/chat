@@ -21,6 +21,26 @@ function normalizeTags(tags?: readonly string[]) {
   return Array.isArray(tags) ? tags.map((tag) => tag.toLowerCase()) : [];
 }
 
+function isAnthropicAdaptiveThinkingModel(model: string) {
+  return (
+    model.includes("opus-4-6") ||
+    model.includes("opus-4-7") ||
+    model.includes("sonnet-4-6") ||
+    model.includes("haiku-4-5") ||
+    model.includes("claude-fable-5") ||
+    model.includes("claude-mythos-5")
+  );
+}
+
+function getAnthropicThinkingBudget(
+  effort: ReasoningEffort,
+  maxTokens: number,
+) {
+  const ratio = effort === "high" ? 0.8 : effort === "medium" ? 0.5 : 0.25;
+  const rawBudget = Math.floor(maxTokens * ratio);
+  return Math.max(1024, Math.min(rawBudget, maxTokens - 1));
+}
+
 export function isReasoningCapableModel(
   config: Pick<LLMConfig, "model" | "providerName" | "tags" | "ownedBy">,
 ) {
@@ -55,7 +75,10 @@ export function isReasoningCapableModel(
     return (
       model.includes("thinking") ||
       model.includes("opus-4") ||
-      model.includes("sonnet-4")
+      model.includes("sonnet-4") ||
+      model.includes("haiku-4-5") ||
+      model.includes("claude-fable-5") ||
+      model.includes("claude-mythos-5")
     );
   }
   if (
@@ -98,6 +121,7 @@ export function applyDeepSeekReasoning(
   payload.thinking = { type: enabled ? "enabled" : "disabled" };
   if (!enabled) return;
 
+  payload.reasoning_effort = intent.effort;
   delete payload.temperature;
   delete payload.top_p;
   delete payload.presence_penalty;
@@ -158,7 +182,23 @@ export function applyAnthropicReasoning(
   if (!intent.enabled) return;
 
   const maxTokens = Number(payload.max_tokens || config.max_tokens || 4000);
-  const budgetTokens = Math.max(1024, Math.min(4096, maxTokens - 1));
+  const model = normalizeModel(config.model);
+
+  if (isAnthropicAdaptiveThinkingModel(model)) {
+    payload.thinking = {
+      type: "enabled",
+    };
+    payload.output_config = {
+      ...(payload.output_config ?? {}),
+      effort: intent.effort,
+    };
+    delete payload.temperature;
+    delete payload.top_p;
+    delete payload.top_k;
+    return;
+  }
+
+  const budgetTokens = getAnthropicThinkingBudget(intent.effort, maxTokens);
   if (budgetTokens >= maxTokens) return;
   payload.thinking = {
     type: "enabled",
