@@ -40,6 +40,14 @@ const pubDate = getArg("--pub-date") ?? new Date().toISOString();
 const { artifact: artifactArch, platform: platformArch } = resolveArch();
 const version = tauriConfig.version;
 const productName = tauriConfig.productName;
+const normalizedTagVersion = tag.replace(/^v/, "");
+
+if (normalizedTagVersion !== version) {
+  throw new Error(
+    `Release tag ${tag} does not match Tauri version ${version}. Update src-tauri/tauri.conf.json or use the matching tag.`,
+  );
+}
+
 const bundleDir = path.join(rootDir, "src-tauri", "target", "release", "bundle", "macos");
 const updaterBundleName = `${productName}.app.tar.gz`;
 const updaterSignatureName = `${updaterBundleName}.sig`;

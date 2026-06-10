@@ -54,6 +54,14 @@ jobs:
             --tag "${{ github.event.release.tag_name }}" \
             --pub-date "${{ github.event.release.published_at }}"
 
+      - name: Verify release updater assets
+        if: github.event_name == 'release'
+        run: |
+          test -s src-tauri/target/release/bundle/macos/Chat.app.tar.gz
+          test -s src-tauri/target/release/bundle/macos/Chat.app.tar.gz.sig
+          test -s src-tauri/target/release/bundle/macos/latest.json
+          node -e "const fs=require('fs'); const manifest=JSON.parse(fs.readFileSync('src-tauri/target/release/bundle/macos/latest.json','utf8')); if (!manifest.platforms?.['darwin-aarch64']?.url || !manifest.platforms?.['darwin-aarch64']?.signature) throw new Error('Invalid macOS updater manifest');"
+
       - name: Upload workflow package artifacts
         uses: actions/upload-artifact@v4
         with:
