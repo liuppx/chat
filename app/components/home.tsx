@@ -48,9 +48,11 @@ import { notifyErrorWithOptions } from "../plugins/show_window";
 
 const loadFunc = async () => {
   try {
-    await waitForWallet();
+    const provider = await initWalletListeners({ refresh: true });
+    if (!provider) {
+      throw new Error("❌未检测到钱包");
+    }
     localStorage.setItem("hasConnectedWallet", "true");
-    await initWalletListeners();
   } catch (error) {
     console.error("钱包检测失败:", error);
     localStorage.setItem("hasConnectedWallet", "false");

@@ -621,12 +621,14 @@ function createWebdavProxyFetcher(endpoint: string) {
 async function getUcanWebDavClient(store: SyncStore) {
   const envBaseUrl = getEnvWebdavBaseUrl();
   const envPrefix = getEnvWebdavPrefix();
-  console.log("[WebDav UCAN] config", {
-    useProxy: store.useProxy,
-    backendBaseUrl: envBaseUrl,
-    backendPrefix: envPrefix,
-    authType: store.webdav.authType,
-  });
+  if (process.env.NODE_ENV === "development") {
+    console.debug("[WebDav UCAN] config", {
+      useProxy: store.useProxy,
+      backendBaseUrl: envBaseUrl,
+      backendPrefix: envPrefix,
+      authType: store.webdav.authType,
+    });
+  }
   const backendUrl = resolveWebdavBaseUrl(store, envBaseUrl);
   if (!backendUrl) {
     throw new Error("WEBDAV_BACKEND_BASE_URL is not configured");
@@ -916,11 +918,7 @@ function createUcanWebDavClient(store: SyncStore) {
       }
     },
 
-    async writeLockMeta(
-      lockMetaPath: string,
-      owner: string,
-      ttlMs: number,
-    ) {
+    async writeLockMeta(lockMetaPath: string, owner: string, ttlMs: number) {
       const { client } = await getUcanWebDavClient(store);
       const payload = JSON.stringify(createLockMeta(owner, ttlMs));
       await client.upload(lockMetaPath, payload, "application/json");

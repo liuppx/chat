@@ -297,7 +297,7 @@ function bindWalletListeners(provider: Eip1193Provider) {
   return listenersCleanup;
 }
 
-export async function initWalletListeners() {
+export async function initWalletListeners(options?: { refresh?: boolean }) {
   if (!providerWatcherCleanup) {
     providerWatcherCleanup = watchProvider(({ provider }) => {
       currentProvider = provider;
@@ -314,7 +314,9 @@ export async function initWalletListeners() {
     }, providerOptions);
   }
 
-  const provider = await resolveProvider({ refresh: true });
+  const provider = await resolveProvider({
+    refresh: options?.refresh ?? false,
+  });
   if (!provider) {
     return null;
   }

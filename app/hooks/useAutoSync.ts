@@ -9,6 +9,10 @@ import {
   isUcanSignPendingError,
 } from "../plugins/ucan-sign-lock";
 
+let autoSyncInFlight = false;
+let lastAutoSyncAt = 0;
+const AUTO_SYNC_DEDUPE_WINDOW_MS = 1500;
+
 export function useAutoSync() {
   const hasHydrated = useSyncStore((state) => state._hasHydrated);
   const autoSyncEnabled = useSyncStore((state) => state.autoSync);
@@ -29,7 +33,6 @@ export function useAutoSync() {
 
   const enabled = autoSyncEnabled && hasHydrated && canSync;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inFlightRef = useRef(false);
 
   useEffect(() => {
     const onAuthChange = () => {
@@ -45,7 +48,9 @@ export function useAutoSync() {
 
   const triggerSync = useCallback(
     async (reason: string) => {
-      if (!enabled || inFlightRef.current) return;
+      if (!enabled || autoSyncInFlight) return;
+      const now = Date.now();
+      if (now - lastAutoSyncAt < AUTO_SYNC_DEDUPE_WINDOW_MS) return;
       if (isUcanSignPending()) {
         return;
       }
@@ -58,16 +63,17 @@ export function useAutoSync() {
         }, debounceMs);
         return;
       }
-      inFlightRef.current = true;
+      autoSyncInFlight = true;
       try {
         await autoSync({ interactive: false });
+        lastAutoSyncAt = Date.now();
       } catch (e) {
         if (isUcanSignPendingError(e)) {
           return;
         }
         console.error(`[AutoSync] ${reason} failed`, e);
       } finally {
-        inFlightRef.current = false;
+        autoSyncInFlight = false;
       }
     },
     [autoSync, debounceMs, enabled],
