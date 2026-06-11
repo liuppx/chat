@@ -913,6 +913,8 @@ const en: LocaleType = {
     FeaturedTitle: "Skills",
     FeaturedSubTitle: "Skills apply task-specific prompts and model settings.",
     More: "All",
+    EmptySkills: "No available skills",
+    ExploreSkills: "Discover",
     NotShow: "Never Show Again",
     ConfirmNoShow: "Confirm to disable？You can enable it in settings later.",
   },

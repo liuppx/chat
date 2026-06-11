@@ -186,6 +186,33 @@
     flex-shrink: 0;
   }
 
+  .empty-skills {
+    grid-column: 1 / -1;
+    min-height: 58px;
+    padding: 0 14px;
+    border: var(--border-in-light);
+    border-radius: 12px;
+    color: var(--black);
+    background: var(--white);
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    opacity: 0.82;
+
+    button {
+      flex-shrink: 0;
+      border: 0;
+      padding: 6px 10px;
+      border-radius: 999px;
+      color: var(--primary);
+      background: var(--hover-color);
+      cursor: pointer;
+      font-weight: 600;
+    }
+  }
+
   .recent-skills {
     width: min(1100px, calc(100% - 40px));
     min-width: 0;

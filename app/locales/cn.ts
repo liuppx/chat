@@ -898,6 +898,8 @@ const cn = {
     FeaturedTitle: "技能",
     FeaturedSubTitle: "技能会带上适合当前任务的提示词和模型参数。",
     More: "全部",
+    EmptySkills: "暂无可用技能",
+    ExploreSkills: "去发现",
   },
 
   URLCommand: {
