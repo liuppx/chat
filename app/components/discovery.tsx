@@ -43,7 +43,9 @@ import { useAccessStore } from "../store/access";
 import {
   getSkillRuntimeIssueSummary,
   getSkillRuntimeStatusOrder,
+  hasSkillMcpRuntimeIssue,
   resolveSkillRuntimeStatus,
+  SkillRuntimeResult,
   SkillRuntimeStatus,
 } from "../skills/runtime";
 
@@ -69,6 +71,7 @@ type Capability = {
   skillPackage?: SkillPackage;
   skillPackageLang?: Lang;
   runtimeStatus?: SkillRuntimeStatus;
+  runtimeResult?: SkillRuntimeResult;
 };
 
 const typeOrder: CapabilityType[] = ["all", "skill", "mcp", "provider"];
@@ -125,8 +128,8 @@ export function DiscoveryPage() {
   const defaultModel = useAccessStore((state) => state.defaultModel);
   const [mcpConfig, setMcpConfig] = useState<McpConfigData>();
   const [mcpStatuses, setMcpStatuses] = useState<
-    Record<string, ServerStatusResponse>
-  >({});
+    Record<string, ServerStatusResponse> | undefined
+  >();
   const [communitySkillPackages, setCommunitySkillPackages] =
     useState<SkillPackageList>({});
   const [communityMcpServers, setCommunityMcpServers] = useState<
@@ -261,6 +264,7 @@ export function DiscoveryPage() {
           globalModelConfig: modelConfig,
           installedPluginIds,
           installedMcpServerIds,
+          mcpStatuses,
         });
         const runtimeSummary = getSkillRuntimeIssueSummary(runtime);
         return {
@@ -293,6 +297,7 @@ export function DiscoveryPage() {
           installed: !skill.builtin,
           skill: runtimeSkill,
           runtimeStatus: runtime.status,
+          runtimeResult: runtime,
         };
       })
       .sort((a, b) => {
@@ -326,6 +331,7 @@ export function DiscoveryPage() {
           globalModelConfig: modelConfig,
           installedPluginIds,
           installedMcpServerIds,
+          mcpStatuses,
         });
         const runtimeSummary = getSkillRuntimeIssueSummary(runtime);
 
@@ -366,6 +372,7 @@ export function DiscoveryPage() {
           skillPackage,
           skillPackageLang: currentLang,
           runtimeStatus: runtime.status,
+          runtimeResult: runtime,
         };
       })
       .sort((a, b) => {
@@ -536,14 +543,20 @@ export function DiscoveryPage() {
         if (chatStore.newSession(installedSkill) !== false) {
           navigate(Path.Chat);
         }
+      } else if (hasSkillMcpRuntimeIssue(item.runtimeResult)) {
+        navigate(Path.McpMarket);
       } else {
-        navigate(Path.Skills);
+        openSkillConfig(installedSkill);
       }
       return;
     }
 
     if (item.type === "skill" && item.skill) {
       if (item.runtimeStatus !== "ready") {
+        if (hasSkillMcpRuntimeIssue(item.runtimeResult)) {
+          navigate(Path.McpMarket);
+          return;
+        }
         openSkillConfig(item.skill);
         return;
       }

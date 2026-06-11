@@ -1,6 +1,7 @@
 import { LLMModel } from "../client/api";
-import { Skill, getSkillApiTools, getSkillMcpTools } from "../store/skill";
 import { ModelConfig } from "../store/config";
+import { ServerStatusResponse } from "../mcp/types";
+import type { Skill } from "../store/skill";
 import {
   collectModelsWithDefaultModel,
   filterModelsByCandidates,
@@ -10,7 +11,11 @@ import {
 
 export type SkillRuntimeStatus = "ready" | "needs_config" | "unavailable";
 
-export type SkillRuntimeIssueType = "model" | "tool";
+export type SkillRuntimeIssueType =
+  | "model"
+  | "api_tool"
+  | "mcp_missing"
+  | "mcp_inactive";
 
 export type SkillRuntimeIssue = {
   type: SkillRuntimeIssueType;
@@ -39,6 +44,22 @@ export function getSkillRuntimeIssueSummary(result: SkillRuntimeResult) {
   return result.issues.map((issue) => issue.message).join(" · ");
 }
 
+export function hasSkillMcpRuntimeIssue(result?: SkillRuntimeResult) {
+  return (
+    result?.issues.some(
+      (issue) => issue.type === "mcp_missing" || issue.type === "mcp_inactive",
+    ) ?? false
+  );
+}
+
+function getSkillApiTools(skill: Skill) {
+  return skill.tools?.apiTools ?? skill.plugin ?? [];
+}
+
+function getSkillMcpTools(skill: Skill) {
+  return skill.tools?.mcpTools ?? [];
+}
+
 export function resolveSkillRuntimeStatus(params: {
   skill: Skill;
   models: readonly LLMModel[];
@@ -48,6 +69,7 @@ export function resolveSkillRuntimeStatus(params: {
   globalModelConfig: ModelConfig;
   installedPluginIds?: readonly string[];
   installedMcpServerIds?: readonly string[];
+  mcpStatuses?: Record<string, ServerStatusResponse | undefined>;
 }): SkillRuntimeResult {
   const {
     skill,
@@ -58,6 +80,7 @@ export function resolveSkillRuntimeStatus(params: {
     globalModelConfig,
     installedPluginIds,
     installedMcpServerIds,
+    mcpStatuses,
   } = params;
 
   const runtimeModels = collectModelsWithDefaultModel(
@@ -89,9 +112,15 @@ export function resolveSkillRuntimeStatus(params: {
     (id) => !pluginIdSet.has(id),
   ).length;
   const mcpServerIdSet = new Set(installedMcpServerIds ?? []);
-  const missingMcpServerCount = getSkillMcpTools(skill).filter(
+  const mcpTools = getSkillMcpTools(skill);
+  const missingMcpServerCount = mcpTools.filter(
     (id) => !mcpServerIdSet.has(id),
   ).length;
+  const inactiveMcpServerCount = mcpTools.filter((id) => {
+    if (!mcpServerIdSet.has(id)) return false;
+    if (!mcpStatuses) return false;
+    return mcpStatuses[id]?.status !== "active";
+  }).length;
 
   const issues: SkillRuntimeIssue[] = [];
 
@@ -126,7 +155,7 @@ export function resolveSkillRuntimeStatus(params: {
 
   if (missingPluginCount > 0) {
     issues.push({
-      type: "tool",
+      type: "api_tool",
       message:
         missingPluginCount === 1
           ? "缺少 1 个工具配置"
@@ -136,11 +165,21 @@ export function resolveSkillRuntimeStatus(params: {
 
   if (missingMcpServerCount > 0) {
     issues.push({
-      type: "tool",
+      type: "mcp_missing",
       message:
         missingMcpServerCount === 1
           ? "缺少 1 个 MCP 配置"
           : `缺少 ${missingMcpServerCount} 个 MCP 配置`,
+    });
+  }
+
+  if (inactiveMcpServerCount > 0) {
+    issues.push({
+      type: "mcp_inactive",
+      message:
+        inactiveMcpServerCount === 1
+          ? "1 个 MCP 未正常运行"
+          : `${inactiveMcpServerCount} 个 MCP 未正常运行`,
     });
   }
 
