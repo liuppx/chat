@@ -38,8 +38,8 @@ export const OFFICIAL_MCP_PRESET_SERVERS: PresetServer[] = [
     description: "Official MCP server for fetching and converting web content.",
     repo: `${OFFICIAL_REPO_BASE}/fetch`,
     tags: ["official", "web", "http"],
-    command: "uvx",
-    baseArgs: ["mcp-server-fetch"],
+    command: "mcp-server-fetch",
+    baseArgs: [],
     configurable: false,
   },
   {
