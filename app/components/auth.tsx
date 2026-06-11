@@ -145,7 +145,7 @@ export function AuthPage() {
         persistWalletHistory(history);
       }
       setWalletHistory(history);
-      setSelectedWalletAccount(account || "");
+      setSelectedWalletAccount(account || history[0] || "");
       if (valid) {
         setUcanStatus("authorized");
       } else if (account) {

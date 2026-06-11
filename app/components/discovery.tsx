@@ -34,6 +34,7 @@ import { IconButton } from "./button";
 import { ErrorBoundary } from "./error";
 import BrainIcon from "../icons/brain.svg";
 import CloseIcon from "../icons/close.svg";
+import EditIcon from "../icons/edit.svg";
 import EyeIcon from "../icons/eye.svg";
 import ModelServiceIcon from "../icons/llm-icons/default.svg";
 import ToolIcon from "../icons/tool.svg";
@@ -90,6 +91,14 @@ function getDiscoveryPath(view: DiscoveryView, type: CapabilityType) {
   if (type !== "all") params.set("type", type);
   const query = params.toString();
   return query ? `${Path.Discovery}?${query}` : Path.Discovery;
+}
+
+function getSkillConfigPath(skill: Skill) {
+  return `${Path.Skills}?skill=${encodeURIComponent(String(skill.id))}`;
+}
+
+function getBuiltinSkillPackageId(skill: Skill) {
+  return `builtin.${skill.lang}.${skill.createdAt}`;
 }
 
 function getCapabilityIcon(type: Capability["type"]) {
@@ -535,7 +544,7 @@ export function DiscoveryPage() {
 
     if (item.type === "skill" && item.skill) {
       if (item.runtimeStatus !== "ready") {
-        navigate(Path.Skills);
+        openSkillConfig(item.skill);
         return;
       }
       if (chatStore.newSession(item.skill) !== false) {
@@ -544,6 +553,31 @@ export function DiscoveryPage() {
       return;
     }
     navigate(item.path);
+  };
+
+  const openSkillConfig = (skill: Skill) => {
+    if (!skill.builtin) {
+      navigate(getSkillConfigPath(skill));
+      return;
+    }
+
+    const packageId = getBuiltinSkillPackageId(skill);
+    const existingSkill = Object.values(useSkillStore.getState().skills).find(
+      (item) =>
+        item.packageId === packageId ||
+        (!item.builtin &&
+          item.lang === skill.lang &&
+          item.createdAt === skill.createdAt &&
+          item.name === skill.name),
+    );
+    const configurableSkill =
+      existingSkill ??
+      useSkillStore.getState().create({
+        ...skill,
+        packageId,
+      });
+
+    navigate(getSkillConfigPath(configurableSkill));
   };
 
   const getActionText = (item: Capability) => {
@@ -665,6 +699,14 @@ export function DiscoveryPage() {
                     bordered
                     onClick={() => handleCapabilityAction(item)}
                   />
+                  {item.type === "skill" && item.skill && (
+                    <IconButton
+                      icon={<EditIcon />}
+                      text={Locale.Discovery.Configure}
+                      bordered
+                      onClick={() => openSkillConfig(item.skill!)}
+                    />
+                  )}
                 </div>
               </div>
             ))}

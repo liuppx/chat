@@ -44,7 +44,7 @@ import {
 } from "./ui-lib";
 import { Avatar, AvatarPicker } from "./emoji";
 import Locale, { AllLangs, ALL_LANG_OPTIONS, Lang } from "../locales";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import chatStyle from "./chat.module.scss";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -902,6 +902,7 @@ export function ContextPrompts(props: {
 
 export function SkillPage() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const skillStore = useSkillStore();
   const chatStore = useChatStore();
@@ -947,7 +948,23 @@ export function SkillPage() {
   const [editingSkillId, setEditingSkillId] = useState<string | undefined>();
   const editingSkill =
     skillStore.get(editingSkillId) ?? BUILTIN_SKILL_STORE.get(editingSkillId);
-  const closeSkillModal = () => setEditingSkillId(undefined);
+  const closeSkillModal = () => {
+    setEditingSkillId(undefined);
+    if (new URLSearchParams(location.search).has("skill")) {
+      navigate(Path.Skills, { replace: true });
+    }
+  };
+
+  useEffect(() => {
+    const skillId = new URLSearchParams(location.search).get("skill");
+    if (!skillId) return;
+    const matchedSkill = allSkills.find(
+      (skill) => String(skill.id) === skillId,
+    );
+    if (matchedSkill) {
+      setEditingSkillId(String(matchedSkill.id));
+    }
+  }, [allSkills, location.search]);
 
   const downloadAll = () => {
     downloadAs(
