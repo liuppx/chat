@@ -1,5 +1,5 @@
 import { BuiltinSkill } from "./typing";
-import { createBuiltinSkill } from "./utils";
+import { CHAT_TOOLBAR_PRESETS, createBuiltinSkill } from "./utils";
 import { ServiceProvider } from "../constant";
 
 export const CN_SKILLS: BuiltinSkill[] = [
@@ -15,6 +15,9 @@ export const CN_SKILLS: BuiltinSkill[] = [
     ],
     lang: "cn",
     createdAt: 1700000001001,
+    ui: {
+      sessionToolbar: CHAT_TOOLBAR_PRESETS.general,
+    },
     context: [
       {
         id: "cn-general-0",
@@ -41,6 +44,9 @@ export const CN_SKILLS: BuiltinSkill[] = [
     ],
     lang: "cn",
     createdAt: 1700000001002,
+    ui: {
+      sessionToolbar: CHAT_TOOLBAR_PRESETS.research,
+    },
     context: [
       {
         id: "cn-web-research-0",
@@ -68,6 +74,9 @@ export const CN_SKILLS: BuiltinSkill[] = [
     ],
     lang: "cn",
     createdAt: 1700000001003,
+    ui: {
+      sessionToolbar: CHAT_TOOLBAR_PRESETS.research,
+    },
     context: [
       {
         id: "cn-reading-0",
@@ -95,6 +104,9 @@ export const CN_SKILLS: BuiltinSkill[] = [
     ],
     lang: "cn",
     createdAt: 1700000001004,
+    ui: {
+      sessionToolbar: CHAT_TOOLBAR_PRESETS.research,
+    },
     context: [
       {
         id: "cn-compare-0",
@@ -128,6 +140,9 @@ export const CN_SKILLS: BuiltinSkill[] = [
     toolStrategy: {
       nativeMcpTools: "auto",
     },
+    ui: {
+      sessionToolbar: CHAT_TOOLBAR_PRESETS.reasoning,
+    },
     context: [
       {
         id: "cn-deep-reasoning-0",
@@ -159,6 +174,9 @@ export const CN_SKILLS: BuiltinSkill[] = [
     createdAt: 1700000001005,
     syncGlobalConfig: false,
     launch: { type: "sd" },
+    ui: {
+      sessionToolbar: CHAT_TOOLBAR_PRESETS.image,
+    },
     context: [
       {
         id: "cn-image-0",

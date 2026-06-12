@@ -12,6 +12,22 @@
             ],
             "lang": "cn",
             "createdAt": 1700000001001,
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": true,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": true
+                }
+            },
             "context": [
                 {
                     "id": "cn-general-0",
@@ -45,6 +61,22 @@
             ],
             "lang": "cn",
             "createdAt": 1700000001002,
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
+            },
             "context": [
                 {
                     "id": "cn-web-research-0",
@@ -78,6 +110,22 @@
             ],
             "lang": "cn",
             "createdAt": 1700000001003,
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
+            },
             "context": [
                 {
                     "id": "cn-reading-0",
@@ -111,6 +159,22 @@
             ],
             "lang": "cn",
             "createdAt": 1700000001004,
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
+            },
             "context": [
                 {
                     "id": "cn-compare-0",
@@ -153,6 +217,22 @@
             "toolStrategy": {
                 "nativeMcpTools": "auto"
             },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": false,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": false,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": false,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
+            },
             "context": [
                 {
                     "id": "cn-deep-reasoning-0",
@@ -190,6 +270,22 @@
             "syncGlobalConfig": false,
             "launch": {
                 "type": "sd"
+            },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": false,
+                    "theme": false,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": false,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": true,
+                    "plugins": false,
+                    "mcp": false,
+                    "shortcutKeys": false,
+                    "realtime": false
+                }
             },
             "context": [
                 {
@@ -230,6 +326,22 @@
             ],
             "lang": "en",
             "createdAt": 1700000002001,
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": true,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": true
+                }
+            },
             "context": [
                 {
                     "id": "en-general-0",
@@ -263,6 +375,22 @@
             ],
             "lang": "en",
             "createdAt": 1700000002002,
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
+            },
             "context": [
                 {
                     "id": "en-web-research-0",
@@ -296,6 +424,22 @@
             ],
             "lang": "en",
             "createdAt": 1700000002003,
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
+            },
             "context": [
                 {
                     "id": "en-reading-0",
@@ -329,6 +473,22 @@
             ],
             "lang": "en",
             "createdAt": 1700000002004,
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
+            },
             "context": [
                 {
                     "id": "en-compare-0",
@@ -371,6 +531,22 @@
             "toolStrategy": {
                 "nativeMcpTools": "auto"
             },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": false,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": false,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": false,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
+            },
             "context": [
                 {
                     "id": "en-deep-reasoning-0",
@@ -408,6 +584,22 @@
             "syncGlobalConfig": false,
             "launch": {
                 "type": "sd"
+            },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": false,
+                    "theme": false,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": false,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": true,
+                    "plugins": false,
+                    "mcp": false,
+                    "shortcutKeys": false,
+                    "realtime": false
+                }
             },
             "context": [
                 {

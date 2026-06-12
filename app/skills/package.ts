@@ -2,7 +2,11 @@ import type { ModelCandidate } from "../client/api";
 import type { Lang } from "../locales";
 import type { ChatMessage } from "../store/chat";
 import type { ModelConfig } from "../store/config";
-import type { BuiltInSkillToolType, Skill } from "../store/skill";
+import type {
+  BuiltInSkillToolType,
+  Skill,
+  SkillSessionToolbarConfig,
+} from "../store/skill";
 import type { BuiltinSkill } from "./typing";
 
 export type LocalizedText = string | Partial<Record<Lang, string>>;
@@ -91,6 +95,7 @@ export type SkillPackage = {
   ui?: {
     entryLabel?: LocalizedText;
     emptyState?: "minimal" | "guided";
+    sessionToolbar?: SkillSessionToolbarConfig;
   };
   permissions?: SkillPermissions;
   compatibility?: {
@@ -209,6 +214,7 @@ export function skillPackageToSkill(
       mcpTools: skillPackage.mcp?.servers?.map((server) => server.id) ?? [],
       apiTools,
     },
+    ui: skillPackage.ui,
     launch: resolveLegacyLaunch(skillPackage.launch),
   };
   syncSkillLegacyPlugin(skill);
@@ -293,6 +299,7 @@ export function skillToSkillPackage(skill: Skill | BuiltinSkill): SkillPackage {
         required: false,
       })),
     },
+    ui: skill.ui,
     permissions: {
       network: false,
       filesystem: false,

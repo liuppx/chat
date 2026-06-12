@@ -46,6 +46,22 @@
             "mcp": {
                 "servers": []
             },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": true,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": true
+                }
+            },
             "permissions": {
                 "network": false,
                 "filesystem": false,
@@ -105,6 +121,22 @@
             "tools": [],
             "mcp": {
                 "servers": []
+            },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
             },
             "permissions": {
                 "network": false,
@@ -166,6 +198,22 @@
             "mcp": {
                 "servers": []
             },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
+            },
             "permissions": {
                 "network": false,
                 "filesystem": false,
@@ -225,6 +273,22 @@
             "tools": [],
             "mcp": {
                 "servers": []
+            },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
             },
             "permissions": {
                 "network": false,
@@ -292,6 +356,22 @@
             "tools": [],
             "mcp": {
                 "servers": []
+            },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": false,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": false,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": false,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
             },
             "permissions": {
                 "network": false,
@@ -363,6 +443,22 @@
             "mcp": {
                 "servers": []
             },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": false,
+                    "theme": false,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": false,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": true,
+                    "plugins": false,
+                    "mcp": false,
+                    "shortcutKeys": false,
+                    "realtime": false
+                }
+            },
             "permissions": {
                 "network": false,
                 "filesystem": false,
@@ -425,6 +521,22 @@
             "mcp": {
                 "servers": []
             },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": true,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": true
+                }
+            },
             "permissions": {
                 "network": false,
                 "filesystem": false,
@@ -484,6 +596,22 @@
             "tools": [],
             "mcp": {
                 "servers": []
+            },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
             },
             "permissions": {
                 "network": false,
@@ -545,6 +673,22 @@
             "mcp": {
                 "servers": []
             },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
+            },
             "permissions": {
                 "network": false,
                 "filesystem": false,
@@ -604,6 +748,22 @@
             "tools": [],
             "mcp": {
                 "servers": []
+            },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": true,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": true,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
             },
             "permissions": {
                 "network": false,
@@ -671,6 +831,22 @@
             "tools": [],
             "mcp": {
                 "servers": []
+            },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": true,
+                    "theme": false,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": true,
+                    "modelSelector": true,
+                    "imageUpload": false,
+                    "imageParams": false,
+                    "plugins": false,
+                    "mcp": false,
+                    "shortcutKeys": true,
+                    "realtime": false
+                }
             },
             "permissions": {
                 "network": false,
@@ -741,6 +917,22 @@
             "tools": [],
             "mcp": {
                 "servers": []
+            },
+            "ui": {
+                "sessionToolbar": {
+                    "settings": false,
+                    "theme": false,
+                    "promptHints": true,
+                    "skillSwitcher": true,
+                    "clearContext": false,
+                    "modelSelector": true,
+                    "imageUpload": true,
+                    "imageParams": true,
+                    "plugins": false,
+                    "mcp": false,
+                    "shortcutKeys": false,
+                    "realtime": false
+                }
             },
             "permissions": {
                 "network": false,

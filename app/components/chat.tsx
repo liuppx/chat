@@ -123,7 +123,11 @@ import {
 } from "../constant";
 import { Avatar } from "./emoji";
 import { ContextPrompts, SkillAvatar, SkillConfig } from "./mask";
-import { syncSkillLegacyPlugin, useSkillStore } from "../store/skill";
+import {
+  getSkillSessionToolbar,
+  syncSkillLegacyPlugin,
+  useSkillStore,
+} from "../store/skill";
 import { ChatCommandPrefix, useChatCommand, useCommand } from "../command";
 import { prettyObject } from "../utils/format";
 import { ExportMessageModal } from "./exporter";
@@ -541,6 +545,7 @@ export function ChatActions(props: {
   const pluginStore = usePluginStore();
   const session = chatStore.currentSession();
   const sessionSkill = session.mask;
+  const toolbar = getSkillSessionToolbar(sessionSkill);
   const { setAttachContents, setUploading } = props;
 
   // switch themes
@@ -649,7 +654,7 @@ export function ChatActions(props: {
   const isMobileScreen = useMobileScreen();
 
   useEffect(() => {
-    const show = isVisionModel(currentModel);
+    const show = toolbar.imageUpload && isVisionModel(currentModel);
     setShowUploadImage(show);
     if (!show) {
       setAttachContents([]);
@@ -698,6 +703,7 @@ export function ChatActions(props: {
     session,
     setAttachContents,
     setUploading,
+    toolbar.imageUpload,
   ]);
 
   return (
@@ -717,7 +723,7 @@ export function ChatActions(props: {
             icon={<BottomIcon />}
           />
         )}
-        {props.hitBottom && (
+        {props.hitBottom && toolbar.settings && (
           <ChatAction
             onClick={props.showPromptModal}
             text={Locale.Chat.InputActions.Settings}
@@ -725,65 +731,75 @@ export function ChatActions(props: {
           />
         )}
 
-        {showUploadImage && (
+        {toolbar.imageUpload && showUploadImage && (
           <ChatAction
             onClick={props.uploadImage}
             text={Locale.Chat.InputActions.UploadImage}
             icon={props.uploading ? <LoadingButtonIcon /> : <ImageIcon />}
           />
         )}
-        <ChatAction
-          onClick={nextTheme}
-          text={Locale.Chat.InputActions.Theme[theme]}
-          icon={
-            <>
-              {theme === Theme.Auto ? (
-                <AutoIcon />
-              ) : theme === Theme.Light ? (
-                <LightIcon />
-              ) : theme === Theme.Dark ? (
-                <DarkIcon />
-              ) : null}
-            </>
-          }
-        />
+        {toolbar.theme && (
+          <ChatAction
+            onClick={nextTheme}
+            text={Locale.Chat.InputActions.Theme[theme]}
+            icon={
+              <>
+                {theme === Theme.Auto ? (
+                  <AutoIcon />
+                ) : theme === Theme.Light ? (
+                  <LightIcon />
+                ) : theme === Theme.Dark ? (
+                  <DarkIcon />
+                ) : null}
+              </>
+            }
+          />
+        )}
 
-        <ChatAction
-          onClick={props.showPromptHints}
-          text={Locale.Chat.InputActions.Prompt}
-          icon={<PromptIcon />}
-        />
+        {toolbar.promptHints && (
+          <ChatAction
+            onClick={props.showPromptHints}
+            text={Locale.Chat.InputActions.Prompt}
+            icon={<PromptIcon />}
+          />
+        )}
 
-        <ChatAction
-          onClick={() => {
-            navigate(Path.Skills);
-          }}
-          text={Locale.Chat.InputActions.Masks}
-          icon={<MaskIcon />}
-        />
+        {toolbar.skillSwitcher && (
+          <ChatAction
+            onClick={() => {
+              navigate(Path.Skills);
+            }}
+            text={Locale.Chat.InputActions.Masks}
+            icon={<MaskIcon />}
+          />
+        )}
 
-        <ChatAction
-          text={Locale.Chat.InputActions.Clear}
-          icon={<BreakIcon />}
-          onClick={() => {
-            chatStore.updateTargetSession(session, (session) => {
-              if (session.clearContextIndex === session.messages.length) {
-                session.clearContextIndex = undefined;
-              } else {
-                session.clearContextIndex = session.messages.length;
-                session.memoryPrompt = ""; // will clear memory
-              }
-            });
-          }}
-        />
+        {toolbar.clearContext && (
+          <ChatAction
+            text={Locale.Chat.InputActions.Clear}
+            icon={<BreakIcon />}
+            onClick={() => {
+              chatStore.updateTargetSession(session, (session) => {
+                if (session.clearContextIndex === session.messages.length) {
+                  session.clearContextIndex = undefined;
+                } else {
+                  session.clearContextIndex = session.messages.length;
+                  session.memoryPrompt = ""; // will clear memory
+                }
+              });
+            }}
+          />
+        )}
 
-        <ChatAction
-          onClick={() => setShowModelSelector(true)}
-          text={currentModelName}
-          icon={<RobotIcon />}
-        />
+        {toolbar.modelSelector && (
+          <ChatAction
+            onClick={() => setShowModelSelector(true)}
+            text={currentModelName}
+            icon={<RobotIcon />}
+          />
+        )}
 
-        {showModelSelector && (
+        {toolbar.modelSelector && showModelSelector && (
           <Selector
             defaultSelectedValue={`${currentModel}@${currentProviderName}`}
             items={modelSelectorItems}
@@ -817,7 +833,7 @@ export function ChatActions(props: {
           />
         )}
 
-        {supportsCustomSize(currentModel) && (
+        {toolbar.imageParams && supportsCustomSize(currentModel) && (
           <ChatAction
             onClick={() => setShowSizeSelector(true)}
             text={currentSize}
@@ -845,7 +861,7 @@ export function ChatActions(props: {
           />
         )}
 
-        {qualityOptions.length > 0 && (
+        {toolbar.imageParams && qualityOptions.length > 0 && (
           <ChatAction
             onClick={() => setShowQualitySelector(true)}
             text={currentQuality}
@@ -873,7 +889,7 @@ export function ChatActions(props: {
           />
         )}
 
-        {isDalle3(currentModel) && (
+        {toolbar.imageParams && isDalle3(currentModel) && (
           <ChatAction
             onClick={() => setShowStyleSelector(true)}
             text={currentStyle}
@@ -901,7 +917,7 @@ export function ChatActions(props: {
           />
         )}
 
-        {showPlugins(currentProviderName, currentModel) && (
+        {toolbar.plugins && showPlugins(currentProviderName, currentModel) && (
           <ChatAction
             onClick={() => {
               if (pluginStore.getAll().length == 0) {
@@ -935,17 +951,17 @@ export function ChatActions(props: {
           />
         )}
 
-        {!isMobileScreen && (
+        {!isMobileScreen && toolbar.shortcutKeys && (
           <ChatAction
             onClick={() => props.setShowShortcutKeyModal(true)}
             text={Locale.Chat.ShortcutKey.Title}
             icon={<ShortcutkeyIcon />}
           />
         )}
-        {!isMobileScreen && <MCPAction />}
+        {!isMobileScreen && toolbar.mcp && <MCPAction />}
       </>
       <div className={styles["chat-input-actions-end"]}>
-        {config.realtimeConfig.enable && (
+        {toolbar.realtime && config.realtimeConfig.enable && (
           <ChatAction
             onClick={() => props.setShowChatSidePanel(true)}
             text={"Realtime Chat"}

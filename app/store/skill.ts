@@ -22,6 +22,25 @@ export type SkillToolStrategy = {
   nativeMcpTools?: SkillNativeMcpToolsMode;
 };
 
+export type SkillSessionToolbarConfig = {
+  settings?: boolean;
+  theme?: boolean;
+  promptHints?: boolean;
+  skillSwitcher?: boolean;
+  clearContext?: boolean;
+  modelSelector?: boolean;
+  imageUpload?: boolean;
+  imageParams?: boolean;
+  plugins?: boolean;
+  mcp?: boolean;
+  shortcutKeys?: boolean;
+  realtime?: boolean;
+};
+
+export type SkillUiConfig = {
+  sessionToolbar?: SkillSessionToolbarConfig;
+};
+
 export type Skill = {
   id: string;
   packageId?: string;
@@ -41,12 +60,35 @@ export type Skill = {
   plugin?: string[];
   tools?: SkillToolsConfig;
   toolStrategy?: SkillToolStrategy;
+  ui?: SkillUiConfig;
   enableArtifacts?: boolean;
   enableCodeFold?: boolean;
   launch?: {
     type: "chat" | "sd";
   };
 };
+
+export const DEFAULT_SESSION_TOOLBAR: Required<SkillSessionToolbarConfig> = {
+  settings: true,
+  theme: true,
+  promptHints: true,
+  skillSwitcher: true,
+  clearContext: true,
+  modelSelector: true,
+  imageUpload: true,
+  imageParams: true,
+  plugins: true,
+  mcp: true,
+  shortcutKeys: true,
+  realtime: true,
+};
+
+export function getSkillSessionToolbar(skill: Skill) {
+  return {
+    ...DEFAULT_SESSION_TOOLBAR,
+    ...skill.ui?.sessionToolbar,
+  };
+}
 
 export const DEFAULT_SKILL_STATE = {
   skills: {} as Record<string, Skill>,
@@ -81,6 +123,9 @@ export const createEmptySkill = () =>
     },
     toolStrategy: {
       nativeMcpTools: "auto",
+    },
+    ui: {
+      sessionToolbar: DEFAULT_SESSION_TOOLBAR,
     },
   }) as Skill;
 
