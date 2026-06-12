@@ -388,7 +388,7 @@ export function DiscoveryPage() {
     );
     const mcpToolItems: Capability[] = mcpPresetServers.map((server) => {
       const serverConfig = mcpConfig?.mcpServers[server.id];
-      const serverStatus = mcpStatuses[server.id]?.status;
+      const serverStatus = mcpStatuses?.[server.id]?.status;
       const installed = Boolean(serverConfig);
       const status =
         serverStatus === "active"
