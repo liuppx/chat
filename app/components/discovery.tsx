@@ -529,6 +529,17 @@ export function DiscoveryPage() {
     return matchType && matchView && matchSearch;
   });
 
+  const startSkill = (skill: Skill) => {
+    if (skill.launch?.type === "sd") {
+      navigate(Path.Sd);
+      return;
+    }
+
+    if (chatStore.newSession(skill) !== false) {
+      navigate(Path.Chat);
+    }
+  };
+
   const handleCapabilityAction = (item: Capability) => {
     if (item.type === "skill" && item.skillPackage && item.skillPackageLang) {
       const skill = skillPackageToSkill(
@@ -540,9 +551,7 @@ export function DiscoveryPage() {
       const installedSkill = useSkillStore.getState().create(skill);
 
       if (item.runtimeStatus === "ready") {
-        if (chatStore.newSession(installedSkill) !== false) {
-          navigate(Path.Chat);
-        }
+        startSkill(installedSkill);
       } else if (hasSkillMcpRuntimeIssue(item.runtimeResult)) {
         navigate(Path.McpMarket);
       } else {
@@ -560,9 +569,7 @@ export function DiscoveryPage() {
         openSkillConfig(item.skill);
         return;
       }
-      if (chatStore.newSession(item.skill) !== false) {
-        navigate(Path.Chat);
-      }
+      startSkill(item.skill);
       return;
     }
     navigate(item.path);
