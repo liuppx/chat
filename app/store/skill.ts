@@ -6,6 +6,7 @@ import { ModelConfig, useAppConfig } from "./config";
 import { StoreKey } from "../constant";
 import { nanoid } from "nanoid";
 import { createPersistStore } from "../utils/store";
+import { disablePlainChatReasoning } from "../utils/plain-chat";
 
 export type BuiltInSkillToolType = "web_search";
 
@@ -67,7 +68,7 @@ export const createEmptySkill = () =>
     name: DEFAULT_TOPIC,
     context: [],
     syncGlobalConfig: true, // use global config as default
-    modelConfig: { ...useAppConfig.getState().modelConfig },
+    modelConfig: disablePlainChatReasoning(useAppConfig.getState().modelConfig),
     candidateModels: [],
     lang: getLang(),
     builtin: false,

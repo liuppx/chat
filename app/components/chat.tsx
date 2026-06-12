@@ -145,6 +145,10 @@ import {
   normalizeModelCandidates,
   normalizeProviderName,
 } from "../utils/model";
+import {
+  disablePlainChatReasoning,
+  isPlainChatSkill,
+} from "../utils/plain-chat";
 import { RealtimeChat } from "@/app/components/realtime-chat";
 import clsx from "clsx";
 import { getAvailableClientsCount, isMcpEnabled } from "../mcp/actions";
@@ -1306,7 +1310,9 @@ function ChatView() {
       // auto sync mask config from global config
       const shouldSyncFromGlobal = sessionSkill.syncGlobalConfig !== false;
       if (shouldSyncFromGlobal) {
-        sessionSkill.modelConfig = { ...config.modelConfig };
+        sessionSkill.modelConfig = isPlainChatSkill(sessionSkill)
+          ? disablePlainChatReasoning(config.modelConfig)
+          : { ...config.modelConfig };
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

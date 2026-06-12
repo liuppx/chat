@@ -53,6 +53,10 @@ import { executeMcpAction, getAllTools, isMcpEnabled } from "../mcp/actions";
 import { extractMcpJson, isMcpJson } from "../mcp/utils";
 import { isValidUcanAuthorization } from "../plugins/wallet";
 import { shouldUseNativeMcpTools } from "./native-tools";
+import {
+  disablePlainChatReasoning,
+  isPlainChatSkill,
+} from "../utils/plain-chat";
 
 const localStorage = safeLocalStorage();
 
@@ -637,7 +641,17 @@ export const useChatStore = createPersistStore(
           return;
         }
         const session = get().currentSession();
-        const modelConfig = session.mask.modelConfig;
+        const modelConfig = isPlainChatSkill(session.mask)
+          ? disablePlainChatReasoning(session.mask.modelConfig)
+          : session.mask.modelConfig;
+        if (
+          isPlainChatSkill(session.mask) &&
+          session.mask.modelConfig.reasoningMode !== modelConfig.reasoningMode
+        ) {
+          get().updateTargetSession(session, (session) => {
+            session.mask.modelConfig = modelConfig;
+          });
+        }
         const normalizedAttachments = attachments ?? [];
         const hasDocumentAttachment = hasNonImageDocumentAttachment(
           normalizedAttachments,
