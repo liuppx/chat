@@ -23,6 +23,7 @@ import {
   syncSkillLegacyPlugin,
   useSkillStore,
 } from "../store/skill";
+import { useSdStore } from "../store/sd";
 import {
   ChatMessage,
   createMessage,
@@ -906,6 +907,7 @@ export function SkillPage() {
 
   const skillStore = useSkillStore();
   const chatStore = useChatStore();
+  const sdStore = useSdStore();
 
   const filterLang = skillStore.language;
 
@@ -952,6 +954,18 @@ export function SkillPage() {
     setEditingSkillId(undefined);
     if (new URLSearchParams(location.search).has("skill")) {
       navigate(Path.Skills, { replace: true });
+    }
+  };
+
+  const startSkill = (skill: Skill) => {
+    if (skill.launch?.type === "sd") {
+      sdStore.setCurrentMode("generation");
+      navigate(Path.Sd);
+      return;
+    }
+
+    if (chatStore.newSession(skill) !== false) {
+      navigate(Path.Chat);
     }
   };
 
@@ -1145,11 +1159,7 @@ export function SkillPage() {
                   <IconButton
                     icon={<AddIcon />}
                     text={Locale.Mask.Item.Chat}
-                    onClick={() => {
-                      if (chatStore.newSession(m) !== false) {
-                        navigate(Path.Chat);
-                      }
-                    }}
+                    onClick={() => startSkill(m)}
                   />
                   {m.builtin ? (
                     <IconButton
