@@ -41,6 +41,7 @@ export function SideBar(props: { className?: string }) {
   const currentModel = sdStore.currentModel;
   const params = sdStore.currentParams;
   const setParams = sdStore.setCurrentParams;
+  const currentSessionId = sdStore.currentSessionId;
   const paramColumns = getParams?.(currentModel, params) || [];
   const hasModelSelection = !!currentModel.value && paramColumns.length > 0;
   const canSubmit =
@@ -80,6 +81,7 @@ export function SideBar(props: { className?: string }) {
       provider: currentModel.provider || "",
       provider_name: currentModel.providerName || "",
       endpoint_type: currentModel.endpointType || "",
+      session_id: currentSessionId,
       model_def: currentModel,
       model: currentModel.value,
       model_name: currentModel.name,

@@ -99,6 +99,7 @@ const defaultParams = getModelParamBasicData(defaultModel.params({}), {});
 
 const DEFAULT_SD_STATE = {
   currentId: 0,
+  currentSessionId: "",
   draw: [],
   currentMode: "generation" as ImageFormMode,
   editSourceType: "history" as "history" | "upload",
@@ -113,6 +114,7 @@ const DEFAULT_SD_STATE = {
 export const useSdStore = createPersistStore<
   {
     currentId: number;
+    currentSessionId: string;
     draw: any[];
     currentMode: ImageFormMode;
     editSourceType: "history" | "upload";
@@ -133,6 +135,7 @@ export const useSdStore = createPersistStore<
     setEditMaskImage: (image: string, name?: string) => void;
     setCurrentModel: (model: any) => void;
     setCurrentParams: (data: any) => void;
+    setCurrentSessionId: (sessionId: string) => void;
     startBlankCreation: (prompt?: string) => void;
     deleteDraw: (id: string) => void;
   }
@@ -153,10 +156,17 @@ export const useSdStore = createPersistStore<
         return id;
       },
       sendTask(data: any, okCall?: Function) {
-        data = { ...data, id: nanoid(), status: "running" };
-        set({ draw: [data, ..._get().draw] });
-        this.getNextId();
-        this.imageGenerationRequestCall(data);
+        const sessionId =
+          data.session_id || _get().currentSessionId || nanoid();
+        data = {
+          ...data,
+          id: nanoid(),
+          session_id: sessionId,
+          status: "running",
+        };
+        set({ currentSessionId: sessionId, draw: [data, ..._get().draw] });
+        get().getNextId();
+        get().imageGenerationRequestCall(data);
         okCall?.();
       },
       async imageGenerationRequestCall(data: any) {
@@ -205,23 +215,23 @@ export const useSdStore = createPersistStore<
           .then((resData) => {
             const errorMessage = schema.resolveErrorMessage(resData);
             if (errorMessage) {
-              this.updateDraw({
+              get().updateDraw({
                 ...data,
                 status: "error",
                 error: normalizeSdErrorMessage(errorMessage),
               });
-              this.getNextId();
+              get().getNextId();
               return;
             }
 
             const imageResult = schema.resolveImageResult(resData);
             if (!imageResult) {
-              this.updateDraw({
+              get().updateDraw({
                 ...data,
                 status: "error",
                 error: normalizeSdErrorMessage(JSON.stringify(resData)),
               });
-              this.getNextId();
+              get().getNextId();
               return;
             }
 
@@ -232,46 +242,43 @@ export const useSdStore = createPersistStore<
 
             imagePromise
               .then((img_data: string) => {
-                this.updateDraw({
+                get().updateDraw({
                   ...data,
                   status: "success",
                   img_data,
                 });
               })
               .catch((e) => {
-                this.updateDraw({
+                get().updateDraw({
                   ...data,
                   status: "error",
                   error: normalizeSdErrorMessage(JSON.stringify(e)),
                 });
               })
               .finally(() => {
-                this.getNextId();
+                get().getNextId();
               });
           })
           .catch((error) => {
-            this.updateDraw({
+            get().updateDraw({
               ...data,
               status: "error",
               error: normalizeSdErrorMessage(error.message),
             });
             console.error("Error:", error);
-            this.getNextId();
+            get().getNextId();
           });
       },
       updateDraw(_draw: any) {
         const draw = _get().draw || [];
-        draw.some((item, index) => {
-          if (item.id === _draw.id) {
-            draw[index] = _draw;
-            set(() => ({ draw }));
-            return true;
-          }
-        });
+        const nextDraw = draw.map((item) =>
+          item.id === _draw.id ? _draw : item,
+        );
+        set({ draw: nextDraw });
       },
       deleteDraw(id: string) {
         set({ draw: (_get().draw || []).filter((item) => item.id !== id) });
-        this.getNextId();
+        get().getNextId();
       },
       setCurrentMode(mode: ImageFormMode) {
         set({ currentMode: mode });
@@ -293,13 +300,18 @@ export const useSdStore = createPersistStore<
           currentParams: data,
         });
       },
+      setCurrentSessionId(sessionId: string) {
+        set({ currentSessionId: sessionId });
+      },
       startBlankCreation(prompt = "") {
         const currentModel = _get().currentModel;
+        const sessionId = nanoid();
         const currentParams = getModelParamBasicData(
           currentModel?.params?.({}) ?? [],
           {},
         );
         set({
+          currentSessionId: sessionId,
           currentMode: "generation",
           editSourceType: "history",
           editSourceImage: "",

@@ -6,7 +6,7 @@ import { IconButton } from "@/app/components/button";
 import ReturnIcon from "@/app/icons/return.svg";
 import Locale from "@/app/locales";
 import { Path, CACHE_URL_PREFIX } from "@/app/constant";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   copyToClipboard,
   getMessageTextContent,
@@ -98,13 +98,33 @@ export function Sd() {
   const config = useAppConfig();
   const scrollRef = useRef<HTMLDivElement>(null);
   const sdStore = useSdStore();
-  const [sdImages, setSdImages] = useState(sdStore.draw);
+  const currentSessionId = sdStore.currentSessionId;
+  const setCurrentSessionId = sdStore.setCurrentSessionId;
   const isSd = location.pathname === Path.Sd;
   const selectedTaskId = new URLSearchParams(location.search).get("task");
+  const selectedTask = useMemo(
+    () => sdStore.draw.find((item: any) => item.id === selectedTaskId),
+    [sdStore.draw, selectedTaskId],
+  );
+  const activeSessionId =
+    selectedTaskId && selectedTask
+      ? selectedTask.session_id || ""
+      : currentSessionId || "";
+  const selectedTaskSessionId = selectedTask?.session_id || "";
+  const sdImages = useMemo(() => {
+    if (!activeSessionId) {
+      return sdStore.draw.filter((item: any) => !item.session_id);
+    }
+    return sdStore.draw.filter(
+      (item: any) => item.session_id === activeSessionId,
+    );
+  }, [activeSessionId, sdStore.draw]);
 
   useEffect(() => {
-    setSdImages(sdStore.draw);
-  }, [sdStore.currentId, sdStore.draw]);
+    if (selectedTaskSessionId && currentSessionId !== selectedTaskSessionId) {
+      setCurrentSessionId(selectedTaskSessionId);
+    }
+  }, [currentSessionId, selectedTaskSessionId, setCurrentSessionId]);
 
   useEffect(() => {
     if (!selectedTaskId) return;
@@ -296,6 +316,8 @@ export function Sd() {
                                 provider: item.provider,
                                 provider_name: item.provider_name,
                                 endpoint_type: item.endpoint_type,
+                                session_id:
+                                  item.session_id || activeSessionId || "",
                                 model_def: item.model_def,
                                 model: item.model,
                                 model_name: item.model_name,
@@ -315,6 +337,9 @@ export function Sd() {
                               bordered
                               title={Locale.Sd.Actions.EditAgain}
                               onClick={() => {
+                                if (item.session_id) {
+                                  sdStore.setCurrentSessionId(item.session_id);
+                                }
                                 sdStore.setCurrentMode("editing");
                                 sdStore.setEditSourceType("history");
                                 if (item.model_def) {
