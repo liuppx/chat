@@ -55,3 +55,4 @@ masks.json
 app/mcp/mcp_config.json
 .env.local
 /output/
+build.mode

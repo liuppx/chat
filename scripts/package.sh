@@ -8,9 +8,11 @@ ENV_FILE="${ROOT_DIR}/.env"
 ENV_TEMPLATE="${ROOT_DIR}/.env.template"
 BUILD_ENV_FILE="${ROOT_DIR}/.env.build"
 BUILD_ENV_TEMPLATE="${ROOT_DIR}/.env.build.template"
+MODE_FILE="${ROOT_DIR}/build.mode"
 VALID_MODES=("standalone" "export" "app" "app-release")
 RUNTIME_ENV_SOURCE=""
 BUILD_ENV_SOURCE=""
+MODE_SOURCE="default"
 
 cd "${ROOT_DIR}"
 
@@ -31,6 +33,10 @@ usage() {
   echo "  $0 export v1.2.3"
   echo "  $0 app-release"
   echo "  $0 standalone --output-dir ./dist"
+  echo
+  echo "Defaults:"
+  echo "  If MODE is omitted, ${MODE_FILE} will be used when present."
+  echo "  If ${MODE_FILE} is missing, standalone is used."
 }
 
 is_valid_mode() {
@@ -79,6 +85,42 @@ load_build_env() {
   fi
 }
 
+read_mode_from_path() {
+  local mode_path="$1"
+  local configured_mode=""
+  configured_mode="$(
+    awk '
+      /^[[:space:]]*#/ { next }
+      /^[[:space:]]*$/ { next }
+      {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+        print
+        exit
+      }
+    ' "${mode_path}"
+  )"
+
+  if [ -z "${configured_mode}" ]; then
+    return 0
+  fi
+
+  if ! is_valid_mode "${configured_mode}"; then
+    echo "Error: invalid mode '${configured_mode}' in ${mode_path}." >&2
+    echo "Valid modes: ${VALID_MODES[*]}" >&2
+    exit 1
+  fi
+
+  MODE="${configured_mode}"
+  MODE_SOURCE="${mode_path}"
+}
+
+read_mode_file() {
+  if [ -f "${MODE_FILE}" ]; then
+    read_mode_from_path "${MODE_FILE}"
+    return 0
+  fi
+}
+
 print_package_config() {
   local effective_build_mode="n/a"
   local effective_build_app="n/a"
@@ -109,6 +151,7 @@ print_package_config() {
 
   echo "Package config:"
   echo "  mode: ${MODE}"
+  echo "  mode_source: ${MODE_SOURCE}"
   echo "  tag: ${TARGET_TAG}"
   echo "  output_dir: ${OUTPUT_DIR}"
   echo "  package_name: ${PACKAGE_NAME}"
@@ -235,8 +278,11 @@ copy_artifacts_for_mode() {
 }
 
 MODE="standalone"
+MODE_SET_FROM_ARG="false"
 TAG_ARG=""
 CUSTOM_OUTPUT_DIR=""
+
+read_mode_file
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -253,8 +299,13 @@ while [ "$#" -gt 0 ]; do
       exit 0
       ;;
     *)
-      if is_valid_mode "$1" && [ "${MODE}" = "standalone" ] && [ -z "${TAG_ARG}" ]; then
+      if is_valid_mode "$1" && [ "${MODE_SET_FROM_ARG}" = "false" ] && [ -z "${TAG_ARG}" ]; then
         MODE="$1"
+        MODE_SOURCE="cli"
+        MODE_SET_FROM_ARG="true"
+      elif is_valid_mode "$1"; then
+        echo "Error: duplicate mode '$1'." >&2
+        exit 1
       elif [ -z "${TAG_ARG}" ]; then
         TAG_ARG="$1"
       else
@@ -382,12 +433,10 @@ PACKAGE_DIR="${OUTPUT_DIR}/${PACKAGE_NAME}"
 
 print_package_config
 
-if [ ! -d "${ROOT_DIR}/node_modules" ]; then
-  if [ -f "${ROOT_DIR}/package-lock.json" ]; then
-    HUSKY=0 npm ci --no-fund --no-audit
-  else
-    HUSKY=0 npm install --no-fund --no-audit
-  fi
+if [ -f "${ROOT_DIR}/package-lock.json" ]; then
+  HUSKY=0 npm ci --no-fund --no-audit
+else
+  HUSKY=0 npm install --no-fund --no-audit
 fi
 
 run_build_for_mode
