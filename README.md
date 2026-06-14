@@ -96,6 +96,10 @@ cp .env.build.template .env.build
 bash scripts/package.sh standalone
 ```
 
+如果希望给环境保留可覆盖的默认打包模式，可以保留仓库里的 `build.mode.template` 作为示例，并在本地创建 `build.mode`。
+`bash scripts/package.sh` 在未显式传入 `MODE` 时会优先读取 `build.mode`；如果该文件不存在，就直接使用默认值 `standalone`。
+脚本执行时会先同步依赖：存在 `package-lock.json` 时运行 `npm ci`，否则运行 `npm install`。
+
 默认会在仓库下的 `output/` 生成产物；如需指定输出目录：
 
 ```bash
