@@ -85,6 +85,11 @@
   min-width: 0;
 }
 
+.control-param-span-split {
+  grid-column: span 3;
+  min-width: 0;
+}
+
 .panel-section {
   padding: 10px 0 12px;
   border-bottom: var(--border-in-light);
@@ -389,7 +394,8 @@
   }
 
   .control-param-span-half,
-  .control-param-span-full {
+  .control-param-span-full,
+  .control-param-span-split {
     grid-column: 1 / -1;
   }
 }

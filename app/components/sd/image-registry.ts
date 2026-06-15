@@ -1,4 +1,8 @@
-import { LLMModel, supportsImageGenerationEndpoint } from "@/app/client/api";
+import {
+  LLMModel,
+  normalizeSupportedEndpoints,
+  supportsImageGenerationEndpoint,
+} from "@/app/client/api";
 import {
   getImageEndpointSchema,
   ImageFormMode,
@@ -43,7 +47,7 @@ function buildRuntimeImageModelForMode(
   mode: ImageFormMode,
 ): ImageModelDefinition | null {
   const tags = model.tags ?? [];
-  const endpoints = model.supportedEndpoints ?? [];
+  const endpoints = normalizeSupportedEndpoints(model.supportedEndpoints);
   const modelType = model.modelType?.trim().toLowerCase();
   if (!tags.includes("image") && modelType !== "image") return null;
   const endpointType: ImageEndpointType =

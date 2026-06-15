@@ -640,6 +640,7 @@ export function ControlParam(props: {
       {props.columns?.map((item) => {
         let element: null | React.ReactNode;
         const compactSelectRowFields = ["size", "quality", "style"];
+        const compactSelectIndex = compactSelectRowFields.indexOf(item.value);
         const hideCompactTitle =
           props.compact &&
           item.type === "select" &&
@@ -648,7 +649,9 @@ export function ControlParam(props: {
           ? item.type === "textarea"
             ? styles["control-param-span-full"]
             : hideCompactTitle
-              ? styles["control-param-span-third"]
+              ? compactSelectIndex === 0
+                ? styles["control-param-span-full"]
+                : styles["control-param-span-split"]
               : styles["control-param-span-half"]
           : undefined;
         switch (item.type) {

@@ -35,9 +35,7 @@ export function SideBar(props: { className?: string }) {
   const navigate = useNavigate();
   const sdStore = useSdStore();
   const currentMode = sdStore.currentMode;
-  const editSourceType = sdStore.editSourceType;
   const editSourceImage = sdStore.editSourceImage;
-  const editMaskImage = sdStore.editMaskImage;
   const currentModel = sdStore.currentModel;
   const params = sdStore.currentParams;
   const setParams = sdStore.setCurrentParams;
@@ -47,14 +45,6 @@ export function SideBar(props: { className?: string }) {
   const canSubmit =
     hasModelSelection &&
     (currentMode !== "editing" || Boolean(editSourceImage));
-  const footerSummary =
-    currentMode === "editing"
-      ? editSourceImage
-        ? editMaskImage
-          ? Locale.SdPanel.SubmitSummaryReady
-          : Locale.SdPanel.SubmitSummaryNoMask
-        : Locale.Sd.SelectImageFirst
-      : Locale.SdPanel.SubmitSummaryGenerate;
 
   const handleSubmit = () => {
     const columns = getParams?.(currentModel, params);
@@ -146,41 +136,14 @@ export function SideBar(props: { className?: string }) {
         <SdPanel />
       </SideBarBody>
       <div className={styles["sidebar-tail"]}>
-        <div className={styles["submit-card"]}>
-          <div className={styles["submit-card-header"]}>
-            <div className={styles["submit-card-title"]}>
-              {Locale.SdPanel.Submit}
-            </div>
-          </div>
-          <div className={styles["submit-card-summary"]}>{footerSummary}</div>
-          <div className={styles["submit-card-meta"]}>
-            {currentModel.name && (
-              <span className={styles["submit-card-chip"]}>
-                {currentModel.name}
-              </span>
-            )}
-            {currentMode === "editing" && editSourceImage && (
-              <span className={styles["submit-card-chip"]}>
-                {editSourceType === "history"
-                  ? Locale.SdPanel.SourceTypes.History
-                  : Locale.SdPanel.SourceTypes.Upload}
-              </span>
-            )}
-            {currentMode === "editing" && editMaskImage && (
-              <span className={styles["submit-card-chip"]}>
-                {Locale.SdPanel.MaskImage}
-              </span>
-            )}
-          </div>
-          <IconButton
-            text={Locale.SdPanel.Submit}
-            type="primary"
-            shadow
-            className={styles["submit-primary"]}
-            disabled={!canSubmit}
-            onClick={handleSubmit}
-          ></IconButton>
-        </div>
+        <IconButton
+          text={Locale.SdPanel.Submit}
+          type="primary"
+          shadow
+          className={styles["submit-primary"]}
+          disabled={!canSubmit}
+          onClick={handleSubmit}
+        ></IconButton>
       </div>
     </SideBarContainer>
   );
