@@ -48,7 +48,7 @@ import {
   normalizeModelCandidates,
   normalizeProviderName,
 } from "../utils/model";
-import { createEmptySkill, Skill } from "./skill";
+import { createEmptySkill, getBuiltinSkillsForLang, Skill } from "./skill";
 import { executeMcpAction, getAllTools, isMcpEnabled } from "../mcp/actions";
 import { extractMcpJson, isMcpJson } from "../mcp/utils";
 import { isValidUcanAuthorization } from "../plugins/wallet";
@@ -142,6 +142,41 @@ function createEmptySession(): ChatSession {
 
     mask: createEmptySkill(),
   };
+}
+
+function isLegacyPlainChatMaskName(name?: string) {
+  return (
+    name === "新的聊天" || name === "New Conversation" || name === DEFAULT_TOPIC
+  );
+}
+
+function getGeneralBuiltinSkill(lang = getLang()) {
+  const config = useAppConfig.getState();
+  return getBuiltinSkillsForLang(lang, config.modelConfig).find(
+    (skill) => skill.name === "通用问答" || skill.name === "Direct Chat",
+  );
+}
+
+function normalizeLegacyPlainChatSession(session: ChatSession) {
+  if (!isPlainChatSkill(session.mask)) return;
+  if (!isLegacyPlainChatMaskName(session.mask.name)) return;
+
+  const generalSkill = getGeneralBuiltinSkill(session.mask.lang || getLang());
+  if (!generalSkill) return;
+
+  const currentModelConfig = disablePlainChatReasoning(
+    session.mask.modelConfig,
+  );
+  session.mask = {
+    ...generalSkill,
+    modelConfig: currentModelConfig,
+    syncGlobalConfig:
+      session.mask.syncGlobalConfig ?? generalSkill.syncGlobalConfig,
+  };
+
+  if (isLegacyPlainChatMaskName(session.topic)) {
+    session.topic = generalSkill.name;
+  }
 }
 
 function getSummarizeModel(
@@ -1182,7 +1217,7 @@ export const useChatStore = createPersistStore(
   },
   {
     name: StoreKey.Chat,
-    version: 3.7,
+    version: 3.8,
     migrate(persistedState, version) {
       const state = persistedState as any;
       const newState = JSON.parse(
@@ -1272,11 +1307,18 @@ export const useChatStore = createPersistStore(
         });
       }
 
+      if (version < 3.8) {
+        newState.sessions.forEach((s) => {
+          normalizeLegacyPlainChatSession(s);
+        });
+      }
+
       newState.sessions.forEach((s) => {
         if (s.type !== "chat") {
           s.type = "chat";
         }
         delete (s as { studio?: unknown }).studio;
+        normalizeLegacyPlainChatSession(s);
       });
 
       return newState as any;

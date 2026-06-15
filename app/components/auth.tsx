@@ -136,11 +136,13 @@ export function AuthPage() {
 
   useEffect(() => {
     let cancelled = false;
+    let refreshToken = 0;
     const refreshStatus = async () => {
+      const token = ++refreshToken;
       const account = normalizeAccount(getCurrentAccount());
       const history = mergeWalletHistory(account, loadWalletHistory());
       const valid = await isValidUcanAuthorization();
-      if (cancelled) return;
+      if (cancelled || token !== refreshToken) return;
       if (history.length > 0) {
         persistWalletHistory(history);
       }

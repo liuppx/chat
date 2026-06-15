@@ -90,6 +90,15 @@ function getSkillEntryKey(skill: Skill) {
   return skill.id || skill.name;
 }
 
+function isGeneralChatSkill(skill: Skill) {
+  return (
+    skill.name === "通用问答" ||
+    skill.name === "Direct Chat" ||
+    skill.createdAt === 1700000001001 ||
+    skill.createdAt === 1700000002001
+  );
+}
+
 export function NewChat() {
   const chatStore = useChatStore();
   const skillStore = useSkillStore();
@@ -120,6 +129,10 @@ export function NewChat() {
   );
   const currentSkillKeys = useMemo(
     () => new Set(skills.map((skill) => getSkillEntryKey(skill))),
+    [skills],
+  );
+  const defaultChatSkill = useMemo(
+    () => skills.find(isGeneralChatSkill),
     [skills],
   );
   const recentSkills = useMemo(() => {
@@ -201,6 +214,12 @@ export function NewChat() {
     const hiddenKeys = new Set(hiddenOrphanSkillKeys);
     return [...recentSkills, ...skills]
       .filter((skill) => {
+        if (
+          defaultChatSkill &&
+          getSkillEntryKey(skill) === getSkillEntryKey(defaultChatSkill)
+        ) {
+          return false;
+        }
         const key = getSkillEntryKey(skill);
         if (!key || seen.has(key)) return false;
         if (hiddenKeys.has(key)) return false;
@@ -217,7 +236,13 @@ export function NewChat() {
         return b.createdAt - a.createdAt;
       })
       .slice(0, 8);
-  }, [hiddenOrphanSkillKeys, recentSkills, skillRuntimeMap, skills]);
+  }, [
+    defaultChatSkill,
+    hiddenOrphanSkillKeys,
+    recentSkills,
+    skillRuntimeMap,
+    skills,
+  ]);
   const entrySkillItems = useMemo(
     () =>
       entrySkills.map((skill) => {
@@ -345,7 +370,8 @@ export function NewChat() {
     navigate(Path.Chat);
   };
 
-  const startDraftChat = () => startChat(undefined, draft, activeModelValue);
+  const startDraftChat = () =>
+    startChat(defaultChatSkill, draft, activeModelValue);
   const hideOrphanSkill = (skill: Skill) => {
     const key = getSkillEntryKey(skill);
     if (!key) return;
@@ -450,7 +476,7 @@ export function NewChat() {
             onClick={startDraftChat}
             type="button"
           >
-            {Locale.NewChat.BlankTitle}
+            {defaultChatSkill?.name || Locale.NewChat.BlankTitle}
             <SendWhiteIcon />
           </button>
         </div>

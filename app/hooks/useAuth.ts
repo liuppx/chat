@@ -9,14 +9,15 @@ export function useAuth(options?: { notify?: boolean }) {
   const shouldNotify = options?.notify === true;
   useEffect(() => {
     let cancelled = false;
+    let checkToken = 0;
     const loginMode = (getClientConfig()?.ucanLoginForceMode || "auto")
       .trim()
       .toLowerCase();
-    const shouldNotifyWalletMissing =
-      shouldNotify && loginMode === "wallet";
+    const shouldNotifyWalletMissing = shouldNotify && loginMode === "wallet";
     const check = async () => {
+      const token = ++checkToken;
       if (localStorage.getItem("hasConnectedWallet") === "false") {
-        if (!cancelled) {
+        if (!cancelled && token === checkToken) {
           if (shouldNotifyWalletMissing) {
             notifyError("❌未检测到钱包，请先安装并连接钱包");
           }
@@ -25,7 +26,7 @@ export function useAuth(options?: { notify?: boolean }) {
         return;
       }
       const valid = await isValidUcanAuthorization();
-      if (cancelled) return;
+      if (cancelled || token !== checkToken) return;
       if (!valid) {
         setIsAuthenticated(false);
         if (shouldNotify) {
