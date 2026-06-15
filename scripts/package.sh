@@ -58,6 +58,24 @@ load_env_file() {
   fi
 }
 
+write_package_version() {
+  local file_path="$1"
+  local value="$2"
+
+  if [ ! -f "${file_path}" ]; then
+    return 0
+  fi
+
+  node -e '
+    const fs = require("fs");
+    const filePath = process.argv[1];
+    const version = process.argv[2];
+    const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    data.version = version.replace(/^v/, "");
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n");
+  ' "${file_path}" "${value}"
+}
+
 ensure_runtime_env() {
   if [ ! -f "${ENV_FILE}" ]; then
     if [ ! -f "${ENV_TEMPLATE}" ]; then
@@ -223,6 +241,8 @@ copy_standalone_artifacts() {
   if [ -f "${BUILD_ENV_TEMPLATE}" ]; then
     cp "${BUILD_ENV_TEMPLATE}" "${PACKAGE_DIR}/.env.build.template"
   fi
+
+  write_package_version "${PACKAGE_DIR}/package.json" "${TARGET_TAG}"
 
   mkdir -p "${PACKAGE_DIR}/scripts"
   cp "${starter_script}" "${PACKAGE_DIR}/scripts/starter.sh"

@@ -3,7 +3,7 @@ function isEnabledEnv(value?: string): boolean {
   return normalized === "1" || normalized === "true";
 }
 
-function readTauriVersion() {
+function readBuildVersion() {
   const fs = (process as any).getBuiltinModule?.("fs") as
     | typeof import("fs")
     | undefined;
@@ -13,13 +13,13 @@ function readTauriVersion() {
   if (!fs || !path) {
     throw Error("[Build Config] Node built-in modules are not available");
   }
-  const tauriConfig = JSON.parse(
-    fs.readFileSync(
-      path.resolve(process.cwd(), "src-tauri/tauri.conf.json"),
-      "utf8",
-    ),
-  ) as { version: string };
-  return tauriConfig.version;
+
+  const packageJsonPath = path.resolve(process.cwd(), "package.json");
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as {
+    version?: string;
+  };
+
+  return packageJson.version?.trim() || "0.0.0";
 }
 
 export const getBuildConfig = () => {
@@ -30,7 +30,7 @@ export const getBuildConfig = () => {
   }
   const buildMode = process.env.BUILD_MODE ?? "standalone";
   const isApp = isEnabledEnv(process.env.BUILD_APP);
-  const version = "v" + readTauriVersion();
+  const version = "v" + readBuildVersion();
 
   const commitInfo = (() => {
     try {
