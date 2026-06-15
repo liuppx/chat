@@ -6,6 +6,7 @@ import {
   releaseUcanSignLock,
 } from "./ucan-sign-lock";
 import {
+  focusPendingApproval,
   getProvider,
   requestAccounts,
   getPreferredAccount,
@@ -223,6 +224,20 @@ function clearWalletAuthState(options?: { clearAccount?: boolean }) {
   clearCachedUcanSession();
 }
 
+async function focusPendingWalletApproval(
+  provider?: Eip1193Provider | null,
+): Promise<boolean> {
+  try {
+    const providerInstance =
+      provider || (await resolveProvider({ refresh: true }));
+    if (!providerInstance) return false;
+    const result = await focusPendingApproval(providerInstance);
+    return Boolean(result?.focused);
+  } catch (error) {
+    return false;
+  }
+}
+
 function bindWalletListeners(provider: Eip1193Provider) {
   listenersCleanup?.();
   let lastObservedAccount = getCurrentAccount();
@@ -337,6 +352,9 @@ export async function connectWallet(preferredAccount?: string) {
   try {
     try {
       const provider = await requireProvider();
+      if (await focusPendingWalletApproval(provider)) {
+        return;
+      }
       const accounts = await requestAccounts({ provider, dedupe: true });
       if (Array.isArray(accounts) && accounts.length > 0) {
         const preferred = preferredAccount?.trim().toLowerCase();
@@ -481,6 +499,7 @@ export async function loginWithUcan(
     return;
   }
   if (loginInFlight) {
+    await focusPendingWalletApproval(provider || currentProvider);
     return;
   }
   loginInFlight = true;
@@ -518,7 +537,8 @@ export async function loginWithUcan(
     }
 
     if (!acquireUcanSignLock()) {
-      if (!options?.silent) {
+      const focused = await focusPendingWalletApproval(providerInstance);
+      if (!options?.silent && !focused) {
         notifyInfo("钱包签名处理中，请在钱包完成确认");
       }
       return;

@@ -391,9 +391,11 @@ function useUcanAuthState() {
 
   useEffect(() => {
     let cancelled = false;
+    let refreshToken = 0;
     const refresh = async () => {
+      const token = ++refreshToken;
       const authorized = await isValidUcanAuthorization();
-      if (cancelled) return;
+      if (cancelled || token !== refreshToken) return;
       setState({
         authorized,
         checking: false,
