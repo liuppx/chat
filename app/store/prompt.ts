@@ -41,9 +41,11 @@ export const SearchService = {
     this.userEngine.add(prompt);
   },
 
-  search(text: string) {
+  search(text: string, options?: { includeBuiltin?: boolean }) {
     const userResults = this.userEngine.search(text);
-    const builtinResults = this.builtinEngine.search(text);
+    const builtinResults = options?.includeBuiltin
+      ? this.builtinEngine.search(text)
+      : [];
     return userResults.concat(builtinResults).map((v) => v.item);
   },
 };
@@ -124,8 +126,7 @@ export const usePromptStore = createPersistStore(
 
     search(text: string) {
       if (text.length === 0) {
-        // return all rompts
-        return this.getUserPrompts().concat(SearchService.builtinPrompts);
+        return this.getUserPrompts();
       }
       return SearchService.search(text) as Prompt[];
     },

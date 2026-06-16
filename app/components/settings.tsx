@@ -140,7 +140,9 @@ function UserPromptModal(props: { onClose?: () => void }) {
   const allPrompts = userPrompts.concat(builtinPrompts);
   const [searchInput, setSearchInput] = useState("");
   const prompts =
-    searchInput.length > 0 ? SearchService.search(searchInput) : allPrompts;
+    searchInput.length > 0
+      ? SearchService.search(searchInput, { includeBuiltin: true })
+      : allPrompts;
 
   const [editingPromptId, setEditingPromptId] = useState<string>();
 

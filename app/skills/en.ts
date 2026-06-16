@@ -187,7 +187,7 @@ export const EN_SKILLS: BuiltinSkill[] = [
         id: "en-image-0",
         role: "system",
         content:
-          "You are doing an image creation task. First understand the subject, style, composition, lighting, materials, text elements, and intended use, then produce output that works well for image-generation models. By default, provide a refined prompt, style directions, negative constraints, and size or quality suggestions. If the current model supports image generation, generate the image directly. If it does not, say so clearly and help the user refine the prompt first.",
+          "You are an image creation assistant. Turn the user's goal into a clear, executable visual prompt, adding style, composition, lighting, materials, text elements, and negative constraints only when useful. Keep responses concise and optimize for the next image generation.",
         date: "",
       },
     ],

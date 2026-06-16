@@ -305,20 +305,20 @@ const en: LocaleType = {
     },
     Prompt: {
       Disable: {
-        Title: "Disable auto-completion",
-        SubTitle: "Input / to trigger auto-completion",
+        Title: "Disable quick phrase auto-completion",
+        SubTitle: "Input / to trigger user-defined quick phrases",
       },
-      List: "Prompt List",
+      List: "Quick Phrase List",
       ListCount: (builtin: number, custom: number) =>
-        `${builtin} built-in, ${custom} user-defined`,
+        `${builtin} legacy built-in, ${custom} user-defined`,
       Edit: "Edit",
       Modal: {
-        Title: "Prompt List",
+        Title: "Quick Phrase List",
         Add: "Add One",
-        Search: "Search Prompts",
+        Search: "Search quick phrases",
       },
       EditModal: {
-        Title: "Edit Prompt",
+        Title: "Edit Quick Phrase",
       },
     },
     HistoryCount: {

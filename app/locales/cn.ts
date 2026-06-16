@@ -301,20 +301,20 @@ const cn = {
     },
     Prompt: {
       Disable: {
-        Title: "禁用提示词自动补全",
-        SubTitle: "在输入框开头输入 / 即可触发自动补全",
+        Title: "禁用快捷语自动补全",
+        SubTitle: "在输入框开头输入 / 可触发用户自定义快捷语",
       },
-      List: "自定义提示词列表",
+      List: "快捷语列表",
       ListCount: (builtin: number, custom: number) =>
-        `内置 ${builtin} 条，用户定义 ${custom} 条`,
+        `兼容内置 ${builtin} 条，用户自定义 ${custom} 条`,
       Edit: "编辑",
       Modal: {
-        Title: "提示词列表",
+        Title: "快捷语列表",
         Add: "新建",
-        Search: "搜索提示词",
+        Search: "搜索快捷语",
       },
       EditModal: {
-        Title: "编辑提示词",
+        Title: "编辑快捷语",
       },
     },
     HistoryCount: {
