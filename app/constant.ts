@@ -98,7 +98,8 @@ export enum StoreKey {
   Plugin = "chat-next-web-plugin",
   Access = "access-control",
   Config = "app-config",
-  Skill = "mask-store",
+  Skill = "skill-store",
+  // Legacy key kept only for migrating old local/remote data.
   Mask = "mask-store",
   Prompt = "prompt-store",
   Update = "chat-update",

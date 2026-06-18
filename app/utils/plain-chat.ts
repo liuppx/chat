@@ -23,3 +23,14 @@ export function isPlainChatSkill(skill: Skill) {
     !skill.launch
   );
 }
+
+export const LEGACY_PLAIN_CHAT_SKILL_NAMES = new Set([
+  "新的聊天",
+  "New Conversation",
+]);
+
+export function isLegacyPlainChatSkill(skill: Skill) {
+  return (
+    LEGACY_PLAIN_CHAT_SKILL_NAMES.has(skill.name) && isPlainChatSkill(skill)
+  );
+}

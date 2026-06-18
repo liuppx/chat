@@ -6,7 +6,10 @@ import { ModelConfig, useAppConfig } from "./config";
 import { StoreKey } from "../constant";
 import { nanoid } from "nanoid";
 import { createPersistStore } from "../utils/store";
-import { disablePlainChatReasoning } from "../utils/plain-chat";
+import {
+  disablePlainChatReasoning,
+  isLegacyPlainChatSkill,
+} from "../utils/plain-chat";
 
 export type BuiltInSkillToolType = "web_search";
 
@@ -96,7 +99,6 @@ export const DEFAULT_SKILL_STATE = {
 };
 
 const LEGACY_REMOVED_SKILL_NAMES = new Set(["高效助手", "Efficient Assistant"]);
-
 export type SkillState = typeof DEFAULT_SKILL_STATE & {
   skills: Record<string, Skill>;
   language?: Lang | undefined;
@@ -152,6 +154,7 @@ export function getBuiltinSkillsForLang(
 }
 
 export function isLaunchableSkill(skill: Skill) {
+  if (isLegacyPlainChatSkill(skill)) return false;
   if (skill.builtin) return true;
 
   return Boolean(
@@ -272,7 +275,7 @@ export const useSkillStore = createPersistStore(
   }),
   {
     name: StoreKey.Skill,
-    version: 4.2,
+    version: 4.3,
 
     migrate(state, version) {
       const legacyState = JSON.parse(JSON.stringify(state)) as SkillState & {
@@ -307,6 +310,14 @@ export const useSkillStore = createPersistStore(
       if (version < 4.2) {
         Object.values(newState.skills).forEach((skill) => {
           syncSkillLegacyPlugin(skill);
+        });
+      }
+
+      if (version < 4.3) {
+        Object.entries(newState.skills).forEach(([id, skill]) => {
+          if (isLegacyPlainChatSkill(skill)) {
+            delete newState.skills[id];
+          }
         });
       }
 

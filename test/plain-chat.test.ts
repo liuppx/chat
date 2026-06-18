@@ -1,5 +1,6 @@
 import {
   disablePlainChatReasoning,
+  isLegacyPlainChatSkill,
   isPlainChatSkill,
 } from "../app/utils/plain-chat";
 import { ServiceProvider } from "../app/constant";
@@ -56,6 +57,7 @@ describe("plain chat reasoning isolation", () => {
 
   test("detects ordinary chat skill", () => {
     expect(isPlainChatSkill(plainSkill)).toBe(true);
+    expect(isLegacyPlainChatSkill(plainSkill)).toBe(true);
   });
 
   test("does not treat prompted skill as ordinary chat", () => {
@@ -72,5 +74,17 @@ describe("plain chat reasoning isolation", () => {
         ],
       }),
     ).toBe(false);
+  });
+
+  test("does not treat built-in general chat as legacy plain chat", () => {
+    const generalSkill = {
+      ...plainSkill,
+      id: "general",
+      name: "通用问答",
+      builtin: true,
+      description: "日常问答、写作、分析和轻量任务处理。",
+    } as Skill;
+
+    expect(isLegacyPlainChatSkill(generalSkill)).toBe(false);
   });
 });

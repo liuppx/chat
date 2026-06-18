@@ -37,6 +37,7 @@ import { usePluginStore } from "../store/plugin";
 import { IconButton } from "./button";
 import { ErrorBoundary } from "./error";
 import { List, ListItem, Modal, showToast } from "./ui-lib";
+import { SkillConfig } from "./mask";
 import AddIcon from "../icons/add.svg";
 import BrainIcon from "../icons/brain.svg";
 import CloseIcon from "../icons/close.svg";
@@ -115,10 +116,6 @@ function getDiscoveryPath(view: DiscoveryView, type: CapabilityType) {
   return query ? `${Path.Discovery}?${query}` : Path.Discovery;
 }
 
-function getSkillConfigPath(skill: Skill) {
-  return `${Path.Skills}?skill=${encodeURIComponent(String(skill.id))}`;
-}
-
 function getBuiltinSkillPackageId(skill: Skill) {
   return `builtin.${skill.lang}.${skill.createdAt}`;
 }
@@ -136,6 +133,7 @@ function getCapabilityIcon(type: Capability["type"]) {
 export function DiscoveryPage() {
   const navigate = useNavigate();
   const chatStore = useChatStore();
+  const skillStore = useSkillStore();
   const sdStore = useSdStore();
   const location = useLocation();
   const view = getInitialView(location.search);
@@ -162,6 +160,7 @@ export function DiscoveryPage() {
   const [editingMcpServerId, setEditingMcpServerId] = useState<string>();
   const [viewingMcpCapability, setViewingMcpCapability] =
     useState<Capability>();
+  const [editingSkillId, setEditingSkillId] = useState<string>();
   const [mcpUserConfig, setMcpUserConfig] = useState<Record<string, any>>({});
   const [savingMcpConfig, setSavingMcpConfig] = useState(false);
 
@@ -237,7 +236,7 @@ export function DiscoveryPage() {
     return () => controller.abort();
   }, []);
 
-  const skills = useMemo(() => {
+  const skills = useMemo<Skill[]>(() => {
     const userSkills = Object.values(skillRecords).sort(
       (a, b) => b.createdAt - a.createdAt,
     );
@@ -254,17 +253,24 @@ export function DiscoveryPage() {
         return false;
       }
       return true;
-    }).map((skill) => ({
-      ...skill,
-      packageId: getBuiltinSkillPackageId(skill as Skill),
-      modelConfig: {
-        ...modelConfig,
-        ...skill.modelConfig,
-      },
-    }));
+    }).map((skill) => {
+      const builtinSkill = skill as Skill;
+      return {
+        ...builtinSkill,
+        packageId: getBuiltinSkillPackageId(builtinSkill),
+        modelConfig: {
+          ...modelConfig,
+          ...builtinSkill.modelConfig,
+        },
+      };
+    });
 
     return [...userSkills, ...builtinSkills];
   }, [hideBuiltinSkills, modelConfig, skillRecords]);
+  const editingSkill = useMemo(
+    () => skills.find((skill) => String(skill.id) === editingSkillId),
+    [editingSkillId, skills],
+  );
   const plugins = useMemo(
     () =>
       Object.values(pluginRecords).sort((a, b) => b.createdAt - a.createdAt),
@@ -304,7 +310,7 @@ export function DiscoveryPage() {
         });
         const runtimeSummary = getSkillRuntimeIssueSummary(runtime);
         return {
-          id: `skill:${"id" in skill ? skill.id : skill.name}`,
+          id: `skill:${skill.id}`,
           type: "skill" as const,
           title: skill.name,
           description: skill.description || Locale.Discovery.DefaultSkillDesc,
@@ -866,11 +872,11 @@ export function DiscoveryPage() {
 
   const openSkillConfig = (skill: Skill) => {
     if (!skill.builtin) {
-      navigate(getSkillConfigPath(skill));
+      setEditingSkillId(String(skill.id));
       return;
     }
 
-    navigate(getSkillConfigPath(enableSkill(skill)));
+    setEditingSkillId(String(enableSkill(skill).id));
   };
 
   const getActionText = (item: Capability) => {
@@ -1059,6 +1065,22 @@ export function DiscoveryPage() {
               ]}
             >
               <List>{renderMcpConfigForm()}</List>
+            </Modal>
+          </div>
+        )}
+        {editingSkill && (
+          <div className="modal-mask">
+            <Modal
+              title={Locale.Mask.EditModal.Title(editingSkill.builtin)}
+              onClose={() => setEditingSkillId(undefined)}
+            >
+              <SkillConfig
+                mask={editingSkill}
+                updateMask={(updater) =>
+                  skillStore.updateMask(editingSkill.id, updater)
+                }
+                readonly={editingSkill.builtin}
+              />
             </Modal>
           </div>
         )}

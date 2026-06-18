@@ -128,6 +128,25 @@ export type AppState = {
   >;
 };
 
+type LegacyAppState = AppState & {
+  [StoreKey.Mask]?: AppState[typeof StoreKey.Skill] & {
+    masks?: AppState[typeof StoreKey.Skill]["skills"];
+  };
+};
+
+function normalizeLegacyAppState<T extends Partial<LegacyAppState>>(state: T) {
+  const mutableState = state as Record<string, unknown>;
+  const legacySkillState = state[StoreKey.Mask];
+  const currentSkillState = state[StoreKey.Skill];
+  if (!currentSkillState && legacySkillState) {
+    mutableState[StoreKey.Skill] = {
+      ...legacySkillState,
+      skills: legacySkillState.skills ?? legacySkillState.masks ?? {},
+    };
+  }
+  return state;
+}
+
 type Merger<T extends keyof AppState, U = AppState[T]> = (
   localState: U,
   remoteState: U,
@@ -322,6 +341,7 @@ export function getLocalAppStateForSync() {
 }
 
 export function setLocalAppState(appState: AppState) {
+  normalizeLegacyAppState(appState as LegacyAppState);
   useChatStore.setState(appState[StoreKey.Chat]);
   useAccessStore.setState(appState[StoreKey.Access]);
   useAppConfig.setState(appState[StoreKey.Config]);
@@ -330,6 +350,8 @@ export function setLocalAppState(appState: AppState) {
 }
 
 export function mergeAppState(localState: AppState, remoteState: AppState) {
+  normalizeLegacyAppState(localState as LegacyAppState);
+  normalizeLegacyAppState(remoteState as LegacyAppState);
   Object.keys(localState).forEach(<T extends keyof AppState>(k: string) => {
     const key = k as T;
     const localStoreState = localState[key];
