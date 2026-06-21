@@ -99,6 +99,12 @@ const Artifacts = dynamic(async () => (await import("./artifacts")).Artifacts, {
 const Settings = dynamic(async () => (await import("./settings")).Settings, {
   loading: () => <Loading noLogo />,
 });
+const RouterPage = dynamic(
+  async () => (await import("./router-page")).RouterPage,
+  {
+    loading: () => <Loading noLogo />,
+  },
+);
 const Centers = dynamic(async () => (await import("./my-center")).Centers, {
   loading: () => <Loading noLogo />,
 });
@@ -322,6 +328,7 @@ function Screen() {
               <Route path={Path.SearchChat} element={<SearchChat />} />
               <Route path={Path.Chat} element={<Chat />} />
               <Route path={Path.Settings} element={<Settings />} />
+              <Route path={Path.Router} element={<RouterPage />} />
               <Route path={Path.Centers} element={<Centers />} />
               <Route path={Path.Discovery} element={<DiscoveryPage />} />
               <Route path={Path.McpMarket} element={<McpMarketPage />} />

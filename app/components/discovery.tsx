@@ -463,80 +463,27 @@ export function DiscoveryPage() {
 
     const mcpItems: Capability[] = [...mcpToolItems];
 
-    const providerMap = new Map<
-      string,
+    const providerItems: Capability[] = [
       {
-        title: string;
-        total: number;
-        available: number;
-        tags: Set<string>;
-      }
-    >();
-    providerMap.set("router", {
-      title: Locale.Discovery.RouterProviderTitle,
-      total: 0,
-      available: 0,
-      tags: new Set(["router"]),
-    });
-
-    models.forEach((model) => {
-      const providerName =
-        model.provider?.providerName?.trim() ||
-        model.ownedBy?.trim() ||
-        Locale.Discovery.Source.Provider;
-      const key = providerName.toLowerCase();
-      const provider = providerMap.get(key) ?? {
-        title: providerName,
-        total: 0,
-        available: 0,
-        tags: new Set<string>(),
-      };
-      provider.total += 1;
-      if (model.available) provider.available += 1;
-      model.tags?.forEach((tag) => provider.tags.add(tag));
-      providerMap.set(key, provider);
-    });
-
-    const providerItems: Capability[] = Array.from(providerMap.entries()).map(
-      ([key, provider]) => ({
-        id: `provider:${key}`,
+        id: "provider:router",
         type: "provider",
-        title: provider.title,
-        description:
-          provider.total > 0
-            ? Locale.Discovery.ProviderDesc(
-                provider.available,
-                provider.total,
-                Array.from(provider.tags).slice(0, 4),
-              )
-            : Locale.Discovery.RouterProviderDesc,
-        highlights: Array.from(provider.tags).slice(0, 4),
-        status:
-          provider.available > 0 || key === "router"
-            ? Locale.Discovery.Status.Enabled
-            : Locale.Discovery.Status.Unavailable,
+        title: Locale.Discovery.RouterProviderTitle,
+        description: Locale.Discovery.RouterProviderDesc,
+        highlights: ["router"],
+        status: Locale.Discovery.Status.Enabled,
         pricing: "usage",
         runtime: "cloud",
-        source:
-          key === "router"
-            ? Locale.Discovery.Source.Official
-            : Locale.Discovery.Source.Provider,
-        path: Path.Settings,
-        installed: provider.available > 0 || key === "router",
-      }),
-    );
-
-    const sortedProviderItems = providerItems.sort((a, b) => {
-      if (a.id === "provider:router") return -1;
-      if (b.id === "provider:router") return 1;
-      return a.title.localeCompare(b.title);
-    });
+        source: Locale.Discovery.Source.Official,
+        path: Path.Router,
+        installed: true,
+      },
+    ];
 
     return [
       ...skillItems,
       ...communitySkillItems,
       ...mcpItems,
-      ...sortedProviderItems,
+      ...providerItems,
     ];
   }, [
     accessCustomModels,
@@ -547,7 +494,6 @@ export function DiscoveryPage() {
     mcpConfig?.mcpServers,
     mcpStatuses,
     modelConfig,
-    models,
     plugins,
     skillRecords,
     skills,

@@ -29,7 +29,6 @@ import {
   showConfirm,
   showToast,
 } from "./ui-lib";
-import { ModelConfigList } from "./model-config";
 
 import { IconButton } from "./button";
 import {
@@ -37,7 +36,6 @@ import {
   useChatStore,
   Theme,
   useUpdateStore,
-  useAccessStore,
   useAppConfig,
 } from "../store";
 
@@ -49,16 +47,7 @@ import Locale, {
 } from "../locales";
 import { copyToClipboard, clientUpdate, semverCompare } from "../utils";
 import Link from "next/link";
-import {
-  OPENAI_BASE_URL,
-  ApiPath,
-  Path,
-  RELEASE_URL,
-  STORAGE_KEY,
-  ServiceProvider,
-  SlotID,
-  UPDATE_URL,
-} from "../constant";
+import { Path, RELEASE_URL, STORAGE_KEY, UPDATE_URL } from "../constant";
 import { SearchService, usePromptStore } from "../store/prompt";
 import { ErrorBoundary } from "./error";
 import { InputRange } from "./input-range";
@@ -77,12 +66,6 @@ import {
   logoutWallet,
   UCAN_AUTH_EVENT,
 } from "../plugins/wallet";
-
-const normalizeUrl = (value: string) => value.replace(/\/+$/, "");
-const ROUTER_BASE_URL =
-  getClientConfig()?.routerBackendUrl || "https://llm.yeying.pub/";
-const ROUTER_BASE_URL_NORMALIZED = normalizeUrl(ROUTER_BASE_URL);
-const ROUTER_PROVIDERS = [ServiceProvider.OpenAI];
 
 function EditPromptModal(props: { id: string; onClose: () => void }) {
   const promptStore = usePromptStore();
@@ -736,58 +719,14 @@ export function Settings() {
     console.debug("[Update] remote version ", updateStore.remoteVersion);
   }
 
-  const accessStore = useAccessStore();
-  const shouldHideBalanceQuery = useMemo(() => {
-    const isOpenAiUrl = accessStore.openaiUrl.includes(OPENAI_BASE_URL);
-    const isRouterUrl = normalizeUrl(accessStore.openaiUrl).includes(
-      ROUTER_BASE_URL_NORMALIZED,
-    );
-
-    return (
-      accessStore.hideBalanceQuery ||
-      isOpenAiUrl ||
-      isRouterUrl ||
-      accessStore.provider === ServiceProvider.Azure
-    );
-  }, [
-    accessStore.hideBalanceQuery,
-    accessStore.openaiUrl,
-    accessStore.provider,
-  ]);
-
-  const usage = {
-    used: updateStore.used,
-    subscription: updateStore.subscription,
-  };
-  const [loadingUsage, setLoadingUsage] = useState(false);
-  function checkUsage(force = false) {
-    if (shouldHideBalanceQuery) {
-      return;
-    }
-
-    setLoadingUsage(true);
-    updateStore.updateUsage(force).finally(() => {
-      setLoadingUsage(false);
-    });
-  }
-
-  const enabledAccessControl = useMemo(
-    () => accessStore.enabledAccessControl(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
   const promptStore = usePromptStore();
   const builtinCount = SearchService.count.builtin;
   const customCount = promptStore.getUserPrompts().length ?? 0;
   const [shouldShowPromptModal, setShowPromptModal] = useState(false);
   const walletAddress = getCurrentAccount() || undefined;
 
-  const showUsage = accessStore.isAuthorized();
   useEffect(() => {
-    // checks per minutes
     checkUpdate();
-    showUsage && checkUsage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -797,85 +736,12 @@ export function Settings() {
         navigate(Path.Home);
       }
     };
-    accessStore.update((state) => {
-      state.useCustomConfig = true;
-      state.provider = ServiceProvider.OpenAI;
-
-      const normalizedOpenAIUrl = normalizeUrl(state.openaiUrl || "");
-      const shouldReplaceEndpoint =
-        normalizedOpenAIUrl.length === 0 ||
-        normalizedOpenAIUrl === normalizeUrl(ApiPath.OpenAI) ||
-        normalizedOpenAIUrl === normalizeUrl(OPENAI_BASE_URL);
-
-      if (shouldReplaceEndpoint || clientConfig?.isApp) {
-        state.openaiUrl = ROUTER_BASE_URL_NORMALIZED;
-      }
-    });
     document.addEventListener("keydown", keydownEvent);
     return () => {
       document.removeEventListener("keydown", keydownEvent);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const showAccessCode = enabledAccessControl && !clientConfig?.isApp;
-
-  const accessCodeComponent = showAccessCode && (
-    <ListItem
-      title={Locale.Settings.Access.AccessCode.Title}
-      subTitle={Locale.Settings.Access.AccessCode.SubTitle}
-    >
-      <PasswordInput
-        value={accessStore.accessCode}
-        type="text"
-        placeholder={Locale.Settings.Access.AccessCode.Placeholder}
-        onChange={(e) => {
-          accessStore.update(
-            (access) => (access.accessCode = e.currentTarget.value),
-          );
-        }}
-      />
-    </ListItem>
-  );
-
-  const openAIConfigComponent = accessStore.provider ===
-    ServiceProvider.OpenAI && (
-    <>
-      <ListItem
-        title={Locale.Settings.Access.OpenAI.Endpoint.Title}
-        subTitle={Locale.Settings.Access.OpenAI.Endpoint.SubTitle}
-      >
-        <input
-          aria-label={Locale.Settings.Access.OpenAI.Endpoint.Title}
-          type="text"
-          value={accessStore.openaiUrl}
-          placeholder={ROUTER_BASE_URL_NORMALIZED}
-          onChange={(e) =>
-            accessStore.update(
-              (access) => (access.openaiUrl = e.currentTarget.value),
-            )
-          }
-        ></input>
-      </ListItem>
-      <ListItem
-        title={Locale.Settings.Access.OpenAI.ApiKey.Title}
-        subTitle={Locale.Settings.Access.OpenAI.ApiKey.SubTitle}
-      >
-        <PasswordInput
-          aria={Locale.Settings.ShowPassword}
-          aria-label={Locale.Settings.Access.OpenAI.ApiKey.Title}
-          value={accessStore.openaiApiKey}
-          type="text"
-          placeholder={Locale.Settings.Access.OpenAI.ApiKey.Placeholder}
-          onChange={(e) => {
-            accessStore.update(
-              (access) => (access.openaiApiKey = e.currentTarget.value),
-            );
-          }}
-        />
-      </ListItem>
-    </>
-  );
 
   return (
     <ErrorBoundary>
@@ -1203,97 +1069,10 @@ export function Settings() {
             </ListItem>
           </List>
 
-          <List id={SlotID.CustomModel}>
-            {accessCodeComponent}
-
-            {!accessStore.hideUserApiKey && accessStore.useCustomConfig && (
-              <>
-                <ListItem
-                  title={Locale.Settings.Access.Provider.Title}
-                  subTitle={Locale.Settings.Access.Provider.SubTitle}
-                >
-                  <Select
-                    aria-label={Locale.Settings.Access.Provider.Title}
-                    value={accessStore.provider}
-                    onChange={(e) => {
-                      accessStore.update(
-                        (access) =>
-                          (access.provider = e.target.value as ServiceProvider),
-                      );
-                    }}
-                  >
-                    {ROUTER_PROVIDERS.map((provider) => (
-                      <option value={provider} key={provider}>
-                        {provider}
-                      </option>
-                    ))}
-                  </Select>
-                </ListItem>
-
-                {openAIConfigComponent}
-              </>
-            )}
-
-            {!shouldHideBalanceQuery && !clientConfig?.isApp ? (
-              <ListItem
-                title={Locale.Settings.Usage.Title}
-                subTitle={
-                  showUsage
-                    ? loadingUsage
-                      ? Locale.Settings.Usage.IsChecking
-                      : Locale.Settings.Usage.SubTitle(
-                          usage?.used ?? "[?]",
-                          usage?.subscription ?? "[?]",
-                        )
-                    : Locale.Settings.Usage.NoAccess
-                }
-              >
-                {!showUsage || loadingUsage ? (
-                  <div />
-                ) : (
-                  <IconButton
-                    icon={<ResetIcon></ResetIcon>}
-                    text={Locale.Settings.Usage.Check}
-                    onClick={() => checkUsage(true)}
-                  />
-                )}
-              </ListItem>
-            ) : null}
-
-            <ListItem
-              title={Locale.Settings.Access.CustomModel.Title}
-              subTitle={Locale.Settings.Access.CustomModel.SubTitle}
-              vertical={true}
-            >
-              <input
-                aria-label={Locale.Settings.Access.CustomModel.Title}
-                style={{ width: "100%", maxWidth: "unset", textAlign: "left" }}
-                type="text"
-                value={config.customModels}
-                placeholder="model1,model2,model3"
-                onChange={(e) =>
-                  config.update(
-                    (config) => (config.customModels = e.currentTarget.value),
-                  )
-                }
-              ></input>
-            </ListItem>
-          </List>
-
-          <List>
-            <ModelConfigList
-              modelConfig={config.modelConfig}
-              updateConfig={(updater) => {
-                const modelConfig = { ...config.modelConfig };
-                updater(modelConfig);
-                config.update((config) => (config.modelConfig = modelConfig));
-              }}
-            />
-          </List>
-
           {shouldShowPromptModal && (
             <UserPromptModal onClose={() => setShowPromptModal(false)} />
           )}
+
           <List>
             <RealtimeConfigList
               realtimeConfig={config.realtimeConfig}

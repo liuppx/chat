@@ -230,6 +230,36 @@ function getValidCachedRouterInvocationToken(
   return cached.token;
 }
 
+function applySelectedRouterTokenAuthorization(
+  headers: Record<string, string>,
+  url: string,
+) {
+  if (!isRouterUrl(url)) return headers;
+  const selectedToken =
+    useAccessStore.getState().selectedRouterToken?.trim() || "";
+  if (selectedToken) {
+    headers["Authorization"] = `Bearer ${selectedToken}`;
+  }
+  return headers;
+}
+
+function getHeadersForRouterModelAccess(
+  url: string,
+  providerNameOverride?: string,
+) {
+  const headers = getHeaders(false, providerNameOverride);
+  return applySelectedRouterTokenAuthorization(headers, url);
+}
+
+function ensureRouterModelAuthorization(
+  url: string,
+  headers: Record<string, string>,
+) {
+  if (isRouterUrl(url) && !headers["Authorization"]) {
+    throw new Error("请先在 Router 页面选择可用令牌");
+  }
+}
+
 export async function getHeadersWithRouterUcan(
   url: string,
   providerNameOverride?: string,
@@ -241,7 +271,9 @@ export async function getHeadersWithRouterUcan(
     if (!isRouterUrl(url)) return headers;
     const audience = getRouterAudience();
     const capabilities = getRouterCapabilities();
-    if (!audience || !capabilities.length) return headers;
+    if (!audience || !capabilities.length) {
+      return applySelectedRouterTokenAuthorization(headers, url);
+    }
     try {
       const centralAuthorization =
         await getCentralUcanAuthorizationHeaderForAudience({
@@ -257,21 +289,30 @@ export async function getHeadersWithRouterUcan(
       }
       console.warn("[UCAN] Failed to issue central invocation", error);
     }
-    return headers;
+    return applySelectedRouterTokenAuthorization(headers, url);
   }
   if (!isRouterUrl(url)) return headers;
-  if (!isUcanMetaValid()) return headers;
+  const selectedToken = useAccessStore.getState().selectedRouterToken?.trim();
+  if (selectedToken) {
+    headers["Authorization"] = `Bearer ${selectedToken}`;
+    return headers;
+  }
+  if (!isUcanMetaValid()) {
+    return applySelectedRouterTokenAuthorization(headers, url);
+  }
 
   const audience = getRouterAudience();
   const capabilities = getRouterCapabilities();
-  if (!audience || !capabilities.length) return headers;
+  if (!audience || !capabilities.length) {
+    return applySelectedRouterTokenAuthorization(headers, url);
+  }
 
   const cachedToken = options.forceRefresh
     ? null
     : getValidCachedRouterInvocationToken(audience, capabilities);
   if (cachedToken && isUcanTokenFresh(cachedToken)) {
     headers["Authorization"] = `Bearer ${cachedToken}`;
-    return headers;
+    return applySelectedRouterTokenAuthorization(headers, url);
   }
 
   try {
@@ -284,7 +325,7 @@ export async function getHeadersWithRouterUcan(
         return await invalidateUcanAndThrow("UCAN session is not available");
       }
       await invalidateUcan("UCAN session is not available");
-      return headers;
+      return applySelectedRouterTokenAuthorization(headers, url);
     }
 
     const ucan = await getOrCreateInvocationUcan({
@@ -314,11 +355,11 @@ export async function getHeadersWithRouterUcan(
         );
       }
       await invalidateUcan(getErrorMessage(error) || "UCAN invocation failed");
-      return headers;
+      return applySelectedRouterTokenAuthorization(headers, url);
     }
     console.warn("[UCAN] Failed to create invocation", error);
   }
-  return headers;
+  return applySelectedRouterTokenAuthorization(headers, url);
 }
 
 function isResponsesPath(path: string) {
@@ -868,7 +909,8 @@ export class ChatGPTApi implements LLMApi {
 
     try {
       const speechPath = this.path(OpenaiPath.SpeechPath);
-      const speechHeaders = await getHeadersWithRouterUcan(speechPath);
+      const speechHeaders = getHeadersForRouterModelAccess(speechPath);
+      ensureRouterModelAuthorization(speechPath, speechHeaders);
       const speechPayload = {
         method: "POST",
         body: JSON.stringify(requestPayload),
@@ -1170,10 +1212,11 @@ export class ChatGPTApi implements LLMApi {
           return toolIndex;
         };
 
-        const chatHeaders = await getHeadersWithRouterUcan(
+        const chatHeaders = getHeadersForRouterModelAccess(
           chatPath,
           modelConfig.providerName,
         );
+        ensureRouterModelAuthorization(chatPath, chatHeaders);
         streamWithThink(
           chatPath,
           requestPayload,
@@ -1413,16 +1456,20 @@ export class ChatGPTApi implements LLMApi {
           {
             ...options,
             getRefreshedHeaders: () =>
-              getHeadersWithRouterUcan(chatPath, modelConfig.providerName, {
-                forceRefresh: true,
-              }),
+              Promise.resolve(
+                getHeadersForRouterModelAccess(
+                  chatPath,
+                  modelConfig.providerName,
+                ),
+              ),
           },
         );
       } else {
-        const chatHeaders = await getHeadersWithRouterUcan(
+        const chatHeaders = getHeadersForRouterModelAccess(
           chatPath,
           modelConfig.providerName,
         );
+        ensureRouterModelAuthorization(chatPath, chatHeaders);
         const chatPayload = {
           method: "POST",
           body: JSON.stringify(requestPayload),
@@ -1525,17 +1572,18 @@ export class ChatGPTApi implements LLMApi {
 
   async models(): Promise<LLMModel[]> {
     const listPath = this.path(OpenaiPath.ListModelPath);
-    const shouldSkipRouterFetch = isRouterUrl(listPath) && !isUcanMetaValid();
+    const listHeaders = getHeadersForRouterModelAccess(listPath);
+    const shouldSkipRouterFetch =
+      isRouterUrl(listPath) && !listHeaders["Authorization"];
 
     if (shouldSkipRouterFetch || this.disableListModels) {
       if (shouldSkipRouterFetch) {
-        console.info("[Models] skip router fetch before UCAN login");
+        console.info("[Models] skip router fetch before token selection");
       }
       return [];
     }
 
     const fetchFromApi = async () => {
-      const listHeaders = await getHeadersWithRouterUcan(listPath);
       const res = await fetch(listPath, {
         method: "GET",
         headers: {
