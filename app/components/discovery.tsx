@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 
+import { getClientConfig } from "../config/client";
 import { COMMUNITY_MARKETPLACE_SKILL_PACKAGES_URL, Path } from "../constant";
 import Locale, { getLang, type Lang } from "../locales";
 import {
@@ -271,8 +272,11 @@ export function DiscoveryPage() {
 
   useEffect(() => {
     const controller = new AbortController();
+    const marketplaceSkillPackagesUrl =
+      getClientConfig()?.marketplaceSkillPackagesUrl ||
+      COMMUNITY_MARKETPLACE_SKILL_PACKAGES_URL;
 
-    fetch(COMMUNITY_MARKETPLACE_SKILL_PACKAGES_URL, {
+    fetch(marketplaceSkillPackagesUrl, {
       signal: controller.signal,
       cache: "no-store",
     })

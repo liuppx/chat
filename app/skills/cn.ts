@@ -203,4 +203,37 @@ export const CN_SKILLS: BuiltinSkill[] = [
       style: "vivid",
     },
   }),
+  createBuiltinSkill({
+    avatar: "1f3a7",
+    name: "实时聊天",
+    description: "使用实时语音对话能力，适合语音交流、即时反馈和口语互动。",
+    category: "语音",
+    starters: [
+      "开始一次实时语音聊天。",
+      "我想用语音和你讨论一个问题。",
+      "开启实时对话，边说边聊。",
+    ],
+    lang: "cn",
+    createdAt: 1700000001007,
+    syncGlobalConfig: false,
+    ui: {
+      sessionToolbar: CHAT_TOOLBAR_PRESETS.realtime,
+    },
+    context: [
+      {
+        id: "cn-realtime-0",
+        role: "system",
+        content:
+          "你正在进行实时语音聊天。回答要自然、简洁，适合口语交流；用户停顿或表达不完整时，优先确认意图并继续推进。",
+        date: "",
+      },
+    ],
+    modelConfig: {
+      temperature: 0.5,
+      historyMessageCount: 6,
+    },
+    realtimeConfig: {
+      enabled: false,
+    },
+  }),
 ];

@@ -46,7 +46,6 @@ import { Avatar, AvatarPicker, WalletAccount } from "./emoji";
 import { getClientConfig } from "../config/client";
 import { nanoid } from "nanoid";
 import { TTSConfigList } from "./tts-config";
-import { RealtimeConfigList } from "./realtime-chat/realtime-config";
 import {
   getCurrentAccount,
   isValidUcanAuthorization,
@@ -662,18 +661,6 @@ export function Settings() {
             <UserPromptModal onClose={() => setShowPromptModal(false)} />
           )}
 
-          <List>
-            <RealtimeConfigList
-              realtimeConfig={config.realtimeConfig}
-              updateConfig={(updater) => {
-                const realtimeConfig = { ...config.realtimeConfig };
-                updater(realtimeConfig);
-                config.update(
-                  (config) => (config.realtimeConfig = realtimeConfig),
-                );
-              }}
-            />
-          </List>
           <List>
             <TTSConfigList
               ttsConfig={config.ttsConfig}

@@ -1,3 +1,4 @@
+import { getClientConfig } from "../config/client";
 import { COMMUNITY_MARKETPLACE_MCP_PACKAGES_URL } from "../constant";
 import { PresetServer } from "./types";
 
@@ -27,7 +28,10 @@ function isValidPresetServer(
 }
 
 export async function fetchCommunityMcpPresetServers(signal?: AbortSignal) {
-  const response = await fetch(COMMUNITY_MARKETPLACE_MCP_PACKAGES_URL, {
+  const marketplaceMcpPackagesUrl =
+    getClientConfig()?.marketplaceMcpPackagesUrl ||
+    COMMUNITY_MARKETPLACE_MCP_PACKAGES_URL;
+  const response = await fetch(marketplaceMcpPackagesUrl, {
     signal,
     cache: "no-store",
   });

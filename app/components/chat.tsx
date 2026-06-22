@@ -961,7 +961,7 @@ export function ChatActions(props: {
         {!isMobileScreen && toolbar.mcp && <MCPAction />}
       </>
       <div className={styles["chat-input-actions-end"]}>
-        {toolbar.realtime && config.realtimeConfig.enable && (
+        {toolbar.realtime && sessionSkill.realtimeConfig?.enabled && (
           <ChatAction
             onClick={() => props.setShowChatSidePanel(true)}
             text={"Realtime Chat"}

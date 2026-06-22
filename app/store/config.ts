@@ -17,7 +17,10 @@ import { createPersistStore } from "../utils/store";
 import { normalizeModels, normalizeProviderName } from "../utils/model";
 import type { ReasoningEffort, ReasoningMode } from "../client/reasoning";
 import type { ResponsesConversationMode } from "../client/api";
-import type { Voice } from "rt-client";
+import {
+  createDefaultRealtimeConfig,
+  type LegacyRealtimeConfig,
+} from "./realtime";
 
 export type ModelType = string;
 export type TTSModelType = (typeof DEFAULT_TTS_MODELS)[number];
@@ -102,18 +105,7 @@ export const createDefaultConfig = () => {
       speed: 1.0,
     },
 
-    realtimeConfig: {
-      enable: false,
-      provider: "OpenAI" as ServiceProvider,
-      model: "gpt-4o-realtime-preview-2024-10-01",
-      apiKey: "",
-      azure: {
-        endpoint: "",
-        deployment: "",
-      },
-      temperature: 0.9,
-      voice: "alloy" as Voice,
-    },
+    realtimeConfig: createDefaultRealtimeConfig(),
   };
 };
 
@@ -123,7 +115,6 @@ export type ChatConfig = typeof DEFAULT_CONFIG;
 
 export type ModelConfig = ChatConfig["modelConfig"];
 export type TTSConfig = ChatConfig["ttsConfig"];
-export type RealtimeConfig = ChatConfig["realtimeConfig"];
 
 export function limitNumber(
   x: number,
@@ -249,6 +240,9 @@ export const useAppConfig = createPersistStore(
           providerName: providerName as ServiceProvider,
           compressProviderName: compressProviderName as any,
         },
+        realtimeConfig: createDefaultRealtimeConfig(
+          state.realtimeConfig as LegacyRealtimeConfig,
+        ),
       };
     },
 
@@ -351,6 +345,9 @@ export const useAppConfig = createPersistStore(
       }
 
       state.models = normalizeModels(state.models ?? []);
+      state.realtimeConfig = createDefaultRealtimeConfig(
+        state.realtimeConfig as LegacyRealtimeConfig,
+      );
       state.modelConfig.providerName = (normalizeProviderName(
         state.modelConfig.providerName,
       ) ?? DEFAULT_CONFIG.modelConfig.providerName) as ServiceProvider;
