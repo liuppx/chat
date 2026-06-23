@@ -213,6 +213,17 @@
   flex: 0 0 auto;
 }
 
+.mcp-config-hint {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: var(--border-in-light);
+  border-radius: 10px;
+  background: var(--hover-color);
+  font-size: 12px;
+  line-height: 1.55;
+  opacity: 0.86;
+}
+
 .mcp-detail {
   display: grid;
   gap: 12px;

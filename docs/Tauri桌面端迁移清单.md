@@ -101,6 +101,8 @@
 
 这个处理只影响桌面导出链路，不影响 Web 开发与 Web 生产运行。
 
+当前桌面端 MCP 是显式禁用状态：`actions.export.ts` 不会读取 `data/mcp_config.json`，也不会启动 stdio MCP 进程。后续如果要支持桌面端 MCP，应使用 Tauri 用户数据目录保存本机配置，并单独设计权限提示、命令白名单和密钥存储，不复用 standalone 的部署目录配置文件。
+
 ### 4. 桌面打包链路
 
 见 [scripts/tauri-build-app.mjs](../scripts/tauri-build-app.mjs)。

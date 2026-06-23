@@ -19,8 +19,7 @@ import path from "path";
 import { getServerSideConfig } from "../config/server";
 
 const logger = new MCPClientLogger("MCP Actions");
-const CONFIG_PATH = path.join(process.cwd(), "app/mcp/mcp_config.json");
-const DEFAULT_CONFIG_CONTENT = JSON.stringify(DEFAULT_MCP_CONFIG, null, 2);
+const DEFAULT_CONFIG_PATH = path.join(process.cwd(), "data/mcp_config.json");
 const MCP_INIT_MAX_ATTEMPTS = 2;
 const MCP_INIT_RETRY_DELAY_MS = 1500;
 
@@ -32,6 +31,14 @@ function getErrorMessage(error: unknown) {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getMcpConfigPath() {
+  const configuredPath = process.env.MCP_CONFIG_PATH?.trim();
+  if (!configuredPath) return DEFAULT_CONFIG_PATH;
+  return path.isAbsolute(configuredPath)
+    ? configuredPath
+    : path.join(process.cwd(), configuredPath);
 }
 
 async function syncServerStatus(
@@ -413,13 +420,15 @@ export async function executeMcpAction(
 
 // 获取 MCP 配置文件
 export async function getMcpConfigFromFile(): Promise<McpConfigData> {
+  const configPath = getMcpConfigPath();
+
   try {
-    const configStr = await fs.readFile(CONFIG_PATH, "utf-8");
+    const configStr = await fs.readFile(configPath, "utf-8");
     return JSON.parse(configStr);
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
       await updateMcpConfig(DEFAULT_MCP_CONFIG);
-      logger.info(`Created default MCP config at ${CONFIG_PATH}`);
+      logger.info(`Created default MCP config at ${configPath}`);
       return DEFAULT_MCP_CONFIG;
     }
 
@@ -431,13 +440,10 @@ export async function getMcpConfigFromFile(): Promise<McpConfigData> {
 // 更新 MCP 配置文件
 async function updateMcpConfig(config: McpConfigData): Promise<void> {
   try {
+    const configPath = getMcpConfigPath();
     // 确保目录存在
-    await fs.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
-    const content =
-      config === DEFAULT_MCP_CONFIG
-        ? DEFAULT_CONFIG_CONTENT
-        : JSON.stringify(config, null, 2);
-    await fs.writeFile(CONFIG_PATH, content);
+    await fs.mkdir(path.dirname(configPath), { recursive: true });
+    await fs.writeFile(configPath, JSON.stringify(config, null, 2));
   } catch (error) {
     throw error;
   }

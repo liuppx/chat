@@ -189,6 +189,16 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function isSensitiveMcpConfigField(key: string, prop: DiscoveryConfigProperty) {
+  const text = `${key} ${prop.description ?? ""}`.toLowerCase();
+  return (
+    text.includes("key") ||
+    text.includes("secret") ||
+    text.includes("token") ||
+    text.includes("password")
+  );
+}
+
 function countSkillPackages(packages: SkillPackageList) {
   return Object.values(packages).reduce((sum, items) => {
     return sum + (items?.length ?? 0);
@@ -638,7 +648,7 @@ export function DiscoveryPage() {
           .map((tag) => getMarketplaceTagLabel(tag, currentLang)),
         status,
         pricing: "free",
-        runtime: server.tags.includes("local") ? "local" : "both",
+        runtime: "local",
         source: officialMcpIds.has(server.id)
           ? Locale.Discovery.Source.Official
           : Locale.Discovery.Source.Community,
@@ -942,7 +952,8 @@ export function DiscoveryPage() {
           >
             <input
               aria-label={key}
-              type="text"
+              type={isSensitiveMcpConfigField(key, prop) ? "password" : "text"}
+              autoComplete="off"
               value={currentValue}
               placeholder={`Enter ${key}`}
               onChange={(e) =>
@@ -1263,6 +1274,11 @@ export function DiscoveryPage() {
                 </div>
                 <div className={styles["card-desc"]}>{item.description}</div>
                 <div className={styles.badges}>
+                  {item.type === "mcp" && (
+                    <span className={styles.badge}>
+                      {Locale.Discovery.McpUserProvided}
+                    </span>
+                  )}
                   <span className={styles.badge}>
                     {Locale.Discovery.Runtime[item.runtime]}
                   </span>
@@ -1351,6 +1367,9 @@ export function DiscoveryPage() {
                 />,
               ]}
             >
+              <div className={styles["mcp-config-hint"]}>
+                {Locale.Discovery.McpUserConfigHint}
+              </div>
               <List>{renderMcpConfigForm()}</List>
             </Modal>
           </div>
@@ -1403,6 +1422,10 @@ export function DiscoveryPage() {
                 <div className={styles["mcp-detail-row"]}>
                   <span>{Locale.Discovery.SourceLabel}</span>
                   <strong>{viewingMcpCapability.source}</strong>
+                </div>
+                <div className={styles["mcp-detail-row"]}>
+                  <span>{Locale.Discovery.ConfigMode}</span>
+                  <strong>{Locale.Discovery.McpUserProvided}</strong>
                 </div>
                 <div className={styles["mcp-detail-desc"]}>
                   {viewingMcpCapability.description}

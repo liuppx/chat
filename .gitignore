@@ -51,8 +51,10 @@ dev
 
 masks.json
 
-# mcp config
+# mcp runtime config
+# app/mcp/mcp_config.json is a legacy local path; keep ignored to avoid leaking old secrets.
 app/mcp/mcp_config.json
+/data/
 .env.local
 /output/
 build.mode

@@ -96,6 +96,7 @@ declare global {
       DEFAULT_INPUT_TEMPLATE?: string;
 
       ENABLE_MCP?: string; // enable mcp functionality
+      MCP_CONFIG_PATH?: string; // optional path for runtime MCP config
 
       WEBDAV_BACKEND_BASE_URL?: string;
       WEBDAV_BACKEND_PREFIX?: string;
