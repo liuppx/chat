@@ -741,6 +741,17 @@ const en: LocaleType = {
     SearchMine: "Search my capabilities",
     Empty: "No matching capabilities",
     ResetFilters: "Clear filters",
+    ReloadMarketplace: "Reload Market",
+    MarketplaceSource: "Market source",
+    MarketplaceSkillSource: "Skill market source",
+    MarketplaceMcpSource: "MCP market source",
+    MarketplaceLoading: "Loading market data",
+    MarketplaceLoaded: (
+      currentLangSkills: number,
+      totalSkills: number,
+      mcps: number,
+    ) => `Loaded ${currentLangSkills}/${totalSkills} skills and ${mcps} MCP`,
+    MarketplaceError: (message: string) => `Market load failed: ${message}`,
     DefaultSkillDesc:
       "A task-oriented workflow that can bind models, prompts, and tools.",
     SkillStarters: (count: number) => `${count} starters`,

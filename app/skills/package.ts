@@ -41,14 +41,14 @@ export type SkillPackageModel = {
 
 export type SkillTool = {
   id: string;
-  name: string;
-  description?: string;
+  name: LocalizedText;
+  description?: LocalizedText;
   required: boolean;
 };
 
 export type SkillMcpServer = {
   id: string;
-  name: string;
+  name: LocalizedText;
   transport: "stdio" | "http" | "sse";
   required: boolean;
   configSchema?: Record<string, unknown>;

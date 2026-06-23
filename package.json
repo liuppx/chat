@@ -6,6 +6,8 @@
     "skill": "npx tsx app/skills/build.ts",
     "skill:watch": "npx watch \"npm run skill\" app/skills",
     "dev": "concurrently -r \"npm run skill:watch\" \"next dev --webpack -p 3020\"",
+    "dev:marketplace": "bash ./scripts/dev-marketplace.sh",
+    "marketplace:snapshot": "bash ./scripts/sync-marketplace-snapshot.sh",
     "build": "npm run skill && cross-env BUILD_MODE=standalone next build --webpack",
     "start": "PORT=3020 node .next/standalone/server.js",
     "lint": "eslint .",

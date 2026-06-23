@@ -115,7 +115,10 @@ export function McpMarketPage() {
         );
         if (controller.signal.aborted) return;
         setPresetServers(
-          mergeMcpPresetServers(OFFICIAL_MCP_PRESET_SERVERS, communityServers),
+          mergeMcpPresetServers(
+            OFFICIAL_MCP_PRESET_SERVERS,
+            communityServers.data,
+          ),
         );
       } catch (error) {
         if (controller.signal.aborted) return;

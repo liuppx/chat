@@ -2,8 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 
-import { getClientConfig } from "../config/client";
-import { COMMUNITY_MARKETPLACE_SKILL_PACKAGES_URL, Path } from "../constant";
+import { Path } from "../constant";
 import Locale, { getLang, type Lang } from "../locales";
 import {
   addMcpServer,
@@ -14,6 +13,10 @@ import {
   fetchCommunityMcpPresetServers,
   mergeMcpPresetServers,
 } from "../mcp/marketplace";
+import {
+  fetchMarketplaceJson,
+  getMarketplaceSourceUrls,
+} from "../marketplace/sources";
 import {
   getMissingMcpConfigKeys,
   readMcpConfigBoolean,
@@ -50,6 +53,7 @@ import CloseIcon from "../icons/close.svg";
 import DeleteIcon from "../icons/delete.svg";
 import EditIcon from "../icons/edit.svg";
 import EyeIcon from "../icons/eye.svg";
+import ReloadIcon from "../icons/reload.svg";
 import ModelServiceIcon from "../icons/llm-icons/default.svg";
 import CloudStorageIcon from "../icons/cloud-success.svg";
 import ToolIcon from "../icons/tool.svg";
@@ -73,6 +77,22 @@ type PricingType = "free" | "subscription" | "usage";
 type RuntimeType = "cloud" | "local" | "both";
 type DiscoveryView = "market" | "mine";
 type SkillPackageList = Partial<Record<Lang, SkillPackage[]>>;
+type MarketplaceLoadStatus = "idle" | "loading" | "ready" | "error";
+type MarketplaceLoadState = {
+  skill: {
+    status: MarketplaceLoadStatus;
+    count: number;
+    total: number;
+    url: string;
+    error?: string;
+  };
+  mcp: {
+    status: MarketplaceLoadStatus;
+    count: number;
+    url: string;
+    error?: string;
+  };
+};
 type DiscoveryConfigProperty = {
   type: string;
   description?: string;
@@ -154,6 +174,23 @@ function getCapabilityIcon(type: Capability["type"]) {
   return <ModelServiceIcon />;
 }
 
+function getMarketplaceUrls() {
+  return {
+    skillUrl: getMarketplaceSourceUrls("skill")[0],
+    mcpUrl: getMarketplaceSourceUrls("mcp")[0],
+  };
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function countSkillPackages(packages: SkillPackageList) {
+  return Object.values(packages).reduce((sum, items) => {
+    return sum + (items?.length ?? 0);
+  }, 0);
+}
+
 export function DiscoveryPage() {
   const navigate = useNavigate();
   const chatStore = useChatStore();
@@ -165,6 +202,7 @@ export function DiscoveryPage() {
   const location = useLocation();
   const view = getInitialView(location.search);
   const activeType = getInitialType(location.search);
+  const currentLang = getLang();
   const [searchText, setSearchText] = useState("");
   const deferredSearchText = useDeferredValue(searchText);
   const skillRecords = useSkillStore((state) => state.skills);
@@ -184,6 +222,24 @@ export function DiscoveryPage() {
   const [communityMcpServers, setCommunityMcpServers] = useState<
     PresetServer[]
   >([]);
+  const [marketplaceReloadKey, setMarketplaceReloadKey] = useState(0);
+  const [marketplaceLoadState, setMarketplaceLoadState] =
+    useState<MarketplaceLoadState>(() => {
+      const { skillUrl, mcpUrl } = getMarketplaceUrls();
+      return {
+        skill: {
+          status: "idle",
+          count: 0,
+          total: 0,
+          url: skillUrl,
+        },
+        mcp: {
+          status: "idle",
+          count: 0,
+          url: mcpUrl,
+        },
+      };
+    });
   const [editingMcpServerId, setEditingMcpServerId] = useState<string>();
   const [viewingMcpCapability, setViewingMcpCapability] =
     useState<Capability>();
@@ -218,15 +274,45 @@ export function DiscoveryPage() {
 
   useEffect(() => {
     const controller = new AbortController();
+    const { mcpUrl } = getMarketplaceUrls();
+
+    setMarketplaceLoadState((state) => ({
+      ...state,
+      mcp: {
+        ...state.mcp,
+        status: "loading",
+        url: mcpUrl,
+        error: undefined,
+      },
+    }));
 
     fetchCommunityMcpPresetServers(controller.signal)
-      .then((servers) => {
+      .then((result) => {
         if (!controller.signal.aborted) {
+          const servers = result.data;
           setCommunityMcpServers(servers);
+          setMarketplaceLoadState((state) => ({
+            ...state,
+            mcp: {
+              status: "ready",
+              count: servers.length,
+              url: result.url,
+            },
+          }));
         }
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
+          setCommunityMcpServers([]);
+          setMarketplaceLoadState((state) => ({
+            ...state,
+            mcp: {
+              status: "error",
+              count: 0,
+              url: mcpUrl,
+              error: getErrorMessage(error),
+            },
+          }));
           console.warn(
             "[Discovery] failed to load community MCP package list",
             error,
@@ -235,7 +321,7 @@ export function DiscoveryPage() {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [marketplaceReloadKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -277,27 +363,47 @@ export function DiscoveryPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const marketplaceSkillPackagesUrl =
-      getClientConfig()?.marketplaceSkillPackagesUrl ||
-      COMMUNITY_MARKETPLACE_SKILL_PACKAGES_URL;
+    const { skillUrl } = getMarketplaceUrls();
 
-    fetch(marketplaceSkillPackagesUrl, {
-      signal: controller.signal,
-      cache: "no-store",
-    })
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        return res.json() as Promise<SkillPackageList>;
-      })
-      .then((packages) => {
+    setMarketplaceLoadState((state) => ({
+      ...state,
+      skill: {
+        ...state.skill,
+        status: "loading",
+        url: skillUrl,
+        error: undefined,
+      },
+    }));
+
+    fetchMarketplaceJson<SkillPackageList>("skill", controller.signal)
+      .then((result) => {
         if (!controller.signal.aborted) {
+          const packages = result.data;
           setCommunitySkillPackages(packages);
+          setMarketplaceLoadState((state) => ({
+            ...state,
+            skill: {
+              status: "ready",
+              count: packages[currentLang]?.length ?? 0,
+              total: countSkillPackages(packages),
+              url: result.url,
+            },
+          }));
         }
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
+          setCommunitySkillPackages({});
+          setMarketplaceLoadState((state) => ({
+            ...state,
+            skill: {
+              status: "error",
+              count: 0,
+              total: 0,
+              url: skillUrl,
+              error: getErrorMessage(error),
+            },
+          }));
           console.warn(
             "[Discovery] failed to load community skill package list",
             error,
@@ -306,7 +412,7 @@ export function DiscoveryPage() {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [currentLang, marketplaceReloadKey]);
 
   const skills = useMemo<Skill[]>(() => {
     const userSkills = Object.values(skillRecords).sort(
@@ -356,7 +462,6 @@ export function DiscoveryPage() {
       OFFICIAL_MCP_PRESET_SERVERS,
       communityMcpServers,
     );
-    const currentLang = getLang();
     const installedPackageIds = new Set(
       Object.values(skillRecords)
         .map((skill) => skill.packageId)
@@ -594,6 +699,7 @@ export function DiscoveryPage() {
     accessCustomModels,
     communityMcpServers,
     communitySkillPackages,
+    currentLang,
     customModels,
     defaultModel,
     mcpConfig?.mcpServers,
@@ -607,6 +713,22 @@ export function DiscoveryPage() {
     storageQuota,
     storageQuotaStatus,
   ]);
+
+  const marketplaceStatusText = useMemo(() => {
+    const skillState = marketplaceLoadState.skill;
+    const mcpState = marketplaceLoadState.mcp;
+    const error = skillState.error || mcpState.error;
+
+    if (error) return Locale.Discovery.MarketplaceError(error);
+    if (skillState.status === "loading" || mcpState.status === "loading") {
+      return Locale.Discovery.MarketplaceLoading;
+    }
+    return Locale.Discovery.MarketplaceLoaded(
+      skillState.count,
+      skillState.total,
+      mcpState.count,
+    );
+  }, [marketplaceLoadState]);
 
   const visibleCapabilities = capabilities.filter((item) => {
     const keyword = deferredSearchText.trim().toLowerCase();
@@ -1066,6 +1188,30 @@ export function DiscoveryPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div
+            className={clsx(
+              styles["marketplace-status"],
+              (marketplaceLoadState.skill.status === "error" ||
+                marketplaceLoadState.mcp.status === "error") &&
+                styles["marketplace-status-error"],
+            )}
+            title={`${Locale.Discovery.MarketplaceSkillSource}: ${marketplaceLoadState.skill.url}\n${Locale.Discovery.MarketplaceMcpSource}: ${marketplaceLoadState.mcp.url}`}
+          >
+            <div className={styles["marketplace-status-main"]}>
+              <span>{marketplaceStatusText}</span>
+              <span className={styles["marketplace-source"]}>
+                {Locale.Discovery.MarketplaceSource}:{" "}
+                {marketplaceLoadState.skill.url}
+              </span>
+            </div>
+            <IconButton
+              icon={<ReloadIcon />}
+              text={Locale.Discovery.ReloadMarketplace}
+              bordered
+              onClick={() => setMarketplaceReloadKey(Date.now())}
+            />
           </div>
 
           <div className={styles.grid}>

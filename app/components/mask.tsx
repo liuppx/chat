@@ -219,10 +219,16 @@ function getSkillPermissionsText(
 function getSkillToolsText(
   skillPackage: SkillPackage,
   labels: ReturnType<typeof getSkillPackageLabels>,
+  lang: Lang,
 ) {
-  const tools = skillPackage.tools?.map((tool) => tool.name || tool.id) ?? [];
+  const tools =
+    skillPackage.tools?.map((tool) =>
+      resolveLocalizedText(tool.name, lang, tool.id),
+    ) ?? [];
   const servers =
-    skillPackage.mcp?.servers?.map((server) => server.name || server.id) ?? [];
+    skillPackage.mcp?.servers?.map((server) =>
+      resolveLocalizedText(server.name, lang, server.id),
+    ) ?? [];
   const items = [...tools, ...servers];
   return items.length ? items.join(", ") : labels.none;
 }
@@ -260,7 +266,7 @@ function SkillPackageSummary(props: { skill: Skill }) {
     },
     {
       label: labels.tools,
-      value: getSkillToolsText(skillPackage, labels),
+      value: getSkillToolsText(skillPackage, labels, props.skill.lang),
     },
     {
       label: labels.visibility,
