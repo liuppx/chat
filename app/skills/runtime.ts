@@ -1,11 +1,13 @@
 import { LLMModel } from "../client/api";
 import { ModelConfig } from "../store/config";
 import { ServerStatusResponse } from "../mcp/types";
+import { useAccessStore } from "../store/access";
 import {
   getRequiredSkillMcpTools,
   getSkillSessionToolbar,
   type Skill,
 } from "../store/skill";
+import { isRouterRealtimeProvider } from "../store/realtime";
 import {
   collectModelsWithDefaultModel,
   filterModelsByCandidates,
@@ -59,6 +61,16 @@ export function hasSkillMcpRuntimeIssue(result?: SkillRuntimeResult) {
 
 function getSkillApiTools(skill: Skill) {
   return skill.tools?.apiTools ?? skill.plugin ?? [];
+}
+
+function hasRouterRealtimeToken(apiKey?: string) {
+  if (apiKey?.trim()) return true;
+  const accessStore = useAccessStore.getState();
+  return Boolean(
+    accessStore.selectedRouterToken?.trim() ||
+    accessStore.openaiApiKey?.trim() ||
+    (accessStore.enabledAccessControl() && accessStore.accessCode?.trim()),
+  );
 }
 
 export function resolveSkillRuntimeStatus(params: {
@@ -202,7 +214,18 @@ export function resolveSkillRuntimeStatus(params: {
         type: "realtime",
         message: "实时聊天未启用",
       });
-    } else if (!realtimeConfig.apiKey?.trim()) {
+    } else if (
+      isRouterRealtimeProvider(realtimeConfig.provider) &&
+      !hasRouterRealtimeToken(realtimeConfig.apiKey)
+    ) {
+      issues.push({
+        type: "realtime",
+        message: "缺少 Router 实时聊天令牌",
+      });
+    } else if (
+      !isRouterRealtimeProvider(realtimeConfig.provider) &&
+      !realtimeConfig.apiKey?.trim()
+    ) {
       issues.push({
         type: "realtime",
         message: "缺少实时聊天 API Key",

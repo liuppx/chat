@@ -644,6 +644,18 @@ const en: LocaleType = {
         SubTitle: "API Key",
         Placeholder: "API Key",
       },
+      Router: {
+        Endpoint: {
+          Title: "Router Endpoint",
+          SubTitle: "Leave empty to use the Router page or runtime endpoint",
+          Placeholder: "https://llm.yeying.pub",
+        },
+        Token: {
+          Title: "Router Token",
+          SubTitle: "Leave empty to use the token selected on the Router page",
+          Placeholder: "Router token, optional",
+        },
+      },
       Azure: {
         Endpoint: {
           Title: "Endpoint",
@@ -728,6 +740,10 @@ const en: LocaleType = {
     },
     SourceLabel: "Source",
     McpStatus: "MCP Status",
+    ConfigMode: "Config mode",
+    McpUserProvided: "User-provided config",
+    McpUserConfigHint:
+      "MCP currently uses user-provided configuration and only applies to standalone or local Next processes. API keys and other secrets are written to this instance's MCP config file, not shipped as marketplace data. Configure them only in a trusted environment.",
     OpenMcpManager: "Open MCP Manager",
     Manage: "Manage",
     Configure: "Configure",

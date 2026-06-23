@@ -1,6 +1,11 @@
 import { BuiltinSkill } from "./typing";
 import { CHAT_TOOLBAR_PRESETS, createBuiltinSkill } from "./utils";
 import { ServiceProvider } from "../constant";
+import {
+  DEFAULT_ROUTER_REALTIME_MODEL,
+  DEFAULT_ROUTER_REALTIME_VOICE,
+  REALTIME_ROUTER_PROVIDER,
+} from "../store/realtime";
 
 export const CN_SKILLS: BuiltinSkill[] = [
   createBuiltinSkill({
@@ -234,6 +239,9 @@ export const CN_SKILLS: BuiltinSkill[] = [
     },
     realtimeConfig: {
       enabled: false,
+      provider: REALTIME_ROUTER_PROVIDER,
+      model: DEFAULT_ROUTER_REALTIME_MODEL,
+      voice: DEFAULT_ROUTER_REALTIME_VOICE,
     },
   }),
 ];

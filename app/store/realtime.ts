@@ -1,19 +1,31 @@
 import { ServiceProvider } from "../constant";
-import type { Voice } from "rt-client";
 
-export type RealtimeProvider = ServiceProvider.OpenAI | ServiceProvider.Azure;
+export const REALTIME_ROUTER_PROVIDER = "Router" as const;
+export const DEFAULT_OPENAI_REALTIME_MODEL =
+  "gpt-4o-realtime-preview-2024-10-01";
+export const DEFAULT_ROUTER_REALTIME_MODEL = "qwen3.5-omni-plus-realtime";
+export const DEFAULT_OPENAI_REALTIME_VOICE = "alloy";
+export const DEFAULT_ROUTER_REALTIME_VOICE = "Tina";
+
+export type RealtimeProvider =
+  | ServiceProvider.OpenAI
+  | ServiceProvider.Azure
+  | typeof REALTIME_ROUTER_PROVIDER;
 
 export type RealtimeConfig = {
   enabled: boolean;
   provider: RealtimeProvider;
   model: string;
   apiKey: string;
+  router: {
+    endpoint: string;
+  };
   azure: {
     endpoint: string;
     deployment: string;
   };
   temperature: number;
-  voice: Voice;
+  voice: string;
 };
 
 export type LegacyRealtimeConfig = Partial<RealtimeConfig> & {
@@ -27,23 +39,35 @@ export function createDefaultRealtimeConfig(
   const defaultConfig: RealtimeConfig = {
     enabled: false,
     provider: ServiceProvider.OpenAI,
-    model: "gpt-4o-realtime-preview-2024-10-01",
+    model: DEFAULT_OPENAI_REALTIME_MODEL,
     apiKey: "",
+    router: {
+      endpoint: "",
+    },
     azure: {
       endpoint: "",
       deployment: "",
     },
     temperature: 0.9,
-    voice: "alloy" as Voice,
+    voice: DEFAULT_OPENAI_REALTIME_VOICE,
   };
 
   return {
     ...defaultConfig,
     ...rest,
     enabled: rest.enabled ?? enable ?? false,
+    router: {
+      endpoint: rest.router?.endpoint ?? "",
+    },
     azure: {
       endpoint: azure?.endpoint ?? "",
       deployment: azure?.deployment ?? "",
     },
   };
+}
+
+export function isRouterRealtimeProvider(
+  provider?: RealtimeProvider | string,
+): provider is typeof REALTIME_ROUTER_PROVIDER {
+  return provider === REALTIME_ROUTER_PROVIDER;
 }

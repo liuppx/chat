@@ -1,26 +1,81 @@
 import {
+  DEFAULT_OPENAI_REALTIME_MODEL,
+  DEFAULT_OPENAI_REALTIME_VOICE,
+  DEFAULT_ROUTER_REALTIME_MODEL,
+  DEFAULT_ROUTER_REALTIME_VOICE,
+  REALTIME_ROUTER_PROVIDER,
   type RealtimeConfig,
   type RealtimeProvider,
+  isRouterRealtimeProvider,
 } from "@/app/store/realtime";
 
 import Locale from "@/app/locales";
 import { ListItem, Select, PasswordInput } from "@/app/components/ui-lib";
 
 import { InputRange } from "@/app/components/input-range";
-import { Voice } from "rt-client";
 import { ServiceProvider } from "@/app/constant";
 
-const providers = [ServiceProvider.OpenAI, ServiceProvider.Azure];
+const providers = [
+  REALTIME_ROUTER_PROVIDER,
+  ServiceProvider.OpenAI,
+  ServiceProvider.Azure,
+];
 
-const models = ["gpt-4o-realtime-preview-2024-10-01"];
+const models = [
+  DEFAULT_ROUTER_REALTIME_MODEL,
+  "qwen3.5-omni-flash-realtime",
+  "qwen3-omni-flash-realtime",
+  "qwen-omni-turbo-realtime",
+  DEFAULT_OPENAI_REALTIME_MODEL,
+];
 
-const voice = ["alloy", "shimmer", "echo"];
+const voices = [
+  DEFAULT_ROUTER_REALTIME_VOICE,
+  "Cherry",
+  "Serena",
+  "Ethan",
+  DEFAULT_OPENAI_REALTIME_VOICE,
+  "shimmer",
+  "echo",
+];
+
+function applyProviderDefaults(
+  config: RealtimeConfig,
+  provider: RealtimeProvider,
+) {
+  config.provider = provider;
+
+  if (isRouterRealtimeProvider(provider)) {
+    if (
+      !config.model ||
+      config.model === DEFAULT_OPENAI_REALTIME_MODEL ||
+      config.model.startsWith("gpt-")
+    ) {
+      config.model = DEFAULT_ROUTER_REALTIME_MODEL;
+    }
+    if (!config.voice || ["alloy", "shimmer", "echo"].includes(config.voice)) {
+      config.voice = DEFAULT_ROUTER_REALTIME_VOICE;
+    }
+    return;
+  }
+
+  if (provider === ServiceProvider.OpenAI) {
+    if (!config.model || config.model.startsWith("qwen")) {
+      config.model = DEFAULT_OPENAI_REALTIME_MODEL;
+    }
+    if (!config.voice || config.voice === DEFAULT_ROUTER_REALTIME_VOICE) {
+      config.voice = DEFAULT_OPENAI_REALTIME_VOICE;
+    }
+  }
+}
 
 export function RealtimeConfigList(props: {
   realtimeConfig: RealtimeConfig;
   updateConfig: (updater: (config: RealtimeConfig) => void) => void;
   showEnable?: boolean;
 }) {
+  const isRouter = isRouterRealtimeProvider(props.realtimeConfig.provider);
+
   const azureConfigComponent = props.realtimeConfig.provider ===
     ServiceProvider.Azure && (
     <>
@@ -57,6 +112,26 @@ export function RealtimeConfigList(props: {
     </>
   );
 
+  const routerConfigComponent = isRouter && (
+    <>
+      <ListItem
+        title={Locale.Settings.Realtime.Router.Endpoint.Title}
+        subTitle={Locale.Settings.Realtime.Router.Endpoint.SubTitle}
+      >
+        <input
+          value={props.realtimeConfig?.router?.endpoint}
+          type="text"
+          placeholder={Locale.Settings.Realtime.Router.Endpoint.Placeholder}
+          onChange={(e) => {
+            props.updateConfig(
+              (config) => (config.router.endpoint = e.currentTarget.value),
+            );
+          }}
+        />
+      </ListItem>
+    </>
+  );
+
   return (
     <>
       {props.showEnable !== false && (
@@ -86,9 +161,11 @@ export function RealtimeConfigList(props: {
               aria-label={Locale.Settings.Realtime.Provider.Title}
               value={props.realtimeConfig.provider}
               onChange={(e) => {
-                props.updateConfig(
-                  (config) =>
-                    (config.provider = e.target.value as RealtimeProvider),
+                props.updateConfig((config) =>
+                  applyProviderDefaults(
+                    config,
+                    e.target.value as RealtimeProvider,
+                  ),
                 );
               }}
             >
@@ -103,30 +180,50 @@ export function RealtimeConfigList(props: {
             title={Locale.Settings.Realtime.Model.Title}
             subTitle={Locale.Settings.Realtime.Model.SubTitle}
           >
-            <Select
+            <input
+              list="realtime-model-options"
               aria-label={Locale.Settings.Realtime.Model.Title}
               value={props.realtimeConfig.model}
               onChange={(e) => {
-                props.updateConfig((config) => (config.model = e.target.value));
+                props.updateConfig(
+                  (config) => (config.model = e.currentTarget.value),
+                );
               }}
-            >
+            />
+            <datalist id="realtime-model-options">
               {models.map((v, i) => (
                 <option value={v} key={i}>
                   {v}
                 </option>
               ))}
-            </Select>
+            </datalist>
           </ListItem>
           <ListItem
-            title={Locale.Settings.Realtime.ApiKey.Title}
-            subTitle={Locale.Settings.Realtime.ApiKey.SubTitle}
+            title={
+              isRouter
+                ? Locale.Settings.Realtime.Router.Token.Title
+                : Locale.Settings.Realtime.ApiKey.Title
+            }
+            subTitle={
+              isRouter
+                ? Locale.Settings.Realtime.Router.Token.SubTitle
+                : Locale.Settings.Realtime.ApiKey.SubTitle
+            }
           >
             <PasswordInput
               aria={Locale.Settings.ShowPassword}
-              aria-label={Locale.Settings.Realtime.ApiKey.Title}
+              aria-label={
+                isRouter
+                  ? Locale.Settings.Realtime.Router.Token.Title
+                  : Locale.Settings.Realtime.ApiKey.Title
+              }
               value={props.realtimeConfig.apiKey}
               type="text"
-              placeholder={Locale.Settings.Realtime.ApiKey.Placeholder}
+              placeholder={
+                isRouter
+                  ? Locale.Settings.Realtime.Router.Token.Placeholder
+                  : Locale.Settings.Realtime.ApiKey.Placeholder
+              }
               onChange={(e) => {
                 props.updateConfig(
                   (config) => (config.apiKey = e.currentTarget.value),
@@ -134,25 +231,28 @@ export function RealtimeConfigList(props: {
               }}
             />
           </ListItem>
+          {routerConfigComponent}
           {azureConfigComponent}
           <ListItem
             title={Locale.Settings.TTS.Voice.Title}
             subTitle={Locale.Settings.TTS.Voice.SubTitle}
           >
-            <Select
+            <input
+              list="realtime-voice-options"
               value={props.realtimeConfig.voice}
               onChange={(e) => {
                 props.updateConfig(
-                  (config) => (config.voice = e.currentTarget.value as Voice),
+                  (config) => (config.voice = e.currentTarget.value),
                 );
               }}
-            >
-              {voice.map((v, i) => (
+            />
+            <datalist id="realtime-voice-options">
+              {voices.map((v, i) => (
                 <option value={v} key={i}>
                   {v}
                 </option>
               ))}
-            </Select>
+            </datalist>
           </ListItem>
           <ListItem
             title={Locale.Settings.Realtime.Temperature.Title}

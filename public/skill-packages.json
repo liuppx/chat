@@ -534,15 +534,18 @@
             },
             "realtime": {
                 "enabled": false,
-                "provider": "OpenAI",
-                "model": "gpt-4o-realtime-preview-2024-10-01",
+                "provider": "Router",
+                "model": "qwen3.5-omni-plus-realtime",
                 "apiKey": "",
+                "router": {
+                    "endpoint": ""
+                },
                 "azure": {
                     "endpoint": "",
                     "deployment": ""
                 },
                 "temperature": 0.9,
-                "voice": "alloy"
+                "voice": "Tina"
             },
             "tools": [],
             "mcp": {
@@ -1114,15 +1117,18 @@
             },
             "realtime": {
                 "enabled": false,
-                "provider": "OpenAI",
-                "model": "gpt-4o-realtime-preview-2024-10-01",
+                "provider": "Router",
+                "model": "qwen3.5-omni-plus-realtime",
                 "apiKey": "",
+                "router": {
+                    "endpoint": ""
+                },
                 "azure": {
                     "endpoint": "",
                     "deployment": ""
                 },
                 "temperature": 0.9,
-                "voice": "alloy"
+                "voice": "Tina"
             },
             "tools": [],
             "mcp": {

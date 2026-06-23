@@ -7,20 +7,61 @@ import clsx from "clsx";
 
 import { useState, useRef, useEffect } from "react";
 
-import { useChatStore, createMessage } from "@/app/store";
+import {
+  DEFAULT_OPENAI_REALTIME_MODEL,
+  createMessage,
+  isRouterRealtimeProvider,
+  useAccessStore,
+  useChatStore,
+} from "@/app/store";
 
 import { IconButton } from "@/app/components/button";
 
-import {
-  Modality,
-  RTClient,
-  RTInputAudioItem,
-  RTResponse,
-  TurnDetection,
-} from "rt-client";
+import { RTClient, RTInputAudioItem, RTResponse } from "rt-client";
 import { AudioHandler } from "@/app/lib/audio";
 import { uploadImage } from "@/app/utils/chat";
 import { VoicePrint } from "@/app/components/voice-print";
+import {
+  RouterRealtimeClient,
+  RouterRealtimeInputAudioItem,
+  RouterRealtimeResponse,
+  createRouterSessionParams,
+} from "./router-realtime-client";
+import { ACCESS_CODE_PREFIX, ServiceProvider } from "@/app/constant";
+import { getClientConfig } from "@/app/config/client";
+
+type RealtimeClient = RTClient | RouterRealtimeClient;
+type RealtimeResponse = RTResponse | RouterRealtimeResponse;
+type InputAudioItem = RTInputAudioItem | RouterRealtimeInputAudioItem;
+
+function resolveRouterEndpoint(endpointOverride?: string) {
+  const accessStore = useAccessStore.getState();
+  return (
+    endpointOverride?.trim() ||
+    accessStore.openaiUrl?.trim() ||
+    getClientConfig()?.routerBackendUrl?.trim() ||
+    "https://llm.yeying.pub"
+  );
+}
+
+function resolveRouterToken(tokenOverride?: string) {
+  const accessStore = useAccessStore.getState();
+  const override = tokenOverride?.trim();
+  if (override) return override;
+
+  const selectedToken = accessStore.selectedRouterToken?.trim();
+  if (selectedToken) return selectedToken;
+
+  const apiKey = accessStore.openaiApiKey?.trim();
+  if (apiKey) return apiKey;
+
+  const accessCode = accessStore.accessCode?.trim();
+  if (accessStore.enabledAccessControl() && accessCode) {
+    return `${ACCESS_CODE_PREFIX}${accessCode}`;
+  }
+
+  return "";
+}
 
 interface RealtimeChatProps {
   onClose?: () => void;
@@ -44,48 +85,56 @@ export function RealtimeChat({
   const [useVAD, setUseVAD] = useState(true);
   const [frequencies, setFrequencies] = useState<Uint8Array | undefined>();
 
-  const clientRef = useRef<RTClient | null>(null);
+  const clientRef = useRef<RealtimeClient | null>(null);
   const audioHandlerRef = useRef<AudioHandler | null>(null);
   const initRef = useRef(false);
-  const handleConnectRef = useRef<() => Promise<void>>(async () => {});
+  const handleConnectRef = useRef<() => Promise<boolean>>(async () => false);
   const toggleRecordingRef = useRef<() => Promise<void>>(async () => {});
   const disconnectRef = useRef<() => Promise<void>>(async () => {});
   const isRecordingRef = useRef(false);
 
   const temperature = realtimeConfig?.temperature ?? 0.9;
   const apiKey = realtimeConfig?.apiKey ?? "";
-  const model = realtimeConfig?.model ?? "gpt-4o-realtime-preview-2024-10-01";
-  const azure = realtimeConfig?.provider === "Azure";
+  const model = realtimeConfig?.model ?? DEFAULT_OPENAI_REALTIME_MODEL;
+  const router = isRouterRealtimeProvider(realtimeConfig?.provider);
+  const azure = realtimeConfig?.provider === ServiceProvider.Azure;
   const azureEndpoint = realtimeConfig?.azure.endpoint ?? "";
   const azureDeployment = realtimeConfig?.azure.deployment ?? "";
   const voice = realtimeConfig?.voice ?? "alloy";
 
   const handleConnect = async () => {
-    if (isConnecting) return;
+    if (isConnecting) return false;
     if (!isConnected) {
       try {
         setIsConnecting(true);
-        clientRef.current = azure
-          ? new RTClient(
-              new URL(azureEndpoint),
-              { key: apiKey },
-              { deployment: azureDeployment },
-            )
-          : new RTClient({ key: apiKey }, { model });
-        const modalities: Modality[] =
-          modality === "audio" ? ["text", "audio"] : ["text"];
-        const turnDetection: TurnDetection = useVAD
-          ? { type: "server_vad" }
-          : null;
-        await clientRef.current.configure({
-          instructions: "",
-          voice,
-          input_audio_transcription: { model: "whisper-1" },
-          turn_detection: turnDetection,
-          tools: [],
-          temperature,
-          modalities,
-        });
+        if (router) {
+          const token = resolveRouterToken(apiKey);
+          if (!token) {
+            throw new Error("Missing Router realtime token");
+          }
+          clientRef.current = new RouterRealtimeClient({
+            endpoint: resolveRouterEndpoint(realtimeConfig?.router?.endpoint),
+            token,
+            model,
+          });
+        } else if (azure) {
+          clientRef.current = new RTClient(
+            new URL(azureEndpoint),
+            { key: apiKey },
+            { deployment: azureDeployment },
+          );
+        } else {
+          clientRef.current = new RTClient({ key: apiKey }, { model });
+        }
+
+        await clientRef.current.configure(
+          createRouterSessionParams({
+            voice,
+            temperature,
+            modality,
+            useVAD,
+          }) as any,
+        );
         startResponseListener();
 
         setIsConnected(true);
@@ -111,14 +160,19 @@ export function RealtimeChat({
         // } catch (error) {
         //   console.error("Set message failed:", error);
         // }
+        return true;
       } catch (error) {
         console.error("Connection failed:", error);
+        clientRef.current = null;
+        setIsConnected(false);
         setStatus("Connection failed");
+        return false;
       } finally {
         setIsConnecting(false);
       }
     } else {
       await disconnect();
+      return false;
     }
   };
 
@@ -152,7 +206,7 @@ export function RealtimeChat({
     }
   };
 
-  const handleResponse = async (response: RTResponse) => {
+  const handleResponse = async (response: RealtimeResponse) => {
     for await (const item of response) {
       if (item.type === "message" && item.role === "assistant") {
         const botMessage = createMessage({
@@ -204,7 +258,7 @@ export function RealtimeChat({
     }
   };
 
-  const handleInputAudio = async (item: RTInputAudioItem) => {
+  const handleInputAudio = async (item: InputAudioItem) => {
     await item.waitForCompletion();
     if (item.transcription) {
       const userMessage = createMessage({
@@ -275,8 +329,10 @@ export function RealtimeChat({
       const handler = new AudioHandler();
       await handler.initialize();
       audioHandlerRef.current = handler;
-      await handleConnectRef.current();
-      await toggleRecordingRef.current();
+      const connected = await handleConnectRef.current();
+      if (connected) {
+        await toggleRecordingRef.current();
+      }
     };
 
     initAudioHandler().catch((error) => {
@@ -319,7 +375,7 @@ export function RealtimeChat({
 
   // update session params
   useEffect(() => {
-    clientRef.current?.configure({ voice });
+    clientRef.current?.configure({ voice: voice as any });
   }, [voice]);
   useEffect(() => {
     clientRef.current?.configure({ temperature });

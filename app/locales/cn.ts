@@ -635,6 +635,18 @@ const cn = {
         SubTitle: "API Key",
         Placeholder: "API Key",
       },
+      Router: {
+        Endpoint: {
+          Title: "Router 地址",
+          SubTitle: "留空则使用 Router 页面或运行时配置里的地址",
+          Placeholder: "https://llm.yeying.pub",
+        },
+        Token: {
+          Title: "Router 令牌",
+          SubTitle: "留空则使用 Router 页面选中的令牌",
+          Placeholder: "Router 令牌，可留空",
+        },
+      },
       Azure: {
         Endpoint: {
           Title: "接口地址",
@@ -718,6 +730,10 @@ const cn = {
     },
     SourceLabel: "来源",
     McpStatus: "MCP 状态",
+    ConfigMode: "配置模式",
+    McpUserProvided: "用户自带配置",
+    McpUserConfigHint:
+      "当前 MCP 使用用户自带配置模式，仅适用于 standalone 或本地 Next 进程。API Key 等密钥会写入该实例的 MCP 配置文件，不会作为市场数据下发；请只在可信环境中配置。",
     OpenMcpManager: "打开 MCP 管理",
     Manage: "管理",
     Configure: "配置",
