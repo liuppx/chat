@@ -103,6 +103,14 @@ export const DEFAULT_SKILL_STATE = {
 };
 
 const LEGACY_REMOVED_SKILL_NAMES = new Set(["高效助手", "Efficient Assistant"]);
+const RETIRED_BUILTIN_SKILL_KEYS = new Set([
+  "cn:1700000001002:网页调研",
+  "cn:1700000001003:阅读总结",
+  "cn:1700000001004:方案对比",
+  "en:1700000002002:Web Research",
+  "en:1700000002003:Read and Summarize",
+  "en:1700000002004:Compare Options",
+]);
 export type SkillState = typeof DEFAULT_SKILL_STATE & {
   skills: Record<string, Skill>;
   builtinOverrides: Record<string, Skill>;
@@ -119,6 +127,23 @@ export function removeLegacySkills(skills: Record<string, Skill>) {
       delete skills[id];
       removed = true;
     }
+  });
+  return removed;
+}
+
+function getSkillRetirementKey(
+  skill: Pick<Skill, "lang" | "createdAt" | "name">,
+) {
+  return `${skill.lang}:${skill.createdAt}:${skill.name}`;
+}
+
+export function removeRetiredBuiltinOverrides(skills: Record<string, Skill>) {
+  let removed = false;
+  Object.entries(skills).forEach(([id, skill]) => {
+    if (!isBuiltinSkillOverride(skill)) return;
+    if (!RETIRED_BUILTIN_SKILL_KEYS.has(getSkillRetirementKey(skill))) return;
+    delete skills[id];
+    removed = true;
   });
   return removed;
 }
@@ -374,7 +399,7 @@ export const useSkillStore = createPersistStore(
   }),
   {
     name: StoreKey.Skill,
-    version: 4.7,
+    version: 4.8,
 
     onRehydrateStorage() {
       return (state) => {
@@ -382,8 +407,16 @@ export const useSkillStore = createPersistStore(
         const skills = { ...state.skills };
         const builtinOverrides = { ...(state.builtinOverrides ?? {}) };
         const removedSkills = removeLegacySkills(skills);
-        const removedOverrides = removeLegacySkills(builtinOverrides);
-        if (!removedSkills && !removedOverrides) return;
+        const removedLegacyOverrides = removeLegacySkills(builtinOverrides);
+        const removedRetiredOverrides =
+          removeRetiredBuiltinOverrides(builtinOverrides);
+        if (
+          !removedSkills &&
+          !removedLegacyOverrides &&
+          !removedRetiredOverrides
+        ) {
+          return;
+        }
         useSkillStore.setState({
           skills,
           builtinOverrides,
@@ -436,6 +469,10 @@ export const useSkillStore = createPersistStore(
           delete newState.skills[id];
         });
         removeLegacySkills(newState.builtinOverrides);
+      }
+
+      if (version < 4.8) {
+        removeRetiredBuiltinOverrides(newState.builtinOverrides);
       }
 
       return newState as any;

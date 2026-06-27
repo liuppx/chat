@@ -14,10 +14,7 @@ import {
   fetchCommunityToolPresetServers,
   mergeToolPresetServers,
 } from "../tools/marketplace";
-import {
-  fetchMarketplaceJson,
-  getMarketplaceSourceUrls,
-} from "../marketplace/sources";
+import { fetchMarketplaceJson } from "../marketplace/sources";
 import {
   getMarketplaceCategoryLabel,
   getMarketplaceTagLabel,
@@ -61,7 +58,6 @@ import CloseIcon from "../icons/close.svg";
 import DeleteIcon from "../icons/delete.svg";
 import EditIcon from "../icons/edit.svg";
 import EyeIcon from "../icons/eye.svg";
-import ReloadIcon from "../icons/reload.svg";
 import ModelServiceIcon from "../icons/llm-icons/default.svg";
 import CloudStorageIcon from "../icons/cloud-success.svg";
 import ToolIcon from "../icons/tool.svg";
@@ -84,22 +80,6 @@ type PricingType = "free" | "subscription" | "usage";
 type RuntimeType = "cloud" | "local" | "both";
 type DiscoveryView = "market" | "mine";
 type SkillPackageList = Partial<Record<Lang, SkillPackage[]>>;
-type MarketplaceLoadStatus = "idle" | "loading" | "ready" | "error";
-type MarketplaceLoadState = {
-  skill: {
-    status: MarketplaceLoadStatus;
-    count: number;
-    total: number;
-    url: string;
-    error?: string;
-  };
-  tool: {
-    status: MarketplaceLoadStatus;
-    count: number;
-    url: string;
-    error?: string;
-  };
-};
 type DiscoveryConfigProperty = {
   type: string;
   description?: string;
@@ -143,6 +123,11 @@ const typeOrder: CapabilityType[] = [
   "storage",
 ];
 
+const OFFICIAL_MARKETPLACE_SKILL_PACKAGE_IDS = new Set([
+  "web-research",
+  "reading-summary",
+]);
+
 function getInitialType(search: string): CapabilityType {
   const type = new URLSearchParams(search).get("type");
   if (type === "model") return "provider";
@@ -181,13 +166,6 @@ function getCapabilityIcon(type: Capability["type"]) {
   return <ModelServiceIcon />;
 }
 
-function getMarketplaceUrls() {
-  return {
-    skillUrl: getMarketplaceSourceUrls("skill")[0],
-    toolUrl: getMarketplaceSourceUrls("tool")[0],
-  };
-}
-
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
@@ -205,10 +183,8 @@ function isSensitiveToolConfigField(
   );
 }
 
-function countSkillPackages(packages: SkillPackageList) {
-  return Object.values(packages).reduce((sum, items) => {
-    return sum + (items?.length ?? 0);
-  }, 0);
+function isOfficialMarketplaceSkillPackage(skillPackage: SkillPackage) {
+  return OFFICIAL_MARKETPLACE_SKILL_PACKAGE_IDS.has(skillPackage.id);
 }
 
 export function DiscoveryPage() {
@@ -249,24 +225,6 @@ export function DiscoveryPage() {
   const [communityToolServers, setCommunityToolServers] = useState<
     PresetServer[]
   >([]);
-  const [marketplaceReloadKey, setMarketplaceReloadKey] = useState(0);
-  const [marketplaceLoadState, setMarketplaceLoadState] =
-    useState<MarketplaceLoadState>(() => {
-      const { skillUrl, toolUrl } = getMarketplaceUrls();
-      return {
-        skill: {
-          status: "idle",
-          count: 0,
-          total: 0,
-          url: skillUrl,
-        },
-        tool: {
-          status: "idle",
-          count: 0,
-          url: toolUrl,
-        },
-      };
-    });
   const [editingToolServerId, setEditingToolServerId] = useState<string>();
   const [viewingToolCapability, setViewingToolCapability] =
     useState<Capability>();
@@ -301,45 +259,16 @@ export function DiscoveryPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const { toolUrl } = getMarketplaceUrls();
-
-    setMarketplaceLoadState((state) => ({
-      ...state,
-      tool: {
-        ...state.tool,
-        status: "loading",
-        url: toolUrl,
-        error: undefined,
-      },
-    }));
 
     fetchCommunityToolPresetServers(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) {
-          const servers = result.data;
-          setCommunityToolServers(servers);
-          setMarketplaceLoadState((state) => ({
-            ...state,
-            tool: {
-              status: "ready",
-              count: servers.length,
-              url: result.url,
-            },
-          }));
+          setCommunityToolServers(result.data);
         }
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
           setCommunityToolServers([]);
-          setMarketplaceLoadState((state) => ({
-            ...state,
-            tool: {
-              status: "error",
-              count: 0,
-              url: toolUrl,
-              error: getErrorMessage(error),
-            },
-          }));
           console.warn(
             "[Discovery] failed to load community tool package list",
             error,
@@ -348,7 +277,7 @@ export function DiscoveryPage() {
       });
 
     return () => controller.abort();
-  }, [marketplaceReloadKey]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -390,47 +319,16 @@ export function DiscoveryPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const { skillUrl } = getMarketplaceUrls();
-
-    setMarketplaceLoadState((state) => ({
-      ...state,
-      skill: {
-        ...state.skill,
-        status: "loading",
-        url: skillUrl,
-        error: undefined,
-      },
-    }));
 
     fetchMarketplaceJson<SkillPackageList>("skill", controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) {
-          const packages = result.data;
-          setCommunitySkillPackages(packages);
-          setMarketplaceLoadState((state) => ({
-            ...state,
-            skill: {
-              status: "ready",
-              count: packages[currentLang]?.length ?? 0,
-              total: countSkillPackages(packages),
-              url: result.url,
-            },
-          }));
+          setCommunitySkillPackages(result.data);
         }
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
           setCommunitySkillPackages({});
-          setMarketplaceLoadState((state) => ({
-            ...state,
-            skill: {
-              status: "error",
-              count: 0,
-              total: 0,
-              url: skillUrl,
-              error: getErrorMessage(error),
-            },
-          }));
           console.warn(
             "[Discovery] failed to load community skill package list",
             error,
@@ -439,7 +337,7 @@ export function DiscoveryPage() {
       });
 
     return () => controller.abort();
-  }, [currentLang, marketplaceReloadKey]);
+  }, [currentLang]);
 
   const skills = useMemo<Skill[]>(() => {
     return mergeVisibleSkills({
@@ -602,7 +500,9 @@ export function DiscoveryPage() {
                 : Locale.Discovery.Status.Unavailable,
           pricing: "free" as const,
           runtime: skillRuntime,
-          source: Locale.Discovery.Source.Community,
+          source: isOfficialMarketplaceSkillPackage(skillPackage)
+            ? Locale.Discovery.Source.Official
+            : Locale.Discovery.Source.Community,
           path: Path.Skills,
           installed: false,
           skillPackage,
@@ -735,26 +635,28 @@ export function DiscoveryPage() {
     storageQuotaStatus,
   ]);
 
-  const marketplaceStatusText = useMemo(() => {
-    const skillState = marketplaceLoadState.skill;
-    const toolState = marketplaceLoadState.tool;
-    const error = skillState.error || toolState.error;
-
-    if (error) return Locale.Discovery.MarketplaceError(error);
-    if (skillState.status === "loading" || toolState.status === "loading") {
-      return Locale.Discovery.MarketplaceLoading;
-    }
-    return Locale.Discovery.MarketplaceLoaded(
-      skillState.count,
-      skillState.total,
-      toolState.count,
-    );
-  }, [marketplaceLoadState]);
+  const marketplaceSkillTitles = useMemo(
+    () =>
+      new Set(
+        (communitySkillPackages[currentLang] ?? []).map((skillPackage) =>
+          resolveLocalizedText(skillPackage.name, currentLang, skillPackage.id),
+        ),
+      ),
+    [communitySkillPackages, currentLang],
+  );
 
   const visibleCapabilities = capabilities.filter((item) => {
     const keyword = deferredSearchText.trim().toLowerCase();
     const matchType = activeType === "all" || item.type === activeType;
     const matchView = view === "market" || item.installed;
+    const hideInstalledMarketplaceShadow =
+      view === "market" &&
+      item.type === "skill" &&
+      item.installed &&
+      !!item.skill &&
+      !item.skill.builtin &&
+      !isBuiltinSkillOverride(item.skill) &&
+      marketplaceSkillTitles.has(item.title);
     const matchSearch =
       !keyword ||
       [
@@ -767,7 +669,9 @@ export function DiscoveryPage() {
         .join(" ")
         .toLowerCase()
         .includes(keyword);
-    return matchType && matchView && matchSearch;
+    return (
+      matchType && matchView && !hideInstalledMarketplaceShadow && matchSearch
+    );
   });
 
   const startSkill = (skill: Skill) => {
@@ -1215,30 +1119,6 @@ export function DiscoveryPage() {
                 </button>
               ))}
             </div>
-          </div>
-
-          <div
-            className={clsx(
-              styles["marketplace-status"],
-              (marketplaceLoadState.skill.status === "error" ||
-                marketplaceLoadState.tool.status === "error") &&
-                styles["marketplace-status-error"],
-            )}
-            title={`${Locale.Discovery.MarketplaceSkillSource}: ${marketplaceLoadState.skill.url}\n${Locale.Discovery.MarketplaceToolSource}: ${marketplaceLoadState.tool.url}`}
-          >
-            <div className={styles["marketplace-status-main"]}>
-              <span>{marketplaceStatusText}</span>
-              <span className={styles["marketplace-source"]}>
-                {Locale.Discovery.MarketplaceSource}:{" "}
-                {marketplaceLoadState.skill.url}
-              </span>
-            </div>
-            <IconButton
-              icon={<ReloadIcon />}
-              text={Locale.Discovery.ReloadMarketplace}
-              bordered
-              onClick={() => setMarketplaceReloadKey(Date.now())}
-            />
           </div>
 
           <div className={styles.grid}>

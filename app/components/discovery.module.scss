@@ -26,9 +26,27 @@
 }
 
 .search {
-  height: 36px;
+  height: 34px;
   flex: 1;
   min-width: 180px;
+  padding: 0 14px;
+  border: var(--border-in-light);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--black);
+  box-sizing: border-box;
+  font-size: 13px;
+  outline: none;
+  appearance: none;
+
+  &::placeholder {
+    color: var(--black);
+    opacity: 0.45;
+  }
+
+  &:focus {
+    border-color: var(--primary);
+  }
 }
 
 .filters {
@@ -52,38 +70,6 @@
   border-color: var(--primary);
   background: var(--hover-color);
   font-weight: 700;
-}
-
-.marketplace-status {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
-  padding: 10px 12px;
-  border: var(--border-in-light);
-  border-radius: 10px;
-  background: var(--white);
-  font-size: 12px;
-  animation: slide-in ease 0.32s;
-}
-
-.marketplace-status-error {
-  border-color: rgba(255, 59, 48, 0.35);
-  background: rgba(255, 59, 48, 0.06);
-}
-
-.marketplace-status-main {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.marketplace-source {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0.65;
 }
 
 .grid {
@@ -277,11 +263,6 @@
   }
 
   .toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .marketplace-status {
     align-items: stretch;
     flex-direction: column;
   }

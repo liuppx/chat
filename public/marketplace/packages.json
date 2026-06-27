@@ -130,7 +130,7 @@
         "en": "Search sources, extract evidence, and produce structured findings."
       },
       "author": {
-        "name": "community"
+        "name": "official"
       },
       "icon": {
         "type": "builtin",
@@ -229,7 +229,7 @@
         "en": "Summarize articles, web pages, or long text into structured takeaways."
       },
       "author": {
-        "name": "community"
+        "name": "official"
       },
       "icon": {
         "type": "builtin",

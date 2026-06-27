@@ -747,17 +747,6 @@ const cn = {
     SearchMine: "搜索我的能力",
     Empty: "没有找到匹配的能力",
     ResetFilters: "清空筛选",
-    ReloadMarketplace: "重新加载市场",
-    MarketplaceSource: "市场源",
-    MarketplaceSkillSource: "技能市场源",
-    MarketplaceToolSource: "工具市场源",
-    MarketplaceLoading: "正在加载市场数据",
-    MarketplaceLoaded: (
-      currentLangSkills: number,
-      totalSkills: number,
-      tools: number,
-    ) => `已加载 ${currentLangSkills}/${totalSkills} 个技能，${tools} 个工具`,
-    MarketplaceError: (message: string) => `市场加载失败：${message}`,
     DefaultSkillDesc:
       "面向任务的工作方式，可绑定模型、提示词和工具；技能本身无需安装。",
     SkillStarters: (count: number) => `${count} 个开场白`,
