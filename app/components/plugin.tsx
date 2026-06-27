@@ -5,7 +5,7 @@ import { PLUGINS_REPO_URL } from "../constant";
 import { IconButton } from "./button";
 import { ErrorBoundary } from "./error";
 
-import styles from "./mask.module.scss";
+import styles from "./skill-editor.module.scss";
 import pluginStyles from "./plugin.module.scss";
 
 import EditIcon from "../icons/edit.svg";
@@ -43,8 +43,8 @@ export function PluginPage() {
   const onSearch = (text: string) => {
     setSearchText(text);
     if (text.length > 0) {
-      const result = allPlugins.filter(
-        (m) => m?.title.toLowerCase().includes(text.toLowerCase()),
+      const result = allPlugins.filter((m) =>
+        m?.title.toLowerCase().includes(text.toLowerCase()),
       );
       setSearchPlugins(result);
     } else {

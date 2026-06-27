@@ -9,11 +9,18 @@ import SendWhiteIcon from "../icons/send-white.svg";
 import DeleteIcon from "../icons/delete.svg";
 
 import { useNavigate } from "react-router-dom";
-import { getLaunchableSkills, Skill, useSkillStore } from "../store/skill";
-import Locale from "../locales";
+import { supportsTextEndpoint } from "../client/api";
+import {
+  getStoredUserSkills,
+  getLaunchableSkills,
+  mergeVisibleSkills,
+  Skill,
+  useSkillStore,
+} from "../store/skill";
+import Locale, { getLang } from "../locales";
 import { ModelType, useAppConfig, useChatStore } from "../store";
 import { useSdStore } from "../store/sd";
-import { SkillAvatar } from "./mask";
+import { SkillAvatar } from "./skill-editor";
 import { useCommand } from "../command";
 import { BUILTIN_SKILL_STORE } from "../skills";
 import clsx from "clsx";
@@ -110,6 +117,10 @@ export function NewChat() {
   const config = useAppConfig();
   const accessStore = useAccessStore();
   const plugins = usePluginStore((state) => state.plugins);
+  const skillRecords = useSkillStore((state) => state.skills);
+  const builtinOverrideRecords = useSkillStore(
+    (state) => state.builtinOverrides,
+  );
   const [draft, setDraft] = useState("");
   const [selectedModelValue, setSelectedModelValue] = useState("");
   const [toolConfig, setToolConfig] = useState<ToolConfigData>();
@@ -128,8 +139,24 @@ export function NewChat() {
   });
 
   const skills = useMemo(
-    () => getLaunchableSkills(Object.values(skillStore.skills)),
-    [skillStore],
+    () =>
+      getLaunchableSkills(
+        mergeVisibleSkills({
+          userSkills: getStoredUserSkills({
+            skills: skillRecords,
+            builtinOverrides: builtinOverrideRecords,
+          }),
+          hideBuiltinSkills: config.hideBuiltinSkills,
+          lang: getLang(),
+          modelConfig: config.modelConfig,
+        }),
+      ),
+    [
+      builtinOverrideRecords,
+      config.hideBuiltinSkills,
+      config.modelConfig,
+      skillRecords,
+    ],
   );
   const currentSkillKeys = useMemo(
     () => new Set(skills.map((skill) => getSkillEntryKey(skill))),
@@ -144,7 +171,7 @@ export function NewChat() {
     return chatStore.sessions
       .slice()
       .sort((a, b) => b.lastUpdate - a.lastUpdate)
-      .map((session) => session.mask as Skill | undefined)
+      .map((session) => session.skill as Skill | undefined)
       .filter((skill): skill is Skill => {
         if (!skill) return false;
         const hasSkillContent =
@@ -291,6 +318,17 @@ export function NewChat() {
     ],
   );
   const availableModels = useSessionModels();
+  const textAvailableModels = useMemo(
+    () =>
+      availableModels.filter((model) => {
+        const tags = Array.isArray(model.tags) ? model.tags : [];
+        if (tags.length > 0) return tags.includes("text");
+        const endpoints = model.supportedEndpoints ?? [];
+        if (endpoints.length > 0) return supportsTextEndpoint(endpoints);
+        return true;
+      }),
+    [availableModels],
+  );
 
   const navigate = useNavigate();
 
@@ -299,15 +337,15 @@ export function NewChat() {
     const preferredProviderName =
       normalizeProviderName(config.modelConfig.providerName) ??
       ServiceProvider.OpenAI;
-    const matchedModel = availableModels.find(
+    const matchedModel = textAvailableModels.find(
       (model) =>
         model.name === preferredModel &&
         model.provider?.providerName === preferredProviderName,
     );
     const fallbackModel =
       matchedModel ??
-      availableModels.find((model) => model.isDefault) ??
-      availableModels[0];
+      textAvailableModels.find((model) => model.isDefault) ??
+      textAvailableModels[0];
 
     if (fallbackModel) {
       return `${fallbackModel.name}@${fallbackModel.provider?.providerName}`;
@@ -315,21 +353,21 @@ export function NewChat() {
 
     return `${preferredModel}@${preferredProviderName}`;
   }, [
-    availableModels,
+    textAvailableModels,
     config.modelConfig.model,
     config.modelConfig.providerName,
   ]);
 
   const activeModelValue = useMemo(() => {
-    const modelStillAvailable = availableModels.some(
+    const modelStillAvailable = textAvailableModels.some(
       (model) =>
         `${model.name}@${model.provider?.providerName}` === selectedModelValue,
     );
     return modelStillAvailable ? selectedModelValue : fallbackModelValue;
-  }, [availableModels, fallbackModelValue, selectedModelValue]);
+  }, [textAvailableModels, fallbackModelValue, selectedModelValue]);
 
   const currentModelLabel = useMemo(() => {
-    const currentModel = availableModels.find(
+    const currentModel = textAvailableModels.find(
       (model) =>
         `${model.name}@${model.provider?.providerName}` === activeModelValue,
     );
@@ -338,7 +376,7 @@ export function NewChat() {
     }
     const [modelName] = getModelProvider(activeModelValue);
     return modelName || config.modelConfig.model;
-  }, [activeModelValue, availableModels, config.modelConfig.model]);
+  }, [activeModelValue, textAvailableModels, config.modelConfig.model]);
 
   const startChat = (skill?: Skill, initialInput = "", modelValue?: string) => {
     if (chatStore.newSession(skill) === false) {
@@ -351,18 +389,18 @@ export function NewChat() {
       const [model, providerName] = getModelProvider(modelValue);
       const normalizedProviderName =
         normalizeProviderName(providerName) ??
-        session.mask.modelConfig.providerName;
+        session.skill.modelConfig.providerName;
 
       if (
         model &&
-        (session.mask.modelConfig.model !== model ||
-          session.mask.modelConfig.providerName !== normalizedProviderName)
+        (session.skill.modelConfig.model !== model ||
+          session.skill.modelConfig.providerName !== normalizedProviderName)
       ) {
         useChatStore.getState().updateTargetSession(session, (draftSession) => {
-          draftSession.mask.modelConfig.model = model as ModelType;
-          draftSession.mask.modelConfig.providerName =
+          draftSession.skill.modelConfig.model = model as ModelType;
+          draftSession.skill.modelConfig.providerName =
             normalizedProviderName as ServiceProvider;
-          draftSession.mask.syncGlobalConfig = false;
+          draftSession.skill.syncGlobalConfig = false;
         });
       }
     }
@@ -459,7 +497,7 @@ export function NewChat() {
               value={activeModelValue}
               onChange={(event) => setSelectedModelValue(event.target.value)}
             >
-              {availableModels.map((model) => (
+              {textAvailableModels.map((model) => (
                 <option
                   key={`${model.name}@${model.provider?.providerName}`}
                   value={`${model.name}@${model.provider?.providerName}`}
@@ -471,7 +509,7 @@ export function NewChat() {
                   }`}
                 </option>
               ))}
-              {availableModels.length === 0 && (
+              {textAvailableModels.length === 0 && (
                 <option value={activeModelValue || config.modelConfig.model}>
                   {currentModelLabel}
                 </option>

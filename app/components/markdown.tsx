@@ -247,7 +247,7 @@ export function PreCode(
 
   const config = useAppConfig();
   const enableArtifacts =
-    session.mask?.enableArtifacts !== false && config.enableArtifacts;
+    session.skill?.enableArtifacts !== false && config.enableArtifacts;
 
   //Wrap the paragraph for plain-text
   useEffect(() => {
@@ -326,7 +326,7 @@ function CustomCode(
   const session = chatStore.currentSession();
   const config = useAppConfig();
   const enableCodeFold =
-    session.mask?.enableCodeFold !== false && config.enableCodeFold;
+    session.skill?.enableCodeFold !== false && config.enableCodeFold;
 
   const ref = useRef<HTMLPreElement>(null);
   const [collapsed, setCollapsed] = useState(true);

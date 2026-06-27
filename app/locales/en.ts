@@ -97,7 +97,6 @@ const en: LocaleType = {
     StopSpeak: "Stop Speak",
     Config: {
       Reset: "Reset to Default",
-      SaveAs: "Save as Skill",
     },
     IsContext: "Contextual Prompt",
     ShortcutKey: {
@@ -705,7 +704,8 @@ const en: LocaleType = {
     Name: "Discovery",
     Page: {
       Title: "Discovery",
-      SubTitle: "Browse and manage skills, tools, models, and storage",
+      SubTitle:
+        "Skills are used or configured; tools can be installed, configured, and managed",
     },
     Types: {
       all: "All",
@@ -716,8 +716,8 @@ const en: LocaleType = {
     },
     Status: {
       Enabled: "Enabled",
+      Available: "Available",
       Installed: "Installed",
-      Installable: "Installable",
       Configurable: "Configurable",
       Unavailable: "Unavailable",
       Paused: "Paused",
@@ -744,7 +744,7 @@ const en: LocaleType = {
     ConfigMode: "Config mode",
     ToolUserProvided: "User-provided tool config",
     ToolUserConfigHint:
-      "Tools currently use user-provided configuration and only apply to standalone or local Next processes. API keys and other secrets are written to this instance's tool runtime config file, not shipped as marketplace data. Configure them only in a trusted environment.",
+      "Tools support both cloud and native runtimes. Web users typically use cloud-hosted tools out of the box; desktop or self-hosted environments can install, configure, and manage tools locally. This panel writes local tool runtime config, so only use it in a trusted environment.",
     OpenToolManager: "Open Tool Manager",
     Manage: "Manage",
     Configure: "Configure",
@@ -770,7 +770,7 @@ const en: LocaleType = {
     ) => `Loaded ${currentLangSkills}/${totalSkills} skills and ${tools} tools`,
     MarketplaceError: (message: string) => `Market load failed: ${message}`,
     DefaultSkillDesc:
-      "A task-oriented workflow that can bind models, prompts, and tools.",
+      "A task-oriented workflow that can bind models, prompts, and tools. Skills themselves do not need installation.",
     SkillStarters: (count: number) => `${count} starters`,
     SkillTools: (count: number) => `${count} bound tools`,
     RouterProviderTitle: "Community Router",
@@ -790,7 +790,7 @@ const en: LocaleType = {
         : `${available}/${total} models available`,
     ToolTitle: "Tools",
     ToolDesc:
-      "Connect tool capabilities such as search, fetch, filesystem, git, and time. Currently mainly backed by the tool layer.",
+      "Connect tool capabilities such as search, fetch, filesystem, git, and time. Tools can be cloud-hosted or locally installed and configured.",
   },
   Tool: {
     Name: "Tools",
@@ -863,9 +863,17 @@ const en: LocaleType = {
       Title: "Skills",
       SubTitle: (count: number) => `${count} skills`,
       Search: "Search Skills",
-      Create: "Create",
+      Create: "Create Local Skill",
       AllCategories: "All",
       Empty: "No matching skills",
+      BuiltinSection: "Built-in Skills",
+      BuiltinSectionDesc:
+        "Official skills available out of the box. Copy them as local skills before changing configuration.",
+      LocalSection: "Local Skills",
+      LocalSectionDesc:
+        "Skill configs created, imported, or copied in this local instance.",
+      BuiltinEmpty: "No matching built-in skills",
+      LocalEmpty: "No matching local skills",
     },
     Item: {
       Info: (count: number) => `${count} prompts`,
@@ -879,7 +887,7 @@ const en: LocaleType = {
       Title: (readonly: boolean) =>
         `Edit Skill ${readonly ? "(readonly)" : ""}`,
       Download: "Download Skill",
-      Clone: "Clone",
+      Clone: "Copy as Local Skill",
     },
     Config: {
       Avatar: "Bot Avatar",

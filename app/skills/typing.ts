@@ -5,5 +5,3 @@ export type BuiltinSkill = Omit<Skill, "id" | "modelConfig"> & {
   builtin: Boolean;
   modelConfig: Partial<ModelConfig>;
 };
-
-export type BuiltinMask = BuiltinSkill;

@@ -126,5 +126,3 @@ export function createBuiltinSkill(input: BuiltinSkillInput): BuiltinSkill {
       : {}),
   };
 }
-
-export const createBuiltinMask = createBuiltinSkill;

@@ -119,9 +119,12 @@ const NewChat = dynamic(async () => (await import("./new-chat")).NewChat, {
   loading: () => <Loading noLogo />,
 });
 
-const SkillPage = dynamic(async () => (await import("./mask")).SkillPage, {
-  loading: () => <Loading noLogo />,
-});
+const SkillPage = dynamic(
+  async () => (await import("./skill-editor")).SkillPage,
+  {
+    loading: () => <Loading noLogo />,
+  },
+);
 
 const PluginPage = dynamic(async () => (await import("./plugin")).PluginPage, {
   loading: () => <Loading noLogo />,

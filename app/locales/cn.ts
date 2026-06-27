@@ -96,7 +96,6 @@ const cn = {
     StopSpeak: "停止",
     Config: {
       Reset: "清除记忆",
-      SaveAs: "存为技能",
     },
     IsContext: "预设提示词",
     ShortcutKey: {
@@ -695,7 +694,7 @@ const cn = {
     Name: "发现",
     Page: {
       Title: "发现",
-      SubTitle: "浏览和管理技能、工具、模型与存储",
+      SubTitle: "技能直接使用或配置，工具可安装、配置和管理",
     },
     Types: {
       all: "全部",
@@ -706,8 +705,8 @@ const cn = {
     },
     Status: {
       Enabled: "已启用",
+      Available: "可用",
       Installed: "已安装",
-      Installable: "可安装",
       Configurable: "可配置",
       Unavailable: "不可用",
       Paused: "已暂停",
@@ -734,7 +733,7 @@ const cn = {
     ConfigMode: "配置模式",
     ToolUserProvided: "用户自带工具配置",
     ToolUserConfigHint:
-      "当前工具使用用户自带配置模式，仅适用于 standalone 或本地 Next 进程。API Key 等密钥会写入该实例的工具运行配置文件，不会作为市场数据下发；请只在可信环境中配置。",
+      "工具支持 cloud / native 两种运行方式。Web 版普通用户通常直接使用云端能力；桌面版或自托管环境可在本地安装、配置和管理。当前这个配置面板写入的是本地工具运行配置，请只在可信环境中使用。",
     OpenToolManager: "打开工具管理",
     Manage: "管理",
     Configure: "配置",
@@ -759,7 +758,8 @@ const cn = {
       tools: number,
     ) => `已加载 ${currentLangSkills}/${totalSkills} 个技能，${tools} 个工具`,
     MarketplaceError: (message: string) => `市场加载失败：${message}`,
-    DefaultSkillDesc: "面向任务的工作方式，可绑定模型、提示词和工具。",
+    DefaultSkillDesc:
+      "面向任务的工作方式，可绑定模型、提示词和工具；技能本身无需安装。",
     SkillStarters: (count: number) => `${count} 个开场白`,
     SkillTools: (count: number) => `${count} 个绑定工具`,
     RouterProviderTitle: "社区 Router",
@@ -778,7 +778,7 @@ const cn = {
         : `${available}/${total} 个模型可用`,
     ToolTitle: "工具",
     ToolDesc:
-      "连接搜索、抓取、文件、Git、时间等工具能力。当前主要由工具层承载。",
+      "连接搜索、抓取、文件、Git、时间等工具能力。工具支持云端托管或本地安装配置。",
   },
   Tool: {
     Name: "工具",
@@ -851,9 +851,16 @@ const cn = {
       Title: "技能",
       SubTitle: (count: number) => `${count} 个技能`,
       Search: "搜索技能",
-      Create: "新建",
+      Create: "新建本地技能",
       AllCategories: "全部",
       Empty: "没有找到匹配的技能",
+      BuiltinSection: "内置技能",
+      BuiltinSectionDesc:
+        "官方提供，开箱即用；如需调整，可复制为本地技能后配置",
+      LocalSection: "本地技能",
+      LocalSectionDesc: "你在当前实例中创建、导入或复制的技能配置",
+      BuiltinEmpty: "没有匹配的内置技能",
+      LocalEmpty: "没有匹配的本地技能",
     },
     Item: {
       Info: (count: number) => `包含 ${count} 条预设对话`,
@@ -866,7 +873,7 @@ const cn = {
     EditModal: {
       Title: (readonly: boolean) => `编辑技能 ${readonly ? "（只读）" : ""}`,
       Download: "下载技能",
-      Clone: "克隆技能",
+      Clone: "复制为本地技能",
     },
     Config: {
       Avatar: "角色头像",

@@ -122,12 +122,8 @@ import {
   UNFINISHED_INPUT,
 } from "../constant";
 import { Avatar } from "./emoji";
-import { ContextPrompts, SkillAvatar, SkillConfig } from "./mask";
-import {
-  getSkillSessionToolbar,
-  syncSkillLegacyPlugin,
-  useSkillStore,
-} from "../store/skill";
+import { ContextPrompts, SkillAvatar, SkillConfig } from "./skill-editor";
+import { getSkillSessionToolbar, syncSkillLegacyPlugin } from "../store/skill";
 import { ChatCommandPrefix, useChatCommand, useCommand } from "../command";
 import { prettyObject } from "../utils/format";
 import { ExportMessageModal } from "./exporter";
@@ -199,9 +195,7 @@ const ToolAction = () => {
 export function SessionConfigModel(props: { onClose: () => void }) {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  const sessionSkill = session.mask;
-  const skillStore = useSkillStore();
-  const navigate = useNavigate();
+  const sessionSkill = session.skill;
   const runtimeModels = useSessionModels();
 
   return (
@@ -224,28 +218,16 @@ export function SessionConfigModel(props: { onClose: () => void }) {
               }
             }}
           />,
-          <IconButton
-            key="copy"
-            icon={<CopyIcon />}
-            bordered
-            text={Locale.Chat.Config.SaveAs}
-            onClick={() => {
-              navigate(Path.Skills);
-              setTimeout(() => {
-                skillStore.create(sessionSkill);
-              }, 500);
-            }}
-          />,
         ]}
       >
         <SkillConfig
-          mask={sessionSkill}
-          updateMask={(updater) => {
+          skill={sessionSkill}
+          updateSkill={(updater) => {
             const nextSkill = { ...sessionSkill };
             updater(nextSkill);
             chatStore.updateTargetSession(
               session,
-              (session) => (session.mask = nextSkill),
+              (session) => (session.skill = nextSkill),
             );
           }}
           modelOptions={runtimeModels}
@@ -274,7 +256,7 @@ function PromptToast(props: {
 }) {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  const sessionSkill = session.mask;
+  const sessionSkill = session.skill;
   const context = sessionSkill.context;
 
   return (
@@ -547,7 +529,7 @@ export function ChatActions(props: {
   const chatStore = useChatStore();
   const pluginStore = usePluginStore();
   const session = chatStore.currentSession();
-  const sessionSkill = session.mask;
+  const sessionSkill = session.skill;
   const toolbar = getSkillSessionToolbar(sessionSkill);
   const { setAttachContents, setUploading } = props;
 
@@ -675,7 +657,7 @@ export function ChatActions(props: {
       // show next model to default model if exist
       let nextModel = models.find((model) => model.isDefault) || models[0];
       chatStore.updateTargetSession(session, (session) => {
-        const sessionSkill = session.mask;
+        const sessionSkill = session.skill;
         const supportedEndpoints = normalizeSupportedEndpoints(
           nextModel.supportedEndpoints,
         );
@@ -811,7 +793,7 @@ export function ChatActions(props: {
               if (s.length === 0) return;
               const [model, providerName] = getModelProvider(s[0]);
               chatStore.updateTargetSession(session, (session) => {
-                const sessionSkill = session.mask;
+                const sessionSkill = session.skill;
                 sessionSkill.modelConfig.model = model as ModelType;
                 sessionSkill.modelConfig.providerName =
                   providerName as ServiceProvider;
@@ -856,7 +838,7 @@ export function ChatActions(props: {
               if (s.length === 0) return;
               const size = s[0];
               chatStore.updateTargetSession(session, (session) => {
-                const sessionSkill = session.mask;
+                const sessionSkill = session.skill;
                 sessionSkill.modelConfig.size = size;
               });
               showToast(size);
@@ -884,7 +866,7 @@ export function ChatActions(props: {
               if (q.length === 0) return;
               const quality = q[0] as ImageQuality;
               chatStore.updateTargetSession(session, (session) => {
-                const sessionSkill = session.mask;
+                const sessionSkill = session.skill;
                 sessionSkill.modelConfig.quality = quality;
               });
               showToast(quality);
@@ -912,7 +894,7 @@ export function ChatActions(props: {
               if (s.length === 0) return;
               const style = s[0];
               chatStore.updateTargetSession(session, (session) => {
-                const sessionSkill = session.mask;
+                const sessionSkill = session.skill;
                 sessionSkill.modelConfig.style = style;
               });
               showToast(style);
@@ -936,7 +918,7 @@ export function ChatActions(props: {
         {showPluginSelector && (
           <Selector
             multiple
-            defaultSelectedValue={chatStore.currentSession().mask?.plugin}
+            defaultSelectedValue={chatStore.currentSession().skill?.plugin}
             items={pluginStore.getAll().map((item) => ({
               title: `${item?.title}@${item?.version}`,
               value: item?.id,
@@ -944,11 +926,11 @@ export function ChatActions(props: {
             onClose={() => setShowPluginSelector(false)}
             onSelection={(s) => {
               chatStore.updateTargetSession(session, (session) => {
-                session.mask.tools = {
-                  ...session.mask.tools,
+                session.skill.tools = {
+                  ...session.skill.tools,
                   apiTools: s as string[],
                 };
-                syncSkillLegacyPlugin(session.mask);
+                syncSkillLegacyPlugin(session.skill);
               });
             }}
           />
@@ -1120,7 +1102,7 @@ function ChatView() {
 
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  const sessionSkill = session.mask;
+  const sessionSkill = session.skill;
   const config = useAppConfig();
   const fontSize = config.fontSize;
   const fontFamily = config.fontFamily;
@@ -1305,7 +1287,7 @@ function ChatView() {
 
   useEffect(() => {
     chatStore.updateTargetSession(session, (session) => {
-      const sessionSkill = session.mask;
+      const sessionSkill = session.skill;
       const stopTiming = Date.now() - REQUEST_TIMEOUT_MS;
       session.messages.forEach((m) => {
         // check if should stop all stale messages
@@ -1435,7 +1417,7 @@ function ChatView() {
 
   const onPinMessage = (message: ChatMessage) => {
     chatStore.updateTargetSession(session, (session) => {
-      const sessionSkill = session.mask;
+      const sessionSkill = session.skill;
       sessionSkill.context.push(message);
     });
 
@@ -1687,7 +1669,7 @@ function ChatView() {
 
   const handlePaste = useCallback(
     async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-      const currentModel = chatStore.currentSession().mask.modelConfig.model;
+      const currentModel = chatStore.currentSession().skill.modelConfig.model;
       if (!isVisionModel(currentModel)) {
         return;
       }
@@ -1991,7 +1973,7 @@ function ChatView() {
                                     chatStore.updateTargetSession(
                                       session,
                                       (session) => {
-                                        const sessionSkill = session.mask;
+                                        const sessionSkill = session.skill;
                                         const m = sessionSkill.context
                                           .concat(session.messages)
                                           .find((m) => m.id === message.id);

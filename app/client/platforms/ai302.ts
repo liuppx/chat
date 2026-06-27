@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  ApiPath,
-  AI302_BASE_URL,
-  AI302,
-} from "@/app/constant";
+import { ApiPath, AI302_BASE_URL, AI302 } from "@/app/constant";
 import {
   useAccessStore,
   useAppConfig,
@@ -60,10 +56,7 @@ export class Ai302Api implements LLMApi {
     if (baseUrl.endsWith("/")) {
       baseUrl = baseUrl.slice(0, baseUrl.length - 1);
     }
-    if (
-      !baseUrl.startsWith("http") &&
-      !baseUrl.startsWith(ApiPath["302.AI"])
-    ) {
+    if (!baseUrl.startsWith("http") && !baseUrl.startsWith(ApiPath["302.AI"])) {
       baseUrl = "https://" + baseUrl;
     }
 
@@ -97,7 +90,7 @@ export class Ai302Api implements LLMApi {
 
     const modelConfig = {
       ...useAppConfig.getState().modelConfig,
-      ...useChatStore.getState().currentSession().mask.modelConfig,
+      ...useChatStore.getState().currentSession().skill.modelConfig,
       ...{
         model: options.config.model,
         providerName: options.config.providerName,
@@ -143,7 +136,7 @@ export class Ai302Api implements LLMApi {
         const [tools, funcs] = usePluginStore
           .getState()
           .getAsTools(
-            useChatStore.getState().currentSession().mask?.plugin || [],
+            useChatStore.getState().currentSession().skill?.plugin || [],
           );
         return streamWithThink(
           chatPath,

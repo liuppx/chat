@@ -73,7 +73,7 @@ export class MoonshotApi implements LLMApi {
 
     const modelConfig = {
       ...useAppConfig.getState().modelConfig,
-      ...useChatStore.getState().currentSession().mask.modelConfig,
+      ...useChatStore.getState().currentSession().skill.modelConfig,
       ...{
         model: options.config.model,
         providerName: options.config.providerName,
@@ -117,7 +117,7 @@ export class MoonshotApi implements LLMApi {
         const [tools, funcs] = usePluginStore
           .getState()
           .getAsTools(
-            useChatStore.getState().currentSession().mask?.plugin || [],
+            useChatStore.getState().currentSession().skill?.plugin || [],
           );
         return stream(
           chatPath,

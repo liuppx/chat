@@ -1,7 +1,9 @@
 import { Skill } from "../store/skill";
+import { CN_SKILLS } from "./cn";
+import { EN_SKILLS } from "./en";
 
 import { type BuiltinSkill } from "./typing";
-export { type BuiltinSkill, type BuiltinMask } from "./typing";
+export { type BuiltinSkill } from "./typing";
 export {
   type LocalizedText,
   type SkillIcon,
@@ -37,9 +39,23 @@ export const BUILTIN_SKILL_STORE = {
 
 export const BUILTIN_SKILLS: BuiltinSkill[] = [];
 
-export const BUILTIN_MASK_ID = BUILTIN_SKILL_ID;
-export const BUILTIN_MASK_STORE = BUILTIN_SKILL_STORE;
-export const BUILTIN_MASKS = BUILTIN_SKILLS;
+function getBuiltinSkillKey(
+  skill: Pick<BuiltinSkill, "lang" | "name" | "createdAt">,
+) {
+  return `${skill.lang}:${skill.name}:${skill.createdAt}`;
+}
+
+function registerBuiltinSkills(skills: BuiltinSkill[]) {
+  const existing = new Set(BUILTIN_SKILLS.map(getBuiltinSkillKey));
+  skills.forEach((skill) => {
+    const key = getBuiltinSkillKey(skill);
+    if (existing.has(key)) return;
+    existing.add(key);
+    BUILTIN_SKILLS.push(BUILTIN_SKILL_STORE.add(skill));
+  });
+}
+
+registerBuiltinSkills([...CN_SKILLS, ...EN_SKILLS]);
 
 if (typeof window != "undefined") {
   // run in browser skip in next server
@@ -51,8 +67,6 @@ if (typeof window != "undefined") {
     })
     .then((skills) => {
       const { cn = [], en = [] } = skills;
-      return [...cn, ...en].map((skill) => {
-        BUILTIN_SKILLS.push(BUILTIN_SKILL_STORE.add(skill));
-      });
+      registerBuiltinSkills([...cn, ...en]);
     });
 }

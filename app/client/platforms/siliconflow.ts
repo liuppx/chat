@@ -1,10 +1,6 @@
 "use client";
 // azure and openai, using same models. so using same LLMApi.
-import {
-  ApiPath,
-  SILICONFLOW_BASE_URL,
-  SiliconFlow,
-} from "@/app/constant";
+import { ApiPath, SILICONFLOW_BASE_URL, SiliconFlow } from "@/app/constant";
 import {
   useAccessStore,
   useAppConfig,
@@ -97,7 +93,7 @@ export class SiliconflowApi implements LLMApi {
 
     const modelConfig = {
       ...useAppConfig.getState().modelConfig,
-      ...useChatStore.getState().currentSession().mask.modelConfig,
+      ...useChatStore.getState().currentSession().skill.modelConfig,
       ...{
         model: options.config.model,
         providerName: options.config.providerName,
@@ -143,7 +139,7 @@ export class SiliconflowApi implements LLMApi {
         const [tools, funcs] = usePluginStore
           .getState()
           .getAsTools(
-            useChatStore.getState().currentSession().mask?.plugin || [],
+            useChatStore.getState().currentSession().skill?.plugin || [],
           );
         return streamWithThink(
           chatPath,
