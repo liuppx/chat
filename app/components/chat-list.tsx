@@ -9,7 +9,7 @@ import { useSdStore } from "../store/sd";
 import Locale from "../locales";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Path } from "../constant";
-import { SkillAvatar } from "./mask";
+import { SkillAvatar } from "./skill-editor";
 import { Skill } from "../store/skill";
 import { useRef, useEffect } from "react";
 import { showConfirm } from "./ui-lib";
@@ -180,7 +180,7 @@ export function ChatList(props: { narrow?: boolean }) {
       narrowLabel: String(session.messages.length),
       time: new Date(session.lastUpdate).toLocaleString(),
       lastUpdate: session.lastUpdate,
-      skill: session.mask,
+      skill: session.skill,
       selected: index === selectedIndex,
       onClick: () => {
         navigate(Path.Chat);

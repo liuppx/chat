@@ -7,9 +7,9 @@ import {
   showToast,
 } from "@/app/components/ui-lib";
 import Locale from "@/app/locales";
+import { useAppConfig } from "@/app/store";
 import { useSdStore } from "@/app/store/sd";
 import clsx from "clsx";
-import { useAllModels } from "@/app/utils/hooks";
 import { resolveImageModels } from "./image-registry";
 import { ImageFormMode } from "./image-endpoint-schemas";
 import { IconButton } from "@/app/components/button";
@@ -808,7 +808,11 @@ export const getParams = (model: any, params: any) => {
 
 export function SdPanel() {
   const sdStore = useSdStore();
-  const runtimeModels = useAllModels();
+  const configModels = useAppConfig((state) => state.models);
+  const runtimeModels = React.useMemo(
+    () => (configModels ?? []).filter((model) => model.available),
+    [configModels],
+  );
   const currentMode = sdStore.currentMode;
   const setCurrentMode = sdStore.setCurrentMode;
   const setEditSourceType = sdStore.setEditSourceType;

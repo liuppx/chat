@@ -27,6 +27,7 @@ import { cloudflareAIGatewayUrl } from "@/app/utils/cloudflare";
 import { RequestPayload } from "./openai";
 import { fetch } from "@/app/utils/stream";
 import { applyMessagesReasoning } from "../reasoning";
+import { normalizeTextModelConfigBySpecification } from "../text-model-spec";
 
 export type MultiBlockContent = {
   type: "image" | "text";
@@ -233,7 +234,7 @@ export class ClaudeApi implements LLMApi {
 
     const modelConfig = {
       ...useAppConfig.getState().modelConfig,
-      ...useChatStore.getState().currentSession().mask.modelConfig,
+      ...useChatStore.getState().currentSession().skill.modelConfig,
       ...{
         model: options.config.model,
       },
@@ -343,18 +344,27 @@ export class ClaudeApi implements LLMApi {
 
     // Anthropic new models reject sending both temperature and top_p.
     // Prefer temperature and drop top_p if both are set to avoid 400 errors.
-    const useTemperature = modelConfig.temperature;
+    const normalizedModelConfig = {
+      ...modelConfig,
+      ...normalizeTextModelConfigBySpecification(modelConfig, {
+        specification: options.config.specification,
+        endpointPath: options.config.endpointPath,
+        supportedEndpoints: options.config.supportedEndpoints,
+        modelName: options.config.model,
+      }),
+    };
+    const useTemperature = normalizedModelConfig.temperature;
     const useTopP =
       useTemperature !== undefined && useTemperature !== null
         ? undefined
-        : modelConfig.top_p;
+        : normalizedModelConfig.top_p;
 
     const requestBody: AnthropicChatRequest = {
       messages: prompt,
       stream: shouldStream,
 
-      model: modelConfig.model,
-      max_tokens: modelConfig.max_tokens,
+      model: normalizedModelConfig.model,
+      max_tokens: normalizedModelConfig.max_tokens,
       temperature: useTemperature,
       top_p: useTopP,
       // top_k: modelConfig.top_k,
@@ -362,7 +372,7 @@ export class ClaudeApi implements LLMApi {
     };
     applyMessagesReasoning(requestBody as any, {
       ...options.config,
-      ...modelConfig,
+      ...normalizedModelConfig,
     });
 
     const endpointPath = normalizeModelEndpointPath(
@@ -381,7 +391,7 @@ export class ClaudeApi implements LLMApi {
 
     if (shouldStream) {
       let index = -1;
-      const sessionSkill = useChatStore.getState().currentSession().mask;
+      const sessionSkill = useChatStore.getState().currentSession().skill;
       const skillApiTools = getSkillApiTools(sessionSkill);
       const skillToolServers = getSkillToolServers(sessionSkill);
       const [tools, funcs] = await getNativeToolBundle(skillApiTools, {

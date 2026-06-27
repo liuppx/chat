@@ -129,13 +129,31 @@ export type AppState = {
 };
 
 type LegacyAppState = AppState & {
+  [StoreKey.Chat]?: AppState[typeof StoreKey.Chat] & {
+    sessions?: Array<LegacyChatSession>;
+  };
   [StoreKey.Mask]?: AppState[typeof StoreKey.Skill] & {
     masks?: AppState[typeof StoreKey.Skill]["skills"];
   };
 };
 
+type LegacyChatSession = ChatSession & {
+  mask?: ChatSession["skill"];
+};
+
 function normalizeLegacyAppState<T extends Partial<LegacyAppState>>(state: T) {
   const mutableState = state as Record<string, unknown>;
+  const chatState = state[StoreKey.Chat];
+  if (chatState?.sessions) {
+    chatState.sessions = chatState.sessions.map(
+      (session: LegacyChatSession) => {
+        if (session.skill || !session.mask) return session;
+        const nextSession = { ...session, skill: session.mask };
+        delete nextSession.mask;
+        return nextSession;
+      },
+    );
+  }
   const legacySkillState = state[StoreKey.Mask];
   const currentSkillState = state[StoreKey.Skill];
   if (!currentSkillState && legacySkillState) {

@@ -90,6 +90,7 @@ export interface LLMConfig {
   providerName?: string;
   endpointPath?: string;
   supportedEndpoints?: string[];
+  specification?: ModelSpecification;
   ownedBy?: string;
   tags?: string[];
   responsesMode?: ResponsesConversationMode;
@@ -352,7 +353,7 @@ export function getHeaders(
   const clientConfig = getClientConfig();
 
   function getConfig() {
-    const modelConfig = chatStore.currentSession().mask.modelConfig;
+    const modelConfig = chatStore.currentSession().skill.modelConfig;
     const providerName =
       normalizeServiceProviderName(
         providerNameOverride ?? modelConfig.providerName,

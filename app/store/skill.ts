@@ -98,12 +98,14 @@ export function getSkillSessionToolbar(skill: Skill) {
 
 export const DEFAULT_SKILL_STATE = {
   skills: {} as Record<string, Skill>,
+  builtinOverrides: {} as Record<string, Skill>,
   language: undefined as Lang | undefined,
 };
 
 const LEGACY_REMOVED_SKILL_NAMES = new Set(["高效助手", "Efficient Assistant"]);
 export type SkillState = typeof DEFAULT_SKILL_STATE & {
   skills: Record<string, Skill>;
+  builtinOverrides: Record<string, Skill>;
   language?: Lang | undefined;
 };
 
@@ -170,6 +172,72 @@ export function getBuiltinSkillsForLang(
     seen.add(item.name);
     return true;
   }).map((skill) => withBuiltinSkillConfig(skill, modelConfig));
+}
+
+export function getBuiltinSkillPackageId(
+  skill: Pick<Skill, "lang" | "createdAt">,
+) {
+  return `builtin.${skill.lang}.${skill.createdAt}`;
+}
+
+export function isBuiltinSkillOverride(
+  skill: Pick<Skill, "builtin" | "packageId" | "lang" | "createdAt">,
+) {
+  return !skill.builtin && skill.packageId === getBuiltinSkillPackageId(skill);
+}
+
+export function getStoredUserSkills(
+  state: Pick<SkillState, "skills" | "builtinOverrides">,
+) {
+  const merged = new Map<string, Skill>();
+  Object.values(state.skills).forEach((skill) => {
+    merged.set(skill.id, skill);
+  });
+  Object.values(state.builtinOverrides).forEach((skill) => {
+    merged.set(skill.id, skill);
+  });
+  return Array.from(merged.values());
+}
+
+function resolveSkillBucket(
+  state: Pick<SkillState, "skills" | "builtinOverrides">,
+  skill?: Partial<Skill>,
+) {
+  if (skill && isBuiltinSkillOverride(skill as Skill)) {
+    return "builtinOverrides" as const;
+  }
+  return "skills" as const;
+}
+
+export function mergeVisibleSkills(params: {
+  userSkills: Skill[];
+  hideBuiltinSkills?: boolean;
+  lang?: Lang;
+  modelConfig?: ModelConfig;
+}) {
+  const {
+    userSkills,
+    hideBuiltinSkills,
+    lang = getLang(),
+    modelConfig = useAppConfig.getState().modelConfig,
+  } = params;
+
+  const sortedUserSkills = userSkills
+    .slice()
+    .sort((a, b) => b.createdAt - a.createdAt);
+  if (hideBuiltinSkills) return sortedUserSkills;
+
+  const enabledPackageIds = new Set(
+    sortedUserSkills.map((skill) => skill.packageId).filter(Boolean),
+  );
+  const builtinSkills = getBuiltinSkillsForLang(lang, modelConfig)
+    .filter((skill) => !enabledPackageIds.has(getBuiltinSkillPackageId(skill)))
+    .map((skill) => ({
+      ...skill,
+      packageId: getBuiltinSkillPackageId(skill),
+    }));
+
+  return [...sortedUserSkills, ...builtinSkills];
 }
 
 export function isLaunchableSkill(skill: Skill) {
@@ -242,62 +310,61 @@ export const useSkillStore = createPersistStore(
 
   (set, get) => ({
     create(skill?: Partial<Skill>) {
-      const skills = get().skills;
+      const bucket = resolveSkillBucket(get(), skill);
+      const records = get()[bucket];
       const id = nanoid();
-      skills[id] = {
+      records[id] = {
         ...createEmptySkill(),
         ...skill,
         id,
         builtin: false,
       };
 
-      set(() => ({ skills }));
+      set(() => ({ [bucket]: records }));
       get().markUpdate();
 
-      return skills[id];
+      return records[id];
     },
     updateSkill(id: string, updater: (skill: Skill) => void) {
-      const skills = get().skills;
-      const skill = skills[id];
+      const bucket =
+        get().skills[id] !== undefined ? "skills" : "builtinOverrides";
+      const records = get()[bucket];
+      const skill = records[id];
       if (!skill) return;
       const updatedSkill = { ...skill };
       updater(updatedSkill);
-      skills[id] = updatedSkill;
-      set(() => ({ skills }));
-      get().markUpdate();
-    },
-    updateMask(id: string, updater: (skill: Skill) => void) {
-      const skills = get().skills;
-      const skill = skills[id];
-      if (!skill) return;
-      const updatedSkill = { ...skill };
-      updater(updatedSkill);
-      skills[id] = updatedSkill;
-      set(() => ({ skills }));
+      records[id] = updatedSkill;
+      set(() => ({ [bucket]: records }));
       get().markUpdate();
     },
     delete(id: string) {
-      const skills = get().skills;
-      delete skills[id];
-      set(() => ({ skills }));
+      if (get().skills[id] !== undefined) {
+        const skills = get().skills;
+        delete skills[id];
+        set(() => ({ skills }));
+      } else {
+        const builtinOverrides = get().builtinOverrides;
+        delete builtinOverrides[id];
+        set(() => ({ builtinOverrides }));
+      }
       get().markUpdate();
     },
 
     get(id?: string) {
-      return get().skills[id ?? 1145141919810];
+      const key = id ?? "1145141919810";
+      return get().skills[key] ?? get().builtinOverrides[key];
     },
     getAll() {
-      const userSkills = Object.values(get().skills).sort(
-        (a, b) => b.createdAt - a.createdAt,
-      );
       const config = useAppConfig.getState();
-      if (config.hideBuiltinSkills) return userSkills;
-      return userSkills.concat(
-        getBuiltinSkillsForLang(getLang(), config.modelConfig),
-      );
+      return mergeVisibleSkills({
+        userSkills: getStoredUserSkills(get()),
+        hideBuiltinSkills: config.hideBuiltinSkills,
+        lang: getLang(),
+        modelConfig: config.modelConfig,
+      });
     },
     search(text: string) {
-      return Object.values(get().skills);
+      return getStoredUserSkills(get());
     },
     setLanguage(language: Lang | undefined) {
       set({
@@ -307,15 +374,19 @@ export const useSkillStore = createPersistStore(
   }),
   {
     name: StoreKey.Skill,
-    version: 4.6,
+    version: 4.7,
 
     onRehydrateStorage() {
       return (state) => {
-        if (!state?.skills) return;
+        if (!state?.skills && !state?.builtinOverrides) return;
         const skills = { ...state.skills };
-        if (!removeLegacySkills(skills)) return;
+        const builtinOverrides = { ...(state.builtinOverrides ?? {}) };
+        const removedSkills = removeLegacySkills(skills);
+        const removedOverrides = removeLegacySkills(builtinOverrides);
+        if (!removedSkills && !removedOverrides) return;
         useSkillStore.setState({
           skills,
+          builtinOverrides,
           lastUpdateTime: Date.now(),
         });
       };
@@ -328,6 +399,7 @@ export const useSkillStore = createPersistStore(
       const newState = {
         ...legacyState,
         skills: legacyState.skills ?? legacyState.masks ?? {},
+        builtinOverrides: legacyState.builtinOverrides ?? {},
       } as SkillState;
 
       // migrate legacy skill id to nanoid
@@ -357,14 +429,16 @@ export const useSkillStore = createPersistStore(
         removeLegacySkills(newState.skills);
       }
 
+      if (version < 4.7) {
+        Object.entries(newState.skills).forEach(([id, skill]) => {
+          if (!isBuiltinSkillOverride(skill)) return;
+          newState.builtinOverrides[id] = skill;
+          delete newState.skills[id];
+        });
+        removeLegacySkills(newState.builtinOverrides);
+      }
+
       return newState as any;
     },
   },
 );
-
-export type Mask = Skill;
-export type MaskState = SkillState & { masks?: Record<string, Skill> };
-export const DEFAULT_MASK_STATE = DEFAULT_SKILL_STATE;
-export const DEFAULT_MASK_AVATAR = DEFAULT_SKILL_AVATAR;
-export const createEmptyMask = createEmptySkill;
-export const useMaskStore = useSkillStore;

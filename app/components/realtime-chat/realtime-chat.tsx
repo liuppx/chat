@@ -76,7 +76,7 @@ export function RealtimeChat({
 }: RealtimeChatProps) {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  const realtimeConfig = session.mask.realtimeConfig;
+  const realtimeConfig = session.skill.realtimeConfig;
   const [status, setStatus] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isConnected, setIsConnected] = useState(false);

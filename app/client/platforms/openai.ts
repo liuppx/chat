@@ -47,34 +47,9 @@ import {
   SupportedTextEndpoint,
   SpeechOptions,
 } from "../api";
+import { normalizeTextModelConfigBySpecification } from "../text-model-spec";
 import Locale from "../../locales";
 import { getClientConfig } from "@/app/config/client";
-import {
-  getRouterAudience,
-  getRouterCapabilities,
-  getUcanRootCapsKey,
-  UCAN_SESSION_ID,
-} from "@/app/plugins/ucan";
-import {
-  getCentralUcanAuthorizationHeaderForAudience,
-  isCentralModeEnabled,
-} from "@/app/plugins/central-ucan";
-import {
-  decodeUcanPayload,
-  getCapabilityAction,
-  getCapabilityResource,
-  getOrCreateInvocationUcan,
-  isUcanTokenFresh,
-  normalizeUcanCapabilities,
-  type UcanCapability,
-} from "@yeying-community/web3-bs";
-import { getCachedUcanSession } from "@/app/plugins/ucan-session";
-import {
-  getErrorMessage,
-  invalidateUcan,
-  invalidateUcanAndThrow,
-  shouldInvalidateUcanByError,
-} from "@/app/plugins/ucan-auth";
 import {
   getMessageTextContent,
   isVisionModel,
@@ -140,13 +115,6 @@ function resolveImageQuality(model: string, quality?: ImageQuality) {
 }
 
 const ROUTER_HOST = "llm.yeying.pub";
-type CachedInvocationToken = {
-  key: string;
-  token: string;
-  exp: number;
-  nbf?: number;
-};
-let cachedRouterInvocationToken: CachedInvocationToken | null = null;
 
 async function uploadGeneratedImageAndGetStableUrlFromBase64(b64Json: string) {
   return await uploadGeneratedImageAndGetStableUrl(
@@ -178,57 +146,6 @@ function isRouterUrl(url: string): boolean {
   } catch {
     return false;
   }
-}
-
-function isUcanMetaValid(): boolean {
-  try {
-    if (typeof localStorage === "undefined") return false;
-    const expRaw = localStorage.getItem("ucanRootExp");
-    const iss = localStorage.getItem("ucanRootIss");
-    const caps = localStorage.getItem("ucanRootCaps");
-    const account = localStorage.getItem("currentAccount") || "";
-    if (!expRaw || !iss || !account) return false;
-    const exp = Number(expRaw);
-    if (!Number.isFinite(exp) || exp <= Date.now()) return false;
-    if (!caps || caps !== getUcanRootCapsKey()) return false;
-    return iss === `did:pkh:eth:${account.toLowerCase()}`;
-  } catch {
-    return false;
-  }
-}
-
-function buildCapsKey(caps: UcanCapability[]) {
-  return normalizeUcanCapabilities(caps || [], { includeLegacyAliases: false })
-    .map((cap) => {
-      const resource = getCapabilityResource(cap);
-      const action = getCapabilityAction(cap);
-      return `${resource}:${action}`;
-    })
-    .filter((entry) => entry !== ":")
-    .sort()
-    .join("|");
-}
-
-function buildRouterInvocationCacheKey(
-  audience: string,
-  capabilities: UcanCapability[],
-) {
-  if (typeof localStorage === "undefined") return "";
-  const account = localStorage.getItem("currentAccount") || "";
-  const rootCaps = localStorage.getItem("ucanRootCaps") || "";
-  return `${account}|${rootCaps}|${audience}|${buildCapsKey(capabilities)}`;
-}
-
-function getValidCachedRouterInvocationToken(
-  audience: string,
-  capabilities: UcanCapability[],
-) {
-  const cacheKey = buildRouterInvocationCacheKey(audience, capabilities);
-  const cached = cachedRouterInvocationToken;
-  if (!cached || !cacheKey || cached.key !== cacheKey) {
-    return null;
-  }
-  return cached.token;
 }
 
 function applySelectedRouterTokenAuthorization(
@@ -264,103 +181,13 @@ function ensureRouterModelAuthorization(
 export async function getHeadersWithRouterUcan(
   url: string,
   providerNameOverride?: string,
-  options: { forceRefresh?: boolean } = {},
+  _options: { forceRefresh?: boolean } = {},
 ) {
   const headers = getHeaders(false, providerNameOverride);
-  const hasFallbackAuthorization = Boolean(headers["Authorization"]);
-  if (isCentralModeEnabled()) {
-    if (!isRouterUrl(url)) return headers;
-    const audience = getRouterAudience();
-    const capabilities = getRouterCapabilities();
-    if (!audience || !capabilities.length) {
-      return applySelectedRouterTokenAuthorization(headers, url);
-    }
-    try {
-      const centralAuthorization =
-        await getCentralUcanAuthorizationHeaderForAudience({
-          audience,
-          capabilities,
-        });
-      if (centralAuthorization) {
-        headers["Authorization"] = centralAuthorization;
-      }
-    } catch (error) {
-      if (!hasFallbackAuthorization) {
-        throw error;
-      }
-      console.warn("[UCAN] Failed to issue central invocation", error);
-    }
-    return applySelectedRouterTokenAuthorization(headers, url);
-  }
   if (!isRouterUrl(url)) return headers;
-  const selectedToken = useAccessStore.getState().selectedRouterToken?.trim();
-  if (selectedToken) {
-    headers["Authorization"] = `Bearer ${selectedToken}`;
-    return headers;
-  }
-  if (!isUcanMetaValid()) {
-    return applySelectedRouterTokenAuthorization(headers, url);
-  }
-
-  const audience = getRouterAudience();
-  const capabilities = getRouterCapabilities();
-  if (!audience || !capabilities.length) {
-    return applySelectedRouterTokenAuthorization(headers, url);
-  }
-
-  const cachedToken = options.forceRefresh
-    ? null
-    : getValidCachedRouterInvocationToken(audience, capabilities);
-  if (cachedToken && isUcanTokenFresh(cachedToken)) {
-    headers["Authorization"] = `Bearer ${cachedToken}`;
-    return applySelectedRouterTokenAuthorization(headers, url);
-  }
-
-  try {
-    // Do not proactively wake the wallet on request paths.
-    // If a valid UCAN session has already been stored locally, use it.
-    const issuer = await getCachedUcanSession();
-    if (!issuer) {
-      cachedRouterInvocationToken = null;
-      if (!hasFallbackAuthorization) {
-        return await invalidateUcanAndThrow("UCAN session is not available");
-      }
-      await invalidateUcan("UCAN session is not available");
-      return applySelectedRouterTokenAuthorization(headers, url);
-    }
-
-    const ucan = await getOrCreateInvocationUcan({
-      ucan: cachedToken || undefined,
-      audience,
-      capabilities,
-      sessionId: UCAN_SESSION_ID,
-      issuer,
-    });
-    const payload = decodeUcanPayload(ucan);
-    const key = buildRouterInvocationCacheKey(audience, capabilities);
-    if (payload && typeof payload.exp === "number" && key) {
-      cachedRouterInvocationToken = {
-        key,
-        token: ucan,
-        exp: payload.exp,
-        nbf: payload.nbf,
-      };
-    }
-    headers["Authorization"] = `Bearer ${ucan}`;
-  } catch (error) {
-    cachedRouterInvocationToken = null;
-    if (shouldInvalidateUcanByError(error)) {
-      if (!hasFallbackAuthorization) {
-        return await invalidateUcanAndThrow(
-          getErrorMessage(error) || "UCAN invocation failed",
-        );
-      }
-      await invalidateUcan(getErrorMessage(error) || "UCAN invocation failed");
-      return applySelectedRouterTokenAuthorization(headers, url);
-    }
-    console.warn("[UCAN] Failed to create invocation", error);
-  }
-  return applySelectedRouterTokenAuthorization(headers, url);
+  const nextHeaders = applySelectedRouterTokenAuthorization(headers, url);
+  ensureRouterModelAuthorization(url, nextHeaders);
+  return nextHeaders;
 }
 
 function isResponsesPath(path: string) {
@@ -1028,11 +855,20 @@ export class ChatGPTApi implements LLMApi {
   async chat(options: ChatOptions) {
     const modelConfig = {
       ...useAppConfig.getState().modelConfig,
-      ...useChatStore.getState().currentSession().mask.modelConfig,
+      ...useChatStore.getState().currentSession().skill.modelConfig,
       ...{
         model: options.config.model,
         providerName: options.config.providerName,
       },
+    };
+    const normalizedModelConfig = {
+      ...modelConfig,
+      ...normalizeTextModelConfigBySpecification(modelConfig, {
+        specification: options.config.specification,
+        endpointPath: options.config.endpointPath,
+        supportedEndpoints: options.config.supportedEndpoints,
+        modelName: options.config.model,
+      }),
     };
     const resolvedModel = mapOpenAIModelName(options.config.model);
     const isDalle3 = _isDalle3(resolvedModel);
@@ -1056,7 +892,7 @@ export class ChatGPTApi implements LLMApi {
     try {
       let tools: any[] = [];
       let funcs: Record<string, Function> = {};
-      const sessionSkill = useChatStore.getState().currentSession().mask;
+      const sessionSkill = useChatStore.getState().currentSession().skill;
       const skillApiTools = getSkillApiTools(sessionSkill);
       const skillToolServers = getSkillToolServers(sessionSkill);
       const skillBuiltInTools = getSkillBuiltInTools(sessionSkill);
@@ -1066,7 +902,7 @@ export class ChatGPTApi implements LLMApi {
           includeToolServers:
             allowNativeToolBridge &&
             shouldUseNativeToolBridge({
-              providerName: modelConfig.providerName,
+              providerName: normalizedModelConfig.providerName,
               endpointPath,
             }),
           toolServerIds: skillToolServers,
@@ -1077,7 +913,7 @@ export class ChatGPTApi implements LLMApi {
 
       const useResponsesProtocol =
         !useImageGenerationEndpoint &&
-        modelConfig.providerName !== ServiceProvider.Azure &&
+        normalizedModelConfig.providerName !== ServiceProvider.Azure &&
         (endpointPath
           ? endpointPath === SupportedTextEndpoint.Responses
           : true);
@@ -1086,7 +922,7 @@ export class ChatGPTApi implements LLMApi {
         shouldFallbackResponsesToolsToChatCompletions({
           useResponsesEndpoint: useResponsesProtocol,
           useImageGenerationEndpoint,
-          providerName: modelConfig.providerName,
+          providerName: normalizedModelConfig.providerName,
           supportedEndpoints: options.config.supportedEndpoints,
           tools,
           hasBuiltInResponsesTools: skillBuiltInTools.length > 0,
@@ -1098,7 +934,7 @@ export class ChatGPTApi implements LLMApi {
         : endpointPath;
 
       let chatPath = "";
-      if (modelConfig.providerName === ServiceProvider.Azure) {
+      if (normalizedModelConfig.providerName === ServiceProvider.Azure) {
         // find model, and get displayName as deployName
         const { models: configModels, customModels: configCustomModels } =
           useAppConfig.getState();
@@ -1114,7 +950,7 @@ export class ChatGPTApi implements LLMApi {
         );
         const model = models.find(
           (model) =>
-            model.name === modelConfig.model &&
+            model.name === normalizedModelConfig.model &&
             model?.provider?.providerName === ServiceProvider.Azure,
         );
         chatPath = this.path(
@@ -1135,7 +971,10 @@ export class ChatGPTApi implements LLMApi {
       }
 
       const responsesConversationMode = useResponsesEndpoint
-        ? resolveResponsesConversationMode(modelConfig.responsesMode, chatPath)
+        ? resolveResponsesConversationMode(
+            normalizedModelConfig.responsesMode,
+            chatPath,
+          )
         : undefined;
 
       const requestTools = useResponsesEndpoint
@@ -1194,15 +1033,16 @@ export class ChatGPTApi implements LLMApi {
             model: resolvedModel,
             input,
             stream: options.config.stream,
-            max_output_tokens: modelConfig.max_tokens,
+            max_output_tokens: normalizedModelConfig.max_tokens,
             store: responsesConversationMode === "stateful",
           };
           if (!isO1OrO3 && !hasNonTextInput) {
-            responsesPayload.temperature = modelConfig.temperature;
-            responsesPayload.top_p = modelConfig.top_p;
+            responsesPayload.temperature = normalizedModelConfig.temperature;
+            responsesPayload.top_p = normalizedModelConfig.top_p;
           }
           applyOpenAICompatibleReasoning(responsesPayload, {
             ...options.config,
+            ...normalizedModelConfig,
             model: resolvedModel,
           });
           if (instructions) {
@@ -1219,20 +1059,28 @@ export class ChatGPTApi implements LLMApi {
             messages: messages as RequestPayload["messages"],
             stream: options.config.stream,
             model: resolvedModel,
-            temperature: !isO1OrO3 ? modelConfig.temperature : 1,
-            presence_penalty: !isO1OrO3 ? modelConfig.presence_penalty : 0,
-            frequency_penalty: !isO1OrO3 ? modelConfig.frequency_penalty : 0,
-            top_p: !isO1OrO3 ? modelConfig.top_p : 1,
+            temperature: !isO1OrO3 ? normalizedModelConfig.temperature : 1,
+            presence_penalty: !isO1OrO3
+              ? normalizedModelConfig.presence_penalty
+              : 0,
+            frequency_penalty: !isO1OrO3
+              ? normalizedModelConfig.frequency_penalty
+              : 0,
+            top_p: !isO1OrO3 ? normalizedModelConfig.top_p : 1,
           };
           if (!isGpt5 && isO1OrO3) {
             chatPayload.messages.unshift({
               role: "developer",
               content: "Formatting re-enabled",
             });
-            chatPayload.max_completion_tokens = modelConfig.max_tokens;
+            chatPayload.max_completion_tokens =
+              normalizedModelConfig.max_tokens;
           }
           if (visionModel && !isO1OrO3 && !isGpt5) {
-            chatPayload.max_tokens = Math.max(modelConfig.max_tokens, 4000);
+            chatPayload.max_tokens = Math.max(
+              normalizedModelConfig.max_tokens,
+              4000,
+            );
           }
           if (isGpt5) {
             delete (chatPayload as any).max_tokens;
@@ -1240,6 +1088,7 @@ export class ChatGPTApi implements LLMApi {
           }
           applyOpenAICompatibleReasoning(chatPayload as any, {
             ...options.config,
+            ...normalizedModelConfig,
             model: resolvedModel,
           });
           requestPayload = chatPayload;

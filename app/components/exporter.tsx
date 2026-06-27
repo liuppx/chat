@@ -39,7 +39,7 @@ import { getClientConfig } from "../config/client";
 import { type ClientApi, getClientApi } from "../client/api";
 import { isDesktopAppRuntime, saveWithDialog, writeFile } from "../tauri";
 import { getMessageTextContent } from "../utils";
-import { SkillAvatar } from "./mask";
+import { SkillAvatar } from "./skill-editor";
 import clsx from "clsx";
 
 const Markdown = dynamic(async () => (await import("./markdown")).Markdown, {
@@ -167,7 +167,7 @@ export function MessageExporter() {
 
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  const sessionSkill = session.mask;
+  const sessionSkill = session.skill;
   const { selection, updateSelection } = useMessageSelector();
   const selectedMessages = useMemo(() => {
     const ret: ChatMessage[] = [];
@@ -414,7 +414,7 @@ export function ImagePreviewer(props: {
 }) {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
-  const sessionSkill = session.mask;
+  const sessionSkill = session.skill;
   const config = useAppConfig();
 
   const previewRef = useRef<HTMLDivElement>(null);

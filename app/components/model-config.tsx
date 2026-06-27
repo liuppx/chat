@@ -2,10 +2,17 @@ import { useMemo } from "react";
 import { ServiceProvider } from "@/app/constant";
 import {
   LLMModel,
+  selectPreferredTextEndpoint,
   supportsImageEditEndpoint,
   supportsImageGenerationEndpoint,
   supportsTextEndpoint,
 } from "../client/api";
+import {
+  getTextModelParameterSpecification,
+  hasExplicitTextParameterCatalog,
+  isTextModelParameterSupported,
+  normalizeTextModelConfigBySpecification,
+} from "../client/text-model-spec";
 import { ModalConfigValidator, ModelConfig } from "../store";
 
 import Locale from "../locales";
@@ -80,6 +87,76 @@ export function ModelConfigList(props: {
   const selectedCompressModelValue = props.modelConfig.compressModel
     ? compressModelValue
     : "";
+  const selectedRuntimeModel = useMemo(
+    () =>
+      (availableModels.find(
+        (model) =>
+          model.name === props.modelConfig.model &&
+          model.provider?.providerName === configuredProviderName,
+      ) ??
+        availableModels.find(
+          (model) => model.name === props.modelConfig.model,
+        )) as LLMModel | undefined,
+    [availableModels, configuredProviderName, props.modelConfig.model],
+  );
+  const selectedEndpointPath = useMemo(
+    () =>
+      selectPreferredTextEndpoint(selectedRuntimeModel?.supportedEndpoints, {
+        modelName: selectedRuntimeModel?.name,
+      }),
+    [selectedRuntimeModel],
+  );
+  const textSpecInput = useMemo(
+    () => ({
+      specification: selectedRuntimeModel?.specification,
+      endpointPath: selectedEndpointPath,
+      supportedEndpoints: selectedRuntimeModel?.supportedEndpoints,
+      modelName: selectedRuntimeModel?.name,
+    }),
+    [selectedEndpointPath, selectedRuntimeModel],
+  );
+  const hasExplicitTextSpec = hasExplicitTextParameterCatalog(textSpecInput);
+  const temperatureSpec = getTextModelParameterSpecification({
+    ...textSpecInput,
+    key: "temperature",
+  });
+  const topPSpec = getTextModelParameterSpecification({
+    ...textSpecInput,
+    key: "top_p",
+  });
+  const maxTokensSpec = getTextModelParameterSpecification({
+    ...textSpecInput,
+    key: "max_tokens",
+  });
+  const presencePenaltySpec = getTextModelParameterSpecification({
+    ...textSpecInput,
+    key: "presence_penalty",
+  });
+  const frequencyPenaltySpec = getTextModelParameterSpecification({
+    ...textSpecInput,
+    key: "frequency_penalty",
+  });
+  const showTemperature =
+    !hasExplicitTextSpec ||
+    isTextModelParameterSupported({ ...textSpecInput, key: "temperature" });
+  const showTopP =
+    !hasExplicitTextSpec ||
+    isTextModelParameterSupported({ ...textSpecInput, key: "top_p" });
+  const showMaxTokens =
+    !hasExplicitTextSpec ||
+    isTextModelParameterSupported({ ...textSpecInput, key: "max_tokens" });
+  const showPresencePenalty =
+    !hasExplicitTextSpec ||
+    isTextModelParameterSupported({
+      ...textSpecInput,
+      key: "presence_penalty",
+    });
+  const showFrequencyPenalty =
+    !hasExplicitTextSpec ||
+    isTextModelParameterSupported({
+      ...textSpecInput,
+      key: "frequency_penalty",
+    });
 
   return (
     <>
@@ -95,6 +172,26 @@ export function ModelConfigList(props: {
             props.updateConfig((config) => {
               config.model = ModalConfigValidator.model(model);
               config.providerName = providerName as ServiceProvider;
+              const nextRuntimeModel = availableModels.find(
+                (item) =>
+                  item.name === model &&
+                  item.provider?.providerName === providerName,
+              ) as LLMModel | undefined;
+              const nextEndpointPath = selectPreferredTextEndpoint(
+                nextRuntimeModel?.supportedEndpoints,
+                {
+                  modelName: nextRuntimeModel?.name ?? model,
+                },
+              );
+              Object.assign(
+                config,
+                normalizeTextModelConfigBySpecification(config, {
+                  specification: nextRuntimeModel?.specification,
+                  endpointPath: nextEndpointPath,
+                  supportedEndpoints: nextRuntimeModel?.supportedEndpoints,
+                  modelName: nextRuntimeModel?.name ?? model,
+                }),
+              );
             });
           }}
         >
@@ -126,112 +223,122 @@ export function ModelConfigList(props: {
           ))}
         </Select>
       </ListItem>
-      <ListItem
-        title={Locale.Settings.Temperature.Title}
-        subTitle={Locale.Settings.Temperature.SubTitle}
-      >
-        <InputRange
-          aria={Locale.Settings.Temperature.Title}
-          value={props.modelConfig.temperature?.toFixed(1)}
-          min="0"
-          max="1" // lets limit it to 0-1
-          step="0.1"
-          onChange={(e) => {
-            props.updateConfig(
-              (config) =>
-                (config.temperature = ModalConfigValidator.temperature(
-                  e.currentTarget.valueAsNumber,
-                )),
-            );
-          }}
-        ></InputRange>
-      </ListItem>
-      <ListItem
-        title={Locale.Settings.TopP.Title}
-        subTitle={Locale.Settings.TopP.SubTitle}
-      >
-        <InputRange
-          aria={Locale.Settings.TopP.Title}
-          value={(props.modelConfig.top_p ?? 1).toFixed(1)}
-          min="0"
-          max="1"
-          step="0.1"
-          onChange={(e) => {
-            props.updateConfig(
-              (config) =>
-                (config.top_p = ModalConfigValidator.top_p(
-                  e.currentTarget.valueAsNumber,
-                )),
-            );
-          }}
-        ></InputRange>
-      </ListItem>
-      <ListItem
-        title={Locale.Settings.MaxTokens.Title}
-        subTitle={Locale.Settings.MaxTokens.SubTitle}
-      >
-        <input
-          aria-label={Locale.Settings.MaxTokens.Title}
-          type="number"
-          min={1024}
-          max={512000}
-          value={props.modelConfig.max_tokens}
-          onChange={(e) =>
-            props.updateConfig(
-              (config) =>
-                (config.max_tokens = ModalConfigValidator.max_tokens(
-                  e.currentTarget.valueAsNumber,
-                )),
-            )
-          }
-        ></input>
-      </ListItem>
+      {showTemperature ? (
+        <ListItem
+          title={Locale.Settings.Temperature.Title}
+          subTitle={Locale.Settings.Temperature.SubTitle}
+        >
+          <InputRange
+            aria={Locale.Settings.Temperature.Title}
+            value={props.modelConfig.temperature?.toFixed(1)}
+            min={String(temperatureSpec?.min ?? 0)}
+            max={String(temperatureSpec?.max ?? 1)}
+            step="0.1"
+            onChange={(e) => {
+              props.updateConfig(
+                (config) =>
+                  (config.temperature = ModalConfigValidator.temperature(
+                    e.currentTarget.valueAsNumber,
+                  )),
+              );
+            }}
+          ></InputRange>
+        </ListItem>
+      ) : null}
+      {showTopP ? (
+        <ListItem
+          title={Locale.Settings.TopP.Title}
+          subTitle={Locale.Settings.TopP.SubTitle}
+        >
+          <InputRange
+            aria={Locale.Settings.TopP.Title}
+            value={(props.modelConfig.top_p ?? 1).toFixed(1)}
+            min={String(topPSpec?.min ?? 0)}
+            max={String(topPSpec?.max ?? 1)}
+            step="0.1"
+            onChange={(e) => {
+              props.updateConfig(
+                (config) =>
+                  (config.top_p = ModalConfigValidator.top_p(
+                    e.currentTarget.valueAsNumber,
+                  )),
+              );
+            }}
+          ></InputRange>
+        </ListItem>
+      ) : null}
+      {showMaxTokens ? (
+        <ListItem
+          title={Locale.Settings.MaxTokens.Title}
+          subTitle={Locale.Settings.MaxTokens.SubTitle}
+        >
+          <input
+            aria-label={Locale.Settings.MaxTokens.Title}
+            type="number"
+            min={maxTokensSpec?.min ?? 1024}
+            max={maxTokensSpec?.max ?? 512000}
+            value={props.modelConfig.max_tokens}
+            onChange={(e) =>
+              props.updateConfig(
+                (config) =>
+                  (config.max_tokens = ModalConfigValidator.max_tokens(
+                    e.currentTarget.valueAsNumber,
+                  )),
+              )
+            }
+          ></input>
+        </ListItem>
+      ) : null}
 
       {props.modelConfig?.providerName == ServiceProvider.Google ? null : (
         <>
-          <ListItem
-            title={Locale.Settings.PresencePenalty.Title}
-            subTitle={Locale.Settings.PresencePenalty.SubTitle}
-          >
-            <InputRange
-              aria={Locale.Settings.PresencePenalty.Title}
-              value={props.modelConfig.presence_penalty?.toFixed(1)}
-              min="-2"
-              max="2"
-              step="0.1"
-              onChange={(e) => {
-                props.updateConfig(
-                  (config) =>
-                    (config.presence_penalty =
-                      ModalConfigValidator.presence_penalty(
-                        e.currentTarget.valueAsNumber,
-                      )),
-                );
-              }}
-            ></InputRange>
-          </ListItem>
+          {showPresencePenalty ? (
+            <ListItem
+              title={Locale.Settings.PresencePenalty.Title}
+              subTitle={Locale.Settings.PresencePenalty.SubTitle}
+            >
+              <InputRange
+                aria={Locale.Settings.PresencePenalty.Title}
+                value={props.modelConfig.presence_penalty?.toFixed(1)}
+                min={String(presencePenaltySpec?.min ?? -2)}
+                max={String(presencePenaltySpec?.max ?? 2)}
+                step="0.1"
+                onChange={(e) => {
+                  props.updateConfig(
+                    (config) =>
+                      (config.presence_penalty =
+                        ModalConfigValidator.presence_penalty(
+                          e.currentTarget.valueAsNumber,
+                        )),
+                  );
+                }}
+              ></InputRange>
+            </ListItem>
+          ) : null}
 
-          <ListItem
-            title={Locale.Settings.FrequencyPenalty.Title}
-            subTitle={Locale.Settings.FrequencyPenalty.SubTitle}
-          >
-            <InputRange
-              aria={Locale.Settings.FrequencyPenalty.Title}
-              value={props.modelConfig.frequency_penalty?.toFixed(1)}
-              min="-2"
-              max="2"
-              step="0.1"
-              onChange={(e) => {
-                props.updateConfig(
-                  (config) =>
-                    (config.frequency_penalty =
-                      ModalConfigValidator.frequency_penalty(
-                        e.currentTarget.valueAsNumber,
-                      )),
-                );
-              }}
-            ></InputRange>
-          </ListItem>
+          {showFrequencyPenalty ? (
+            <ListItem
+              title={Locale.Settings.FrequencyPenalty.Title}
+              subTitle={Locale.Settings.FrequencyPenalty.SubTitle}
+            >
+              <InputRange
+                aria={Locale.Settings.FrequencyPenalty.Title}
+                value={props.modelConfig.frequency_penalty?.toFixed(1)}
+                min={String(frequencyPenaltySpec?.min ?? -2)}
+                max={String(frequencyPenaltySpec?.max ?? 2)}
+                step="0.1"
+                onChange={(e) => {
+                  props.updateConfig(
+                    (config) =>
+                      (config.frequency_penalty =
+                        ModalConfigValidator.frequency_penalty(
+                          e.currentTarget.valueAsNumber,
+                        )),
+                  );
+                }}
+              ></InputRange>
+            </ListItem>
+          ) : null}
 
           <ListItem
             title={Locale.Settings.InjectSystemPrompts.Title}

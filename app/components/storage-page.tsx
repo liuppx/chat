@@ -13,7 +13,11 @@ import Locale from "../locales";
 import { fetchQuota, WebDAVQuota } from "../plugins/webdav";
 import { useChatStore } from "../store";
 import { usePromptStore } from "../store/prompt";
-import { useSkillStore } from "../store/skill";
+import {
+  getStoredUserSkills,
+  isBuiltinSkillOverride,
+  useSkillStore,
+} from "../store/skill";
 import { useSyncStore } from "../store/sync";
 import { ProviderType } from "../utils/cloud";
 import { formatBytes } from "../utils/format";
@@ -48,7 +52,10 @@ export function StoragePage() {
   const syncStore = useSyncStore();
   const chatStore = useChatStore();
   const promptStore = usePromptStore();
-  const skillStore = useSkillStore();
+  const skillRecords = useSkillStore((state) => state.skills);
+  const builtinOverrideRecords = useSkillStore(
+    (state) => state.builtinOverrides,
+  );
   const webdavPortalUrl = resolveConfigUrl(
     getClientConfig()?.webdavBackendBaseUrl,
   );
@@ -74,9 +81,17 @@ export function StoragePage() {
       chat: sessions.length,
       message: messageCount,
       prompt: Object.keys(promptStore.prompts).length,
-      skill: Object.keys(skillStore.skills).length,
+      skill: getStoredUserSkills({
+        skills: skillRecords,
+        builtinOverrides: builtinOverrideRecords,
+      }).filter((skill) => !isBuiltinSkillOverride(skill)).length,
     };
-  }, [chatStore.sessions, promptStore.prompts, skillStore.skills]);
+  }, [
+    builtinOverrideRecords,
+    chatStore.sessions,
+    promptStore.prompts,
+    skillRecords,
+  ]);
 
   const status = !configured
     ? "warning"

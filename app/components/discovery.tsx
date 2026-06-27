@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 
+import { getClientConfig } from "../config/client";
 import { Path } from "../constant";
 import Locale, { getLang, type Lang } from "../locales";
 import {
@@ -33,24 +34,27 @@ import {
   ServerStatusResponse,
 } from "../tools/types";
 import {
-  BUILTIN_SKILLS,
   resolveLocalizedText,
   type SkillPackage,
   skillPackageToSkill,
 } from "../skills";
 import { useAppConfig, useChatStore } from "../store";
 import {
+  getStoredUserSkills,
   Skill,
+  getBuiltinSkillPackageId,
   getSkillApiTools,
   getSkillBuiltInTools,
   getSkillToolServers,
+  isBuiltinSkillOverride,
+  mergeVisibleSkills,
   useSkillStore,
 } from "../store/skill";
 import { usePluginStore } from "../store/plugin";
 import { IconButton } from "./button";
 import { ErrorBoundary } from "./error";
 import { List, ListItem, Modal, showToast } from "./ui-lib";
-import { SkillConfig } from "./mask";
+import { SkillConfig } from "./skill-editor";
 import AddIcon from "../icons/add.svg";
 import BrainIcon from "../icons/brain.svg";
 import CloseIcon from "../icons/close.svg";
@@ -70,7 +74,6 @@ import { formatBytes } from "../utils/format";
 import {
   getSkillRuntimeIssueSummary,
   getSkillRuntimeStatusOrder,
-  hasSkillToolRuntimeIssue,
   resolveSkillRuntimeStatus,
   SkillRuntimeResult,
   SkillRuntimeStatus,
@@ -128,6 +131,10 @@ type Capability = {
   presetServer?: PresetServer;
 };
 
+const isApp = !!getClientConfig()?.isApp;
+const skillRuntime: RuntimeType = isApp ? "local" : "cloud";
+const toolRuntime: RuntimeType = isApp ? "local" : "cloud";
+
 const typeOrder: CapabilityType[] = [
   "all",
   "skill",
@@ -161,10 +168,6 @@ function getDiscoveryPath(view: DiscoveryView, type: CapabilityType) {
   if (type !== "all") params.set("type", type);
   const query = params.toString();
   return query ? `${Path.Discovery}?${query}` : Path.Discovery;
-}
-
-function getBuiltinSkillPackageId(skill: Skill) {
-  return `builtin.${skill.lang}.${skill.createdAt}`;
 }
 
 function getSkillPackageId(skill: Skill) {
@@ -227,6 +230,9 @@ export function DiscoveryPage() {
   const [searchText, setSearchText] = useState("");
   const deferredSearchText = useDeferredValue(searchText);
   const skillRecords = useSkillStore((state) => state.skills);
+  const builtinOverrideRecords = useSkillStore(
+    (state) => state.builtinOverrides,
+  );
   const pluginRecords = usePluginStore((state) => state.plugins);
   const models = useAppConfig((state) => state.models);
   const hideBuiltinSkills = useAppConfig((state) => state.hideBuiltinSkills);
@@ -436,36 +442,22 @@ export function DiscoveryPage() {
   }, [currentLang, marketplaceReloadKey]);
 
   const skills = useMemo<Skill[]>(() => {
-    const userSkills = Object.values(skillRecords).sort(
-      (a, b) => b.createdAt - a.createdAt,
-    );
-    if (hideBuiltinSkills) return userSkills;
-
-    const enabledPackageIds = new Set(
-      userSkills.map((skill) => skill.packageId).filter(Boolean),
-    );
-    const seen = new Set<string>();
-    const builtinSkills = BUILTIN_SKILLS.filter((skill) => {
-      if (skill.lang !== getLang() || seen.has(skill.name)) return false;
-      seen.add(skill.name);
-      if (enabledPackageIds.has(getBuiltinSkillPackageId(skill as Skill))) {
-        return false;
-      }
-      return true;
-    }).map((skill) => {
-      const builtinSkill = skill as Skill;
-      return {
-        ...builtinSkill,
-        packageId: getBuiltinSkillPackageId(builtinSkill),
-        modelConfig: {
-          ...modelConfig,
-          ...builtinSkill.modelConfig,
-        },
-      };
+    return mergeVisibleSkills({
+      userSkills: getStoredUserSkills({
+        skills: skillRecords,
+        builtinOverrides: builtinOverrideRecords,
+      }),
+      hideBuiltinSkills,
+      lang: currentLang,
+      modelConfig,
     });
-
-    return [...userSkills, ...builtinSkills];
-  }, [hideBuiltinSkills, modelConfig, skillRecords]);
+  }, [
+    builtinOverrideRecords,
+    currentLang,
+    hideBuiltinSkills,
+    modelConfig,
+    skillRecords,
+  ]);
   const editingSkill = useMemo(
     () => skills.find((skill) => String(skill.id) === editingSkillId),
     [editingSkillId, skills],
@@ -484,7 +476,10 @@ export function DiscoveryPage() {
       communityToolServers,
     );
     const installedPackageIds = new Set(
-      Object.values(skillRecords)
+      getStoredUserSkills({
+        skills: skillRecords,
+        builtinOverrides: builtinOverrideRecords,
+      })
         .map((skill) => skill.packageId)
         .filter(Boolean),
     );
@@ -523,18 +518,19 @@ export function DiscoveryPage() {
             runtimeSummary || undefined,
           ].filter(Boolean) as string[],
           status:
-            !skill.builtin && runtime.status === "ready"
-              ? Locale.Discovery.Status.Enabled
+            runtime.status === "ready"
+              ? Locale.Discovery.Status.Available
               : runtime.status === "unavailable"
                 ? Locale.Discovery.Status.Unavailable
                 : Locale.Discovery.Status.Configurable,
           pricing: "free" as const,
-          runtime: "both" as const,
-          source: skill.builtin
-            ? Locale.Discovery.Source.Official
-            : Locale.Discovery.Source.Custom,
+          runtime: skillRuntime,
+          source:
+            skill.builtin || isBuiltinSkillOverride(skill)
+              ? Locale.Discovery.Source.Official
+              : Locale.Discovery.Source.Custom,
           path: Path.Skills,
-          installed: !skill.builtin,
+          installed: true,
           skill: runtimeSkill,
           runtimeStatus: runtime.status,
           runtimeResult: runtime,
@@ -600,12 +596,12 @@ export function DiscoveryPage() {
           ].filter(Boolean) as string[],
           status:
             runtime.status === "ready"
-              ? Locale.Discovery.Status.Installable
+              ? Locale.Discovery.Status.Available
               : runtime.status === "needs_config"
                 ? Locale.Discovery.Status.Configurable
                 : Locale.Discovery.Status.Unavailable,
           pricing: "free" as const,
-          runtime: "both" as const,
+          runtime: skillRuntime,
           source: Locale.Discovery.Source.Community,
           path: Path.Skills,
           installed: false,
@@ -651,7 +647,7 @@ export function DiscoveryPage() {
           .map((tag) => getMarketplaceTagLabel(tag, currentLang)),
         status,
         pricing: "free",
-        runtime: "local",
+        runtime: toolRuntime,
         source: officialToolIds.has(server.id)
           ? Locale.Discovery.Source.Official
           : Locale.Discovery.Source.Community,
@@ -731,6 +727,7 @@ export function DiscoveryPage() {
     models,
     officialToolPresetServers,
     plugins,
+    builtinOverrideRecords,
     skillRecords,
     skills,
     storageConfigured,
@@ -785,9 +782,9 @@ export function DiscoveryPage() {
     }
   };
 
-  const enableSkill = (skill: Skill) => {
+  const ensureSkillConfigRecord = (skill: Skill) => {
     const packageId = getSkillPackageId(skill);
-    const existingSkill = Object.values(useSkillStore.getState().skills).find(
+    const existingSkill = getStoredUserSkills(useSkillStore.getState()).find(
       (item) =>
         item.packageId === packageId ||
         (!item.builtin &&
@@ -803,6 +800,27 @@ export function DiscoveryPage() {
         packageId,
       })
     );
+  };
+
+  const openSkillConfig = (skill: Skill) => {
+    const editableSkill = skill.builtin
+      ? ensureSkillConfigRecord(skill)
+      : skill;
+    setEditingSkillId(String(editableSkill.id));
+  };
+
+  const getConfigurableSkill = (item: Capability) => {
+    if (item.type !== "skill") return undefined;
+    if (item.skill) return item.skill;
+    if (!item.skillPackage || !item.skillPackageLang) return undefined;
+
+    const skill = skillPackageToSkill(
+      item.skillPackage,
+      item.skillPackageLang,
+      modelConfig,
+    );
+    skill.packageId = item.skillPackage.id;
+    return ensureSkillConfigRecord(skill);
   };
 
   useEffect(() => {
@@ -1083,31 +1101,21 @@ export function DiscoveryPage() {
         modelConfig,
       );
       skill.packageId = item.skillPackage.id;
-      const installedSkill = useSkillStore.getState().create(skill);
 
       if (item.runtimeStatus === "ready") {
-        startSkill(installedSkill);
-      } else if (hasSkillToolRuntimeIssue(item.runtimeResult)) {
-        navigate(Path.ToolMarket);
+        startSkill(skill);
       } else {
-        openSkillConfig(installedSkill);
+        openSkillConfig(ensureSkillConfigRecord(skill));
       }
       return;
     }
 
     if (item.type === "skill" && item.skill) {
-      const enabledSkill = item.installed
-        ? item.skill
-        : enableSkill(item.skill);
       if (item.runtimeStatus !== "ready") {
-        if (hasSkillToolRuntimeIssue(item.runtimeResult)) {
-          navigate(Path.ToolMarket);
-          return;
-        }
-        openSkillConfig(enabledSkill);
+        openSkillConfig(item.skill);
         return;
       }
-      startSkill(enabledSkill);
+      startSkill(item.skill);
       return;
     }
     if (item.type === "storage") {
@@ -1117,22 +1125,11 @@ export function DiscoveryPage() {
     navigate(item.path);
   };
 
-  const openSkillConfig = (skill: Skill) => {
-    if (!skill.builtin) {
-      setEditingSkillId(String(skill.id));
-      return;
-    }
-
-    setEditingSkillId(String(enableSkill(skill).id));
-  };
-
   const getActionText = (item: Capability) => {
     if (item.type === "skill") {
-      if (item.skillPackage && !item.installed) return Locale.Discovery.Install;
-      if (!item.installed) return Locale.Discovery.Enable;
       return item.runtimeStatus === "ready"
         ? Locale.Discovery.Use
-        : Locale.Discovery.Manage;
+        : Locale.Discovery.Configure;
     }
     if (item.type === "tool") {
       if (!item.installed && item.presetServer?.configurable) {
@@ -1309,14 +1306,16 @@ export function DiscoveryPage() {
                       handleCapabilityAction(item);
                     }}
                   />
-                  {item.type === "skill" && item.skill && (
+                  {item.type === "skill" && (
                     <IconButton
                       icon={<EditIcon />}
                       text={Locale.Discovery.Configure}
                       bordered
                       onClick={(event) => {
                         event.stopPropagation();
-                        openSkillConfig(item.skill!);
+                        const skill = getConfigurableSkill(item);
+                        if (!skill) return;
+                        openSkillConfig(skill);
                       }}
                     />
                   )}
@@ -1384,9 +1383,9 @@ export function DiscoveryPage() {
               onClose={() => setEditingSkillId(undefined)}
             >
               <SkillConfig
-                mask={editingSkill}
-                updateMask={(updater) =>
-                  skillStore.updateMask(editingSkill.id, updater)
+                skill={editingSkill}
+                updateSkill={(updater) =>
+                  skillStore.updateSkill(editingSkill.id, updater)
                 }
                 readonly={editingSkill.builtin}
               />

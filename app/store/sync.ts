@@ -173,7 +173,7 @@ function collectCacheMediaUrls(appState: AppState) {
   for (const session of chatState.sessions) {
     collectMessageMediaUrls(session.messages as MessageLike[], mediaUrls);
     collectMessageMediaUrls(
-      session.mask?.context as MessageLike[] | undefined,
+      session.skill?.context as MessageLike[] | undefined,
       mediaUrls,
     );
   }
@@ -181,13 +181,21 @@ function collectCacheMediaUrls(appState: AppState) {
   const skillState = appState[StoreKey.Skill] as
     | ((typeof appState)[typeof StoreKey.Skill] & {
         masks?: Record<string, SkillLike>;
+        builtinOverrides?: Record<string, SkillLike>;
       })
     | undefined;
-  const skills = (skillState?.skills ?? skillState?.masks ?? {}) as Record<
-    string,
-    SkillLike
-  >;
-  for (const skill of Object.values(skills)) {
+  const skills = [
+    ...Object.values(
+      (skillState?.skills ?? skillState?.masks ?? {}) as Record<
+        string,
+        SkillLike
+      >,
+    ),
+    ...Object.values(
+      (skillState?.builtinOverrides ?? {}) as Record<string, SkillLike>,
+    ),
+  ];
+  for (const skill of skills) {
     collectMessageMediaUrls(skill.context, mediaUrls);
   }
 

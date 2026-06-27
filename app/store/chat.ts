@@ -120,8 +120,12 @@ export interface ChatSession {
   lastSummarizeIndex: number;
   clearContextIndex?: number;
 
-  mask: Skill;
+  skill: Skill;
 }
+
+type LegacyChatSession = ChatSession & {
+  mask?: Skill;
+};
 
 export const DEFAULT_TOPIC = "通用问答";
 export const BOT_HELLO: ChatMessage = createMessage({
@@ -144,7 +148,7 @@ function createEmptySession(): ChatSession {
     lastUpdate: Date.now(),
     lastSummarizeIndex: 0,
 
-    mask: createEmptySkill("cn"),
+    skill: createEmptySkill("cn"),
   };
 }
 
@@ -160,20 +164,20 @@ function getGeneralBuiltinSkill(lang = getLang()) {
 }
 
 function normalizeLegacyPlainChatSession(session: ChatSession) {
-  if (!isPlainChatSkill(session.mask)) return;
-  if (!isLegacyPlainChatMaskName(session.mask.name)) return;
+  if (!isPlainChatSkill(session.skill)) return;
+  if (!isLegacyPlainChatMaskName(session.skill.name)) return;
 
-  const generalSkill = getGeneralBuiltinSkill(session.mask.lang || getLang());
+  const generalSkill = getGeneralBuiltinSkill(session.skill.lang || getLang());
   if (!generalSkill) return;
 
   const currentModelConfig = disablePlainChatReasoning(
-    session.mask.modelConfig,
+    session.skill.modelConfig,
   );
-  session.mask = {
+  session.skill = {
     ...generalSkill,
     modelConfig: currentModelConfig,
     syncGlobalConfig:
-      session.mask.syncGlobalConfig ?? generalSkill.syncGlobalConfig,
+      session.skill.syncGlobalConfig ?? generalSkill.syncGlobalConfig,
   };
 
   if (isLegacyPlainChatMaskName(session.topic)) {
@@ -285,6 +289,7 @@ function resolveRuntimeModelRouting(
     requestProvider,
     endpointPath,
     supportedEndpoints,
+    specification: selectedModel?.specification,
     ownedBy: selectedModel?.ownedBy,
     tags: selectedModel?.tags,
   };
@@ -423,10 +428,10 @@ export const useChatStore = createPersistStore(
           ...msg,
           id: nanoid(), // 生成新的消息 ID
         }));
-        newSession.mask = {
-          ...currentSession.mask,
+        newSession.skill = {
+          ...currentSession.skill,
           modelConfig: {
-            ...currentSession.mask.modelConfig,
+            ...currentSession.skill.modelConfig,
           },
         };
 
@@ -550,7 +555,7 @@ export const useChatStore = createPersistStore(
             nextModelConfig.tags = preferredCandidateModel.tags;
           }
 
-          session.mask = {
+          session.skill = {
             ...skill,
             candidateModels,
             syncGlobalConfig: shouldSyncFromGlobal,
@@ -678,15 +683,15 @@ export const useChatStore = createPersistStore(
           return;
         }
         const session = get().currentSession();
-        const modelConfig = isPlainChatSkill(session.mask)
-          ? disablePlainChatReasoning(session.mask.modelConfig)
-          : session.mask.modelConfig;
+        const modelConfig = isPlainChatSkill(session.skill)
+          ? disablePlainChatReasoning(session.skill.modelConfig)
+          : session.skill.modelConfig;
         if (
-          isPlainChatSkill(session.mask) &&
-          session.mask.modelConfig.reasoningMode !== modelConfig.reasoningMode
+          isPlainChatSkill(session.skill) &&
+          session.skill.modelConfig.reasoningMode !== modelConfig.reasoningMode
         ) {
           get().updateTargetSession(session, (session) => {
-            session.mask.modelConfig = modelConfig;
+            session.skill.modelConfig = modelConfig;
           });
         }
         const normalizedAttachments = attachments ?? [];
@@ -769,6 +774,7 @@ export const useChatStore = createPersistStore(
             providerName: routing.requestProvider,
             endpointPath: routing.endpointPath,
             supportedEndpoints: routing.supportedEndpoints,
+            specification: routing.specification,
             ownedBy: routing.ownedBy,
             tags: routing.tags,
             stream: true,
@@ -859,19 +865,19 @@ export const useChatStore = createPersistStore(
 
       async getMessagesWithMemory() {
         const session = get().currentSession();
-        const modelConfig = session.mask.modelConfig;
+        const modelConfig = session.skill.modelConfig;
         const clearContextIndex = session.clearContextIndex ?? 0;
         const messages = session.messages.slice();
         const totalMessageCount = session.messages.length;
 
         // in-context prompts
-        const contextPrompts = session.mask.context.slice();
+        const contextPrompts = session.skill.context.slice();
 
         // system prompts, to get close to OpenAI Web ChatGPT
         const shouldInjectSystemPrompts =
           modelConfig.enableInjectSystemPrompts &&
-          (session.mask.modelConfig.model.startsWith("gpt-") ||
-            session.mask.modelConfig.model.startsWith("chatgpt-"));
+          (session.skill.modelConfig.model.startsWith("gpt-") ||
+            session.skill.modelConfig.model.startsWith("chatgpt-"));
 
         const toolRuntimeEnabled = await isToolRuntimeEnabled();
         const nativeToolBridgeEnabled = shouldUseNativeToolBridge({
@@ -995,7 +1001,7 @@ export const useChatStore = createPersistStore(
       ) {
         const config = useAppConfig.getState();
         const session = targetSession;
-        const modelConfig = session.mask.modelConfig;
+        const modelConfig = session.skill.modelConfig;
         const currentRouting = resolveRuntimeModelRouting(
           modelConfig.model,
           modelConfig.providerName,
@@ -1008,8 +1014,8 @@ export const useChatStore = createPersistStore(
         const [model, providerName] = modelConfig.compressModel
           ? [modelConfig.compressModel, modelConfig.compressProviderName]
           : getSummarizeModel(
-              session.mask.modelConfig.model,
-              session.mask.modelConfig.providerName,
+              session.skill.modelConfig.model,
+              session.skill.modelConfig.providerName,
             );
         const summarizeProviderName =
           (providerName as ServiceProvider) || ServiceProvider.OpenAI;
@@ -1052,6 +1058,7 @@ export const useChatStore = createPersistStore(
                 providerName: summarizeRouting.requestProvider,
                 endpointPath: summarizeRouting.endpointPath,
                 supportedEndpoints: summarizeRouting.supportedEndpoints,
+                specification: summarizeRouting.specification,
                 ownedBy: summarizeRouting.ownedBy,
                 tags: summarizeRouting.tags,
               },
@@ -1123,6 +1130,7 @@ export const useChatStore = createPersistStore(
               providerName: summarizeRouting.requestProvider,
               endpointPath: summarizeRouting.endpointPath,
               supportedEndpoints: summarizeRouting.supportedEndpoints,
+              specification: summarizeRouting.specification,
               ownedBy: summarizeRouting.ownedBy,
               tags: summarizeRouting.tags,
             },
@@ -1221,12 +1229,21 @@ export const useChatStore = createPersistStore(
   },
   {
     name: StoreKey.Chat,
-    version: 3.8,
+    version: 3.9,
     migrate(persistedState, version) {
       const state = persistedState as any;
       const newState = JSON.parse(
         JSON.stringify(state),
-      ) as typeof DEFAULT_CHAT_STATE;
+      ) as typeof DEFAULT_CHAT_STATE & {
+        sessions: LegacyChatSession[];
+      };
+
+      newState.sessions.forEach((session: LegacyChatSession) => {
+        if (!session.skill && session.mask) {
+          session.skill = session.mask;
+        }
+        delete session.mask;
+      });
 
       if (version < 2) {
         newState.sessions = [];
@@ -1236,9 +1253,9 @@ export const useChatStore = createPersistStore(
           const newSession = createEmptySession();
           newSession.topic = oldSession.topic;
           newSession.messages = [...oldSession.messages];
-          newSession.mask.modelConfig.sendMemory = true;
-          newSession.mask.modelConfig.historyMessageCount = 4;
-          newSession.mask.modelConfig.compressMessageLengthThreshold = 1000;
+          newSession.skill.modelConfig.sendMemory = true;
+          newSession.skill.modelConfig.historyMessageCount = 4;
+          newSession.skill.modelConfig.compressMessageLengthThreshold = 1000;
           newState.sessions.push(newSession);
         }
       }
@@ -1257,12 +1274,12 @@ export const useChatStore = createPersistStore(
         newState.sessions.forEach((s) => {
           if (
             // Exclude those already set by user
-            !s.mask.modelConfig.hasOwnProperty("enableInjectSystemPrompts")
+            !s.skill.modelConfig.hasOwnProperty("enableInjectSystemPrompts")
           ) {
             // Because users may have changed this configuration,
             // the user's current configuration is used instead of the default
             const config = useAppConfig.getState();
-            s.mask.modelConfig.enableInjectSystemPrompts =
+            s.skill.modelConfig.enableInjectSystemPrompts =
               config.modelConfig.enableInjectSystemPrompts;
           }
         });
@@ -1272,8 +1289,8 @@ export const useChatStore = createPersistStore(
       if (version < 3.2) {
         newState.sessions.forEach((s) => {
           const config = useAppConfig.getState();
-          s.mask.modelConfig.compressModel = config.modelConfig.compressModel;
-          s.mask.modelConfig.compressProviderName =
+          s.skill.modelConfig.compressModel = config.modelConfig.compressModel;
+          s.skill.modelConfig.compressProviderName =
             config.modelConfig.compressProviderName;
         });
       }
@@ -1281,8 +1298,8 @@ export const useChatStore = createPersistStore(
       if (version < 3.3) {
         newState.sessions.forEach((s) => {
           const config = useAppConfig.getState();
-          s.mask.modelConfig.compressModel = "";
-          s.mask.modelConfig.compressProviderName = "";
+          s.skill.modelConfig.compressModel = "";
+          s.skill.modelConfig.compressProviderName = "";
         });
       }
       if (version < 3.4) {
@@ -1296,8 +1313,8 @@ export const useChatStore = createPersistStore(
           s.messages.forEach((m) => {
             m.content = normalizeMessageContent(m.content);
           });
-          if (Array.isArray(s.mask?.context)) {
-            s.mask.context = s.mask.context.map((m) => ({
+          if (Array.isArray(s.skill?.context)) {
+            s.skill.context = s.skill.context.map((m) => ({
               ...m,
               content: normalizeMessageContent(m.content),
             }));

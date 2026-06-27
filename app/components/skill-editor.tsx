@@ -1,7 +1,7 @@
 import { IconButton } from "./button";
 import { ErrorBoundary } from "./error";
 
-import styles from "./mask.module.scss";
+import styles from "./skill-editor.module.scss";
 
 import DownloadIcon from "../icons/download.svg";
 import UploadIcon from "../icons/upload.svg";
@@ -17,10 +17,12 @@ import {
   DEFAULT_SKILL_AVATAR,
   Skill,
   allowSkillNativeToolBridge,
+  getStoredUserSkills,
   getSkillBuiltInTools,
   getSkillToolServers,
   getSkillSessionToolbar,
   getLaunchableSkills,
+  mergeVisibleSkills,
   syncSkillLegacyPlugin,
   useSkillStore,
 } from "../store/skill";
@@ -49,7 +51,7 @@ import {
   showConfirm,
 } from "./ui-lib";
 import { Avatar, AvatarPicker } from "./emoji";
-import Locale, { AllLangs, ALL_LANG_OPTIONS, Lang } from "../locales";
+import Locale, { AllLangs, ALL_LANG_OPTIONS, getLang, Lang } from "../locales";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import chatStyle from "./chat.module.scss";
@@ -315,17 +317,15 @@ export function SkillAvatar(props: { avatar: string; model?: ModelType }) {
   return useEmoji ? <Avatar avatar={props.avatar} /> : <Avatar model={model} />;
 }
 
-export const MaskAvatar = SkillAvatar;
-
 export function SkillConfig(props: {
-  mask: Skill;
-  updateMask: Updater<Skill>;
+  skill: Skill;
+  updateSkill: Updater<Skill>;
   extraListItems?: ReactNode;
   readonly?: boolean;
   shouldSyncFromGlobal?: boolean;
   modelOptions?: LLMModel[];
 }) {
-  const skill = props.mask;
+  const skill = props.skill;
   const [showPicker, setShowPicker] = useState(false);
   const [showCandidateModelSelector, setShowCandidateModelSelector] =
     useState(false);
@@ -411,10 +411,10 @@ export function SkillConfig(props: {
 
     const config = { ...skill.modelConfig };
     updater(config);
-    props.updateMask((mask) => {
-      mask.modelConfig = config;
+    props.updateSkill((skill) => {
+      skill.modelConfig = config;
       // if user changed current session mask, it will disable auto sync
-      mask.syncGlobalConfig = false;
+      skill.syncGlobalConfig = false;
     });
   };
 
@@ -423,8 +423,8 @@ export function SkillConfig(props: {
 
     const config = createDefaultRealtimeConfig(skill.realtimeConfig);
     updater(config);
-    props.updateMask((mask) => {
-      mask.realtimeConfig = config;
+    props.updateSkill((skill) => {
+      skill.realtimeConfig = config;
     });
   };
 
@@ -480,7 +480,7 @@ export function SkillConfig(props: {
           updateContext={(updater) => {
             const context = skill.context.slice();
             updater(context);
-            props.updateMask((mask) => (mask.context = context));
+            props.updateSkill((skill) => (skill.context = context));
           }}
         />
       )}
@@ -491,7 +491,7 @@ export function SkillConfig(props: {
             content={
               <AvatarPicker
                 onEmojiClick={(emoji) => {
-                  props.updateMask((mask) => (mask.avatar = emoji));
+                  props.updateSkill((skill) => (skill.avatar = emoji));
                   setShowPicker(false);
                 }}
               ></AvatarPicker>
@@ -518,8 +518,8 @@ export function SkillConfig(props: {
             type="text"
             value={skill.name}
             onInput={(e) =>
-              props.updateMask((mask) => {
-                mask.name = e.currentTarget.value;
+              props.updateSkill((skill) => {
+                skill.name = e.currentTarget.value;
               })
             }
           ></input>
@@ -569,9 +569,9 @@ export function SkillConfig(props: {
             type="checkbox"
             checked={allowNativeToolBridge}
             onChange={(e) => {
-              props.updateMask((mask) => {
-                mask.toolStrategy = {
-                  ...mask.toolStrategy,
+              props.updateSkill((skill) => {
+                skill.toolStrategy = {
+                  ...skill.toolStrategy,
                   nativeToolBridge: e.currentTarget.checked ? "auto" : "off",
                 };
               });
@@ -587,8 +587,8 @@ export function SkillConfig(props: {
             type="checkbox"
             checked={skill.hideContext}
             onChange={(e) => {
-              props.updateMask((mask) => {
-                mask.hideContext = e.currentTarget.checked;
+              props.updateSkill((skill) => {
+                skill.hideContext = e.currentTarget.checked;
               });
             }}
           ></input>
@@ -604,8 +604,8 @@ export function SkillConfig(props: {
               type="checkbox"
               checked={skill.enableArtifacts !== false}
               onChange={(e) => {
-                props.updateMask((mask) => {
-                  mask.enableArtifacts = e.currentTarget.checked;
+                props.updateSkill((skill) => {
+                  skill.enableArtifacts = e.currentTarget.checked;
                 });
               }}
             ></input>
@@ -621,8 +621,8 @@ export function SkillConfig(props: {
               type="checkbox"
               checked={skill.enableCodeFold !== false}
               onChange={(e) => {
-                props.updateMask((mask) => {
-                  mask.enableCodeFold = e.currentTarget.checked;
+                props.updateSkill((skill) => {
+                  skill.enableCodeFold = e.currentTarget.checked;
                 });
               }}
             ></input>
@@ -658,13 +658,13 @@ export function SkillConfig(props: {
                   checked &&
                   (await showConfirm(Locale.Mask.Config.Sync.Confirm))
                 ) {
-                  props.updateMask((mask) => {
-                    mask.syncGlobalConfig = checked;
-                    mask.modelConfig = { ...globalConfig.modelConfig };
+                  props.updateSkill((skill) => {
+                    skill.syncGlobalConfig = checked;
+                    skill.modelConfig = { ...globalConfig.modelConfig };
                   });
                 } else if (!checked) {
-                  props.updateMask((mask) => {
-                    mask.syncGlobalConfig = checked;
+                  props.updateSkill((skill) => {
+                    skill.syncGlobalConfig = checked;
                   });
                 }
               }}
@@ -706,9 +706,9 @@ export function SkillConfig(props: {
                 };
               }),
             );
-            props.updateMask((mask) => {
-              mask.candidateModels = candidates;
-              mask.syncGlobalConfig = false;
+            props.updateSkill((skill) => {
+              skill.candidateModels = candidates;
+              skill.syncGlobalConfig = false;
             });
           }}
         />
@@ -720,12 +720,12 @@ export function SkillConfig(props: {
           items={builtInToolSelectorItems}
           onClose={() => setShowBuiltInToolSelector(false)}
           onSelection={(selection) => {
-            props.updateMask((mask) => {
-              mask.tools = {
-                ...mask.tools,
+            props.updateSkill((skill) => {
+              skill.tools = {
+                ...skill.tools,
                 builtInTools: selection,
               };
-              syncSkillLegacyPlugin(mask);
+              syncSkillLegacyPlugin(skill);
             });
           }}
         />
@@ -737,12 +737,12 @@ export function SkillConfig(props: {
           items={toolServerSelectorItems}
           onClose={() => setShowToolServerSelector(false)}
           onSelection={(selection) => {
-            props.updateMask((mask) => {
-              mask.tools = {
-                ...mask.tools,
+            props.updateSkill((skill) => {
+              skill.tools = {
+                ...skill.tools,
                 toolServers: selection,
               };
-              syncSkillLegacyPlugin(mask);
+              syncSkillLegacyPlugin(skill);
             });
           }}
         />
@@ -750,8 +750,6 @@ export function SkillConfig(props: {
     </>
   );
 }
-
-export const MaskConfig = SkillConfig;
 
 function ContextPromptItem(props: {
   index: number;
@@ -942,12 +940,25 @@ export function SkillPage() {
   const skillStore = useSkillStore();
   const chatStore = useChatStore();
   const sdStore = useSdStore();
+  const config = useAppConfig();
+  const skillRecords = useSkillStore((state) => state.skills);
+  const builtinOverrideRecords = useSkillStore(
+    (state) => state.builtinOverrides,
+  );
 
   const filterLang = skillStore.language;
 
-  const allSkills = getLaunchableSkills(skillStore.getAll()).filter(
-    (m) => !filterLang || m.lang === filterLang,
-  );
+  const allSkills = getLaunchableSkills(
+    mergeVisibleSkills({
+      userSkills: getStoredUserSkills({
+        skills: skillRecords,
+        builtinOverrides: builtinOverrideRecords,
+      }),
+      hideBuiltinSkills: config.hideBuiltinSkills,
+      lang: getLang(),
+      modelConfig: config.modelConfig,
+    }),
+  ).filter((m) => !filterLang || m.lang === filterLang);
 
   const [searchText, setSearchText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -980,6 +991,14 @@ export function SkillPage() {
       return matchCategory && (!keyword || haystack.includes(keyword));
     });
   }, [allSkills, searchText, selectedCategory]);
+  const builtinSkills = useMemo(
+    () => skills.filter((skill) => skill.builtin),
+    [skills],
+  );
+  const localSkills = useMemo(
+    () => skills.filter((skill) => !skill.builtin),
+    [skills],
+  );
 
   const [editingSkillId, setEditingSkillId] = useState<string | undefined>();
   const editingSkill =
@@ -1039,6 +1058,82 @@ export function SkillPage() {
         }
       } catch {}
     });
+  };
+
+  const renderSkillGrid = (sectionSkills: Skill[], emptyText: string) => {
+    if (sectionSkills.length === 0) {
+      return <div className={styles["mask-empty"]}>{emptyText}</div>;
+    }
+
+    return (
+      <div className={styles["mask-grid"]}>
+        {sectionSkills.map((m) => (
+          <div className={styles["mask-item"]} key={m.id}>
+            <div className={styles["mask-header"]}>
+              <div className={styles["mask-icon"]}>
+                <SkillAvatar avatar={m.avatar} model={m.modelConfig.model} />
+              </div>
+              <div className={styles["mask-title"]}>
+                <div className={styles["mask-name"]}>{m.name}</div>
+                {m.category && (
+                  <div className={styles["mask-category"]}>{m.category}</div>
+                )}
+                {m.description && (
+                  <div className={styles["mask-description"]}>
+                    {m.description}
+                  </div>
+                )}
+                <div className={clsx(styles["mask-info"], "one-line")}>
+                  {`${Locale.Mask.Item.Info(m.context.length)} / ${
+                    ALL_LANG_OPTIONS[m.lang]
+                  } / ${m.modelConfig.model}`}
+                </div>
+                {!!m.starters?.length && (
+                  <div className={styles["mask-starters"]}>
+                    {m.starters.slice(0, 2).map((starter) => (
+                      <div key={starter} className={styles["mask-starter"]}>
+                        {starter}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className={styles["mask-actions"]}>
+              <IconButton
+                icon={<AddIcon />}
+                text={Locale.Mask.Item.Chat}
+                onClick={() => startSkill(m)}
+              />
+              {m.builtin ? (
+                <IconButton
+                  icon={<EyeIcon />}
+                  text={Locale.Mask.Item.View}
+                  onClick={() => setEditingSkillId(m.id)}
+                />
+              ) : (
+                <IconButton
+                  icon={<EditIcon />}
+                  text={Locale.Mask.Item.Edit}
+                  onClick={() => setEditingSkillId(m.id)}
+                />
+              )}
+              {!m.builtin && (
+                <IconButton
+                  icon={<DeleteIcon />}
+                  text={Locale.Mask.Item.Delete}
+                  onClick={async () => {
+                    if (await showConfirm(Locale.Mask.Item.DeleteConfirm)) {
+                      skillStore.delete(m.id);
+                    }
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -1151,83 +1246,35 @@ export function SkillPage() {
             </div>
           )}
 
-          <div className={styles["mask-grid"]}>
-            {skills.map((m) => (
-              <div className={styles["mask-item"]} key={m.id}>
-                <div className={styles["mask-header"]}>
-                  <div className={styles["mask-icon"]}>
-                    <SkillAvatar
-                      avatar={m.avatar}
-                      model={m.modelConfig.model}
-                    />
+          {skills.length === 0 ? (
+            <div className={styles["mask-empty"]}>{Locale.Mask.Page.Empty}</div>
+          ) : (
+            <div className={styles["mask-sections"]}>
+              <section className={styles["mask-section"]}>
+                <div className={styles["mask-section-header"]}>
+                  <div className={styles["mask-section-title"]}>
+                    {Locale.Mask.Page.BuiltinSection}
                   </div>
-                  <div className={styles["mask-title"]}>
-                    <div className={styles["mask-name"]}>{m.name}</div>
-                    {m.category && (
-                      <div className={styles["mask-category"]}>
-                        {m.category}
-                      </div>
-                    )}
-                    {m.description && (
-                      <div className={styles["mask-description"]}>
-                        {m.description}
-                      </div>
-                    )}
-                    <div className={clsx(styles["mask-info"], "one-line")}>
-                      {`${Locale.Mask.Item.Info(m.context.length)} / ${
-                        ALL_LANG_OPTIONS[m.lang]
-                      } / ${m.modelConfig.model}`}
-                    </div>
-                    {!!m.starters?.length && (
-                      <div className={styles["mask-starters"]}>
-                        {m.starters.slice(0, 2).map((starter) => (
-                          <div key={starter} className={styles["mask-starter"]}>
-                            {starter}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  <div className={styles["mask-section-desc"]}>
+                    {Locale.Mask.Page.BuiltinSectionDesc}
                   </div>
                 </div>
-                <div className={styles["mask-actions"]}>
-                  <IconButton
-                    icon={<AddIcon />}
-                    text={Locale.Mask.Item.Chat}
-                    onClick={() => startSkill(m)}
-                  />
-                  {m.builtin ? (
-                    <IconButton
-                      icon={<EyeIcon />}
-                      text={Locale.Mask.Item.View}
-                      onClick={() => setEditingSkillId(m.id)}
-                    />
-                  ) : (
-                    <IconButton
-                      icon={<EditIcon />}
-                      text={Locale.Mask.Item.Edit}
-                      onClick={() => setEditingSkillId(m.id)}
-                    />
-                  )}
-                  {!m.builtin && (
-                    <IconButton
-                      icon={<DeleteIcon />}
-                      text={Locale.Mask.Item.Delete}
-                      onClick={async () => {
-                        if (await showConfirm(Locale.Mask.Item.DeleteConfirm)) {
-                          skillStore.delete(m.id);
-                        }
-                      }}
-                    />
-                  )}
+                {renderSkillGrid(builtinSkills, Locale.Mask.Page.BuiltinEmpty)}
+              </section>
+
+              <section className={styles["mask-section"]}>
+                <div className={styles["mask-section-header"]}>
+                  <div className={styles["mask-section-title"]}>
+                    {Locale.Mask.Page.LocalSection}
+                  </div>
+                  <div className={styles["mask-section-desc"]}>
+                    {Locale.Mask.Page.LocalSectionDesc}
+                  </div>
                 </div>
-              </div>
-            ))}
-            {skills.length === 0 && (
-              <div className={styles["mask-empty"]}>
-                {Locale.Mask.Page.Empty}
-              </div>
-            )}
-          </div>
+                {renderSkillGrid(localSkills, Locale.Mask.Page.LocalEmpty)}
+              </section>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1263,9 +1310,9 @@ export function SkillPage() {
             ]}
           >
             <SkillConfig
-              mask={editingSkill}
-              updateMask={(updater) =>
-                skillStore.updateMask(editingSkillId!, updater)
+              skill={editingSkill}
+              updateSkill={(updater) =>
+                skillStore.updateSkill(editingSkillId!, updater)
               }
               readonly={editingSkill.builtin}
             />

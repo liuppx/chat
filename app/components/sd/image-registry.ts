@@ -49,8 +49,7 @@ function buildRuntimeImageModelForMode(
 ): ImageModelDefinition | null {
   const tags = Array.isArray(model.tags) ? model.tags : [];
   const endpoints = normalizeSupportedEndpoints(model.supportedEndpoints);
-  const modelType = model.modelType?.trim().toLowerCase();
-  if (!tags.includes("image") && modelType !== "image") return null;
+  if (!tags.includes("image")) return null;
   const endpointType: ImageEndpointType =
     mode === "editing" ? "images-edits" : "images-generation";
   const isSupported =
