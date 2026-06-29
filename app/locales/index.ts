@@ -24,6 +24,10 @@ export const ALL_LANG_OPTIONS: Record<Lang, string> = {
   en: "English",
 };
 
+export function getLocaleByLang(lang: Lang): LocaleType {
+  return ALL_LANGS[lang] as LocaleType;
+}
+
 const fallbackLang = en;
 const targetLang = ALL_LANGS[getLang()] as LocaleType;
 

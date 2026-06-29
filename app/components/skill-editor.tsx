@@ -51,7 +51,13 @@ import {
   showConfirm,
 } from "./ui-lib";
 import { Avatar, AvatarPicker } from "./emoji";
-import Locale, { AllLangs, ALL_LANG_OPTIONS, getLang, Lang } from "../locales";
+import Locale, {
+  AllLangs,
+  ALL_LANG_OPTIONS,
+  getLang,
+  getLocaleByLang,
+  Lang,
+} from "../locales";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import chatStyle from "./chat.module.scss";
@@ -139,7 +145,7 @@ function useSkillPackage(skill: Skill) {
 }
 
 function getSkillPackageLabels(lang: Lang) {
-  return (lang === "cn" ? cn : en).Skill.Package.Labels;
+  return getLocaleByLang(lang).Skill.Package.Labels;
 }
 
 function getSkillRuntimeText(
@@ -404,7 +410,7 @@ export function SkillConfig(props: {
       {props.readonly ? (
         <List>
           <ListItem
-            title={(skill.lang === "cn" ? cn : en).Skill.Package.Title}
+            title={getLocaleByLang(skill.lang).Skill.Package.Title}
             vertical
           >
             <SkillPackageSummary skill={skill} />
