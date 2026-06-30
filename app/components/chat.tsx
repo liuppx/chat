@@ -165,6 +165,8 @@ const Markdown = dynamic(async () => (await import("./markdown")).Markdown, {
   loading: () => <LoadingIcon />,
 });
 
+const ROUTER_TOKEN_REQUIRED_ERROR = "请先在 Router 页面选择可用令牌";
+
 const ToolAction = () => {
   const navigate = useNavigate();
   const [count, setCount] = useState<number>(0);
@@ -1233,6 +1235,17 @@ function ChatView() {
     action: "token" | "select" | "recharge" | "renew" | "disabled",
   ) =>
     `${Path.Router}?redirect=${encodeURIComponent(Path.Chat)}&action=${action}`;
+  const shouldShowRouterTokenAction = (message: RenderMessage) => {
+    if (!message.isError || message.role === "user") return false;
+
+    const content = getMessageTextContent(message);
+    return (
+      content.includes(ROUTER_TOKEN_REQUIRED_ERROR) ||
+      content.includes(Locale.Chat.RouterPrompt.MissingToken)
+    );
+  };
+  const getRouterTokenErrorContent = () =>
+    `${ROUTER_TOKEN_REQUIRED_ERROR}，[${Locale.Chat.RouterPrompt.Action}](/#${buildRouterRedirectTarget("select")})。`;
   const hasRouterToken = useAccessStore(
     (state) => state.selectedRouterToken.trim().length > 0,
   );
@@ -2019,6 +2032,11 @@ function ChatView() {
                     ) && !isContext;
                   const showTyping = message.preview || message.streaming;
                   const messageImages = getMessageImages(message);
+                  const showRouterTokenAction =
+                    shouldShowRouterTokenAction(message);
+                  const messageTextContent = showRouterTokenAction
+                    ? getRouterTokenErrorContent()
+                    : getMessageTextContent(message);
 
                   const shouldShowClearContextDivider =
                     i === clearContextIndex - 1;
@@ -2197,7 +2215,7 @@ function ChatView() {
                           <div className={styles["chat-message-item"]}>
                             <Markdown
                               key={message.streaming ? "loading" : "done"}
-                              content={getMessageTextContent(message)}
+                              content={messageTextContent}
                               loading={
                                 (message.preview || message.streaming) &&
                                 getMessageContentLength(message) === 0 &&

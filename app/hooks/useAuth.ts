@@ -19,7 +19,7 @@ export function useAuth(options?: { notify?: boolean }) {
       if (localStorage.getItem("hasConnectedWallet") === "false") {
         if (!cancelled && token === checkToken) {
           if (shouldNotifyWalletMissing) {
-            notifyError("❌未检测到钱包，请先安装并连接钱包");
+            notifyError("未检测到钱包，请先安装并连接钱包");
           }
           setIsAuthenticated(false);
         }
@@ -30,7 +30,7 @@ export function useAuth(options?: { notify?: boolean }) {
       if (!valid) {
         setIsAuthenticated(false);
         if (shouldNotify) {
-          notifyError("❌未完成授权，请连接钱包完成 UCAN 授权");
+          notifyError("未完成授权，请连接钱包完成 UCAN 授权");
         }
         return;
       }

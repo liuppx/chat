@@ -9,7 +9,6 @@ import {
   focusPendingApproval,
   getProvider,
   requestAccounts,
-  getPreferredAccount,
   getChainId as getChainIdFromSdk,
   getBalance as getBalanceFromSdk,
   watchProvider,
@@ -79,8 +78,65 @@ let listenersReady = false;
 let loginInFlight = false;
 let logoutInFlight = false;
 
+export type WalletLoginAccountResolution =
+  | {
+      status: "pending";
+      provider: Eip1193Provider;
+      account: null;
+      walletAccount: null;
+      expectedAccount: string | null;
+      accounts: string[];
+    }
+  | {
+      status: "wallet";
+      provider: Eip1193Provider;
+      account: string;
+      walletAccount: string;
+      expectedAccount: null;
+      accounts: string[];
+    }
+  | {
+      status: "matched";
+      provider: Eip1193Provider;
+      account: string;
+      walletAccount: string;
+      expectedAccount: string;
+      accounts: string[];
+    }
+  | {
+      status: "mismatch";
+      provider: Eip1193Provider;
+      account: null;
+      walletAccount: string;
+      expectedAccount: string;
+      accounts: string[];
+    }
+  | {
+      status: "unavailable";
+      provider: Eip1193Provider;
+      account: null;
+      walletAccount: null;
+      expectedAccount: string | null;
+      accounts: string[];
+    };
+
 function getUcanIssuer(address: string) {
   return `did:pkh:eth:${address.toLowerCase()}`;
+}
+
+function normalizeAccount(account?: string | null) {
+  const normalized = (account || "").trim();
+  return normalized || null;
+}
+
+function isSameAccount(left?: string | null, right?: string | null) {
+  const normalizedLeft = normalizeAccount(left);
+  const normalizedRight = normalizeAccount(right);
+  return Boolean(
+    normalizedLeft &&
+    normalizedRight &&
+    normalizedLeft.toLowerCase() === normalizedRight.toLowerCase(),
+  );
 }
 
 export function isUcanMetaAuthorized(): boolean {
@@ -210,7 +266,7 @@ async function resolveProvider(options?: {
 async function requireProvider(): Promise<Eip1193Provider> {
   const provider = await resolveProvider({ refresh: true });
   if (!provider) {
-    throw new Error("❌未检测到钱包");
+    throw new Error("未检测到钱包");
   }
   return provider;
 }
@@ -342,49 +398,101 @@ export async function initWalletListeners(options?: { refresh?: boolean }) {
 export async function waitForWallet() {
   const provider = await resolveProvider({ refresh: true });
   if (!provider) {
-    throw new Error("❌未检测到钱包");
+    throw new Error("未检测到钱包");
   }
   return provider;
+}
+
+export async function resolveWalletLoginAccount(
+  preferredAccount?: string | null,
+): Promise<WalletLoginAccountResolution> {
+  const provider = await requireProvider();
+  const focused = await focusPendingWalletApproval(provider);
+  if (focused) {
+    return {
+      status: "pending",
+      provider,
+      account: null,
+      walletAccount: null,
+      expectedAccount: normalizeAccount(preferredAccount),
+      accounts: [],
+    };
+  }
+
+  const accounts = await requestAccounts({ provider, dedupe: true });
+  const walletAccount = normalizeAccount(accounts[0]);
+  const expectedAccount = normalizeAccount(preferredAccount);
+
+  if (!walletAccount) {
+    return {
+      status: "unavailable",
+      provider,
+      account: null,
+      walletAccount: null,
+      expectedAccount,
+      accounts,
+    };
+  }
+
+  if (!expectedAccount) {
+    return {
+      status: "wallet",
+      provider,
+      account: walletAccount,
+      walletAccount,
+      expectedAccount: null,
+      accounts,
+    };
+  }
+
+  if (isSameAccount(expectedAccount, walletAccount)) {
+    return {
+      status: "matched",
+      provider,
+      account: walletAccount,
+      walletAccount,
+      expectedAccount,
+      accounts,
+    };
+  }
+
+  return {
+    status: "mismatch",
+    provider,
+    account: null,
+    walletAccount,
+    expectedAccount,
+    accounts,
+  };
 }
 
 // 连接钱包
 export async function connectWallet(preferredAccount?: string) {
   try {
     try {
-      const provider = await requireProvider();
-      if (await focusPendingWalletApproval(provider)) {
+      const resolution = await resolveWalletLoginAccount(preferredAccount);
+      if (resolution.status === "pending") {
         return;
       }
-      const accounts = await requestAccounts({ provider, dedupe: true });
-      if (Array.isArray(accounts) && accounts.length > 0) {
-        const preferred = preferredAccount?.trim().toLowerCase();
-        let currentAccount =
-          (
-            await getPreferredAccount({
-              provider,
-              storageKey: "currentAccount",
-              autoConnect: false,
-            })
-          ).account || accounts[0];
-        if (preferred) {
-          const matchedAccount = accounts.find(
-            (account) => account.toLowerCase() === preferred,
-          );
-          if (!matchedAccount) {
-            notifyError("❌请在钱包中切换到选中的账户");
-            return;
-          }
-          currentAccount = matchedAccount;
+      if (resolution.status === "unavailable") {
+        if (resolution.accounts.length === 0) {
+          notifyError("未获取到账户");
         }
+        return;
+      }
+      if (resolution.status === "mismatch") {
+        notifyError("请在钱包中切换到选中的账户");
+        return;
+      }
+      const currentAccount = resolution.account;
+      if (currentAccount) {
         localStorage.setItem("currentAccount", currentAccount);
         setUcanAuthMode(UCAN_AUTH_MODE_WALLET, { emit: false });
         clearCentralUcanAuth({ preserveMode: true, emit: false });
-        await loginWithUcan(provider, currentAccount, {
+        await loginWithUcan(resolution.provider, currentAccount, {
           silent: false,
           reload: false,
         });
-      } else {
-        notifyError("❌未获取到账户");
       }
     } catch (error) {
       // 类型守卫：判断是否为具有 message 和 code 的 Error 对象
@@ -394,34 +502,34 @@ export async function connectWallet(preferredAccount?: string) {
           code?: number;
           [key: string]: any;
         };
-        console.log(`❌error.message=${err.message}`);
+        console.log(`error.message=${err.message}`);
         if (
           typeof err.message === "string" &&
           err.message.includes("Session expired")
         ) {
           notifyError(
-            `❌会话已过期，请打开钱包插件输入密码激活钱包状态 ${error}`,
+            `会话已过期，请打开钱包插件输入密码激活钱包状态 ${error}`,
           );
         } else if (classifyWalletError(error).type === "userRejected") {
-          notifyError(`❌用户拒绝了连接请求 ${error}`);
+          notifyError(`用户拒绝了连接请求 ${error}`);
         } else if (classifyWalletError(error).type === "notFound") {
-          notifyError("❌未检测到钱包，请先安装并连接钱包");
+          notifyError("未检测到钱包，请先安装并连接钱包");
         } else if (classifyWalletError(error).type === "disconnected") {
-          notifyError("❌钱包连接已断开，请稍后重试或刷新钱包扩展");
+          notifyError("钱包连接已断开，请稍后重试或刷新钱包扩展");
         } else {
-          console.error("❌未知连接错误:", error);
-          notifyError(`❌连接失败，请检查钱包状态 ${error}`);
+          console.error("未知连接错误:", error);
+          notifyError(`连接失败，请检查钱包状态 ${error}`);
         }
       } else {
         // 处理非标准错误（比如字符串或 null）
-        console.error("❌非预期的错误类型:", error);
-        notifyError(`❌连接失败，发生未知错误 ${error}`);
+        console.error("非预期的错误类型:", error);
+        notifyError(`连接失败，发生未知错误 ${error}`);
       }
       return;
     }
   } catch (error) {
-    console.error("❌连接失败:", error);
-    notifyError(`❌连接失败: ${error}`);
+    console.error("连接失败:", error);
+    notifyError(`连接失败: ${error}`);
   }
 }
 
@@ -436,7 +544,7 @@ export function getCurrentAccount() {
 // 获取链 ID
 export async function getChainId() {
   if (localStorage.getItem("hasConnectedWallet") === "false") {
-    notifyError("❌未检测到钱包，请先安装并连接钱包");
+    notifyError("未检测到钱包，请先安装并连接钱包");
     return;
   }
   try {
@@ -444,7 +552,7 @@ export async function getChainId() {
     const chainId = await getChainIdFromSdk(provider);
 
     if (!chainId) {
-      notifyError("❌获取链 ID 失败");
+      notifyError("获取链 ID 失败");
       return;
     }
 
@@ -459,20 +567,20 @@ export async function getChainId() {
       chainNames[chainId as keyof typeof chainNames] || "未知网络";
     return `链 ID: ${chainId}\n网络: ${chainName}`;
   } catch (error) {
-    console.error("❌获取链 ID 失败:", error);
-    notifyError(`❌获取链 ID 失败: ${error}`);
+    console.error("获取链 ID 失败:", error);
+    notifyError(`获取链 ID 失败: ${error}`);
   }
 }
 
 // 获取余额
 export async function getBalance() {
   if (localStorage.getItem("hasConnectedWallet") === "false") {
-    notifyError("❌未检测到钱包，请先安装并连接钱包");
+    notifyError("未检测到钱包，请先安装并连接钱包");
     return;
   }
   const currentAccount = getCurrentAccount();
   if (!currentAccount) {
-    notifyError("❌请先连接钱包");
+    notifyError("请先连接钱包");
     return;
   }
   try {
@@ -483,8 +591,8 @@ export async function getBalance() {
     const ethBalance = parseInt(balance, 16) / 1e18;
     return `余额: ${ethBalance.toFixed(6)} ETH\n原始值: ${balance}`;
   } catch (error) {
-    console.error("❌获取余额失败:", error);
-    notifyError(`❌获取余额失败: ${error}`);
+    console.error("获取余额失败:", error);
+    notifyError(`获取余额失败: ${error}`);
   }
 }
 
@@ -495,7 +603,7 @@ export async function loginWithUcan(
   options?: { silent?: boolean; reload?: boolean },
 ) {
   if (localStorage.getItem("hasConnectedWallet") === "false") {
-    notifyError("❌未检测到钱包，请先安装并连接钱包");
+    notifyError("未检测到钱包，请先安装并连接钱包");
     return;
   }
   if (loginInFlight) {
@@ -509,7 +617,7 @@ export async function loginWithUcan(
     clearCentralUcanAuth({ preserveMode: true, emit: false });
     const currentAccount = address || getCurrentAccount();
     if (!currentAccount) {
-      notifyError("❌请先连接钱包");
+      notifyError("请先连接钱包");
       return;
     }
 
@@ -574,7 +682,7 @@ export async function loginWithUcan(
     emitAuthError("");
     emitAuthChange();
     if (!options?.silent) {
-      notifySuccess(`✅授权成功`);
+      notifySuccess(`授权成功`);
     }
     if (options?.reload) {
       window.location.reload();
@@ -597,9 +705,9 @@ export async function loginWithUcan(
     ) {
       emitAuthError("Request timeout");
     }
-    console.error("❌授权失败:", error);
+    console.error("授权失败:", error);
     if (!options?.silent) {
-      notifyError(`❌授权失败: ${error}`);
+      notifyError(`授权失败: ${error}`);
     }
     releaseUcanSignLock();
   } finally {
@@ -623,7 +731,7 @@ export async function logoutWallet() {
   clearCachedUcanSession();
   clearCentralUcanAuth({ emit: false });
   emitAuthChange();
-  notifySuccess("✅已退出");
+  notifySuccess("已退出");
 }
 
 /**
