@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, type FocusEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Path } from "../constant";
 import Locale from "../locales";
+import ClearIcon from "../icons/close.svg";
 import Delete from "../icons/close.svg";
 import Logo from "../icons/yeying.svg";
 import { useMobileScreen } from "@/app/utils";
@@ -12,9 +13,10 @@ import { safeLocalStorage } from "@/app/utils";
 import clsx from "clsx";
 import {
   UCAN_AUTH_EVENT,
-  connectWallet,
   getCurrentAccount,
   isValidUcanAuthorization,
+  loginWithUcan,
+  resolveWalletLoginAccount,
   waitForWallet,
 } from "../plugins/wallet";
 import {
@@ -28,6 +30,7 @@ import {
 } from "../plugins/central-ucan";
 import { getRouterAudience } from "../plugins/ucan";
 import { notifyError, notifyInfo, notifySuccess } from "../plugins/show_window";
+import { showModal } from "./ui-lib";
 
 const storage = safeLocalStorage();
 const WALLET_HISTORY_KEY = "walletAccountHistory";
@@ -113,6 +116,77 @@ function getUcanLoginForceMode(): UcanLoginForceMode {
   return "auto";
 }
 
+function renderWalletMismatchPrompt(
+  expectedAccount: string,
+  walletAccount: string,
+) {
+  return (
+    <div>
+      <div>应用地址和钱包地址不一致，请选择登录方式。</div>
+      <div style={{ marginTop: 12 }}>
+        应用：<code>{expectedAccount}</code>
+      </div>
+      <div style={{ marginTop: 8 }}>
+        钱包：<code>{walletAccount}</code>
+      </div>
+    </div>
+  );
+}
+
+function showWalletMismatchDecision(
+  expectedAccount: string,
+  walletAccount: string,
+) {
+  return new Promise<"wallet" | "switch" | "cancel">((resolve) => {
+    let settled = false;
+    const finish = (decision: "wallet" | "switch" | "cancel") => {
+      if (settled) return;
+      settled = true;
+      resolve(decision);
+    };
+    const closeModal = showModal({
+      title: "账户不一致",
+      actions: [
+        <IconButton
+          key="cancel"
+          text={Locale.UI.Cancel}
+          onClick={() => {
+            finish("cancel");
+            void closeModal();
+          }}
+          bordered
+          shadow
+        />,
+        <IconButton
+          key="switch"
+          text="去钱包切换"
+          onClick={() => {
+            finish("switch");
+            void closeModal();
+          }}
+          bordered
+          shadow
+        />,
+        <IconButton
+          key="wallet"
+          text="使用钱包当前地址"
+          type="primary"
+          onClick={() => {
+            finish("wallet");
+            void closeModal();
+          }}
+          bordered
+          shadow
+        />,
+      ],
+      onClose: () => {
+        finish("cancel");
+      },
+      children: renderWalletMismatchPrompt(expectedAccount, walletAccount),
+    });
+  });
+}
+
 export function AuthPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -121,6 +195,8 @@ export function AuthPage() {
   >("checking");
   const [walletHistory, setWalletHistory] = useState<string[]>([]);
   const [selectedWalletAccount, setSelectedWalletAccount] = useState("");
+  const [hasSelectedWalletAccount, setHasSelectedWalletAccount] =
+    useState(false);
   const [isWalletAccountFocused, setIsWalletAccountFocused] = useState(false);
   const [isWalletHistoryOpen, setIsWalletHistoryOpen] = useState(false);
   const [centralLoading, setCentralLoading] = useState(false);
@@ -147,7 +223,6 @@ export function AuthPage() {
         persistWalletHistory(history);
       }
       setWalletHistory(history);
-      setSelectedWalletAccount(account || history[0] || "");
       if (valid) {
         setUcanStatus("authorized");
       } else if (account) {
@@ -193,12 +268,12 @@ export function AuthPage() {
           redirectUri,
         });
         applyCentralAuthorizeExchange(result, { emit: false });
-        notifySuccess("✅中心化 UCAN 登录成功");
+        notifySuccess("中心化 UCAN 登录成功");
         const target = encodeURIComponent(redirectPath);
         navigate(`${Path.Auth}?redirect=${target}`, { replace: true });
         window.dispatchEvent(new Event(UCAN_AUTH_EVENT));
       } catch (error) {
-        const message = `❌中心化授权码兑换失败: ${error}`;
+        const message = `中心化授权码兑换失败: ${error}`;
         notifyError(message);
       } finally {
         setCentralLoading(false);
@@ -216,7 +291,7 @@ export function AuthPage() {
     }
     const routerAudience = getRouterAudience();
     if (!routerAudience) {
-      notifyError("❌无法解析 Router audience，请检查 ROUTER_BACKEND_URL");
+      notifyError("无法解析 Router audience，请检查 ROUTER_BACKEND_URL");
       return;
     }
     const redirectUri = getCentralRedirectUri();
@@ -233,10 +308,10 @@ export function AuthPage() {
       });
       setUcanAuthMode(UCAN_AUTH_MODE_CENTRAL, { emit: false });
       storage.setItem("currentAccount", address);
-      notifySuccess("✅已创建中心化授权请求，跳转认证页");
+      notifySuccess("已创建中心化授权请求，跳转认证页");
       window.location.href = request.verifyUrl;
     } catch (error) {
-      notifyError(`❌创建中心化授权请求失败: ${error}`);
+      notifyError(`创建中心化授权请求失败: ${error}`);
     } finally {
       setCentralLoading(false);
     }
@@ -244,7 +319,9 @@ export function AuthPage() {
 
   const handlePrimaryLogin = async () => {
     if (centralLoading) return;
-    const preferredAddress = normalizeAccount(selectedWalletAccount);
+    const preferredAddress = hasSelectedWalletAccount
+      ? normalizeAccount(selectedWalletAccount)
+      : "";
     const forceMode = getUcanLoginForceMode();
 
     if (forceMode === "central") {
@@ -255,32 +332,62 @@ export function AuthPage() {
     try {
       await waitForWallet();
       setUcanAuthMode(UCAN_AUTH_MODE_WALLET, { emit: false });
-      await connectWallet(preferredAddress || undefined);
+      const resolution = await resolveWalletLoginAccount(
+        preferredAddress || undefined,
+      );
+
+      if (resolution.status === "pending") {
+        return;
+      }
+
+      if (resolution.status === "unavailable") {
+        notifyError("未获取到账户");
+        return;
+      }
+
+      if (resolution.status === "mismatch") {
+        const decision = await showWalletMismatchDecision(
+          resolution.expectedAccount,
+          resolution.walletAccount,
+        );
+
+        if (decision === "switch") {
+          setSelectedWalletAccount(resolution.expectedAccount);
+          notifyInfo("请先在钱包中切换到应用地址，然后重新点击登录");
+          return;
+        }
+
+        if (decision !== "wallet") {
+          notifyInfo("已取消登录");
+          return;
+        }
+        setSelectedWalletAccount(resolution.walletAccount);
+        setHasSelectedWalletAccount(true);
+        storage.setItem("currentAccount", resolution.walletAccount);
+        await loginWithUcan(resolution.provider, resolution.walletAccount, {
+          silent: false,
+          reload: false,
+        });
+        return;
+      }
+
+      storage.setItem("currentAccount", resolution.account);
+      setSelectedWalletAccount(resolution.account);
+      setHasSelectedWalletAccount(true);
+      await loginWithUcan(resolution.provider, resolution.account, {
+        silent: false,
+        reload: false,
+      });
       return;
     } catch (error) {
       if (forceMode === "wallet") {
-        notifyError(`❌钱包登录失败: ${error}`);
+        notifyError(`钱包登录失败: ${error}`);
         return;
       }
       // wallet not available, fallback to centralized UCAN service
     }
 
     await handleCentralAuthorizeLogin(preferredAddress);
-  };
-
-  const handleCopyWalletAccount = async () => {
-    const address = normalizeAccount(selectedWalletAccount);
-    if (!address) {
-      notifyInfo("请先输入或选择区块链地址");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(address);
-      notifySuccess("已复制地址");
-    } catch (error) {
-      console.error("copy wallet account failed", error);
-      notifyError("复制失败");
-    }
   };
 
   const handleWalletSelectWrapBlur = (event: FocusEvent<HTMLDivElement>) => {
@@ -290,7 +397,11 @@ export function AuthPage() {
     }
     setIsWalletHistoryOpen(false);
     setIsWalletAccountFocused(false);
-    setSelectedWalletAccount((value) => normalizeAccount(value));
+    setSelectedWalletAccount((value) => {
+      const normalized = normalizeAccount(value);
+      setHasSelectedWalletAccount(normalized.length > 0);
+      return normalized;
+    });
   };
 
   const handleWalletHistoryToggle = () => {
@@ -306,9 +417,17 @@ export function AuthPage() {
 
   const handleWalletHistorySelect = (account: string) => {
     setSelectedWalletAccount(account);
+    setHasSelectedWalletAccount(true);
     setIsWalletHistoryOpen(false);
     setIsWalletAccountFocused(false);
     walletAccountInputRef.current?.blur();
+  };
+
+  const handleWalletAccountClear = () => {
+    setSelectedWalletAccount("");
+    setHasSelectedWalletAccount(false);
+    setIsWalletHistoryOpen(false);
+    walletAccountInputRef.current?.focus();
   };
 
   const isWalletConnectDisabled = ucanStatus === "authorized" || centralLoading;
@@ -317,7 +436,9 @@ export function AuthPage() {
   );
   const walletAccountInputValue = isWalletAccountFocused
     ? selectedWalletAccount
-    : formatAccountPreview(selectedWalletAccount);
+    : formatAccountPreview(
+        hasSelectedWalletAccount ? selectedWalletAccount : "",
+      );
 
   return (
     <div className={styles["auth-page"]}>
@@ -332,20 +453,34 @@ export function AuthPage() {
             className={styles["auth-wallet-select"]}
             value={walletAccountInputValue}
             onChange={(event) => {
-              setSelectedWalletAccount(event.target.value);
+              const value = event.target.value;
+              setSelectedWalletAccount(value);
+              setHasSelectedWalletAccount(normalizeAccount(value).length > 0);
               setIsWalletHistoryOpen(true);
             }}
             onFocus={() => {
               setIsWalletAccountFocused(true);
               setIsWalletHistoryOpen(true);
             }}
-            data-empty={selectedWalletAccount ? "false" : "true"}
+            data-empty={hasSelectedWalletAccount ? "false" : "true"}
             aria-label="输入或选择区块链地址"
             placeholder="输入或选择区块链地址"
             autoComplete="off"
             spellCheck={false}
-            title={selectedWalletAccount}
+            title={hasSelectedWalletAccount ? selectedWalletAccount : ""}
           />
+          {hasSelectedWalletAccount && (
+            <button
+              type="button"
+              className={styles["auth-wallet-clear"]}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={handleWalletAccountClear}
+              title="清空当前选择"
+              aria-label="清空当前选择"
+            >
+              <ClearIcon />
+            </button>
+          )}
           {isWalletHistoryOpen && (
             <div className={styles["auth-wallet-history-menu"]}>
               {walletHistory.length > 0 ? (
@@ -372,16 +507,6 @@ export function AuthPage() {
               )}
             </div>
           )}
-          <button
-            type="button"
-            className={styles["auth-wallet-copy"]}
-            onClick={handleCopyWalletAccount}
-            disabled={!normalizedSelectedWalletAccount}
-            title="复制完整地址"
-            aria-label="复制完整地址"
-          >
-            复制
-          </button>
           <button
             type="button"
             className={styles["auth-wallet-arrow-button"]}

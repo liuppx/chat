@@ -173,7 +173,7 @@
     min-height: 40px;
     border: 0;
     border-radius: 10px;
-    padding: 0 68px 0 12px;
+    padding: 0 56px 0 12px;
     background: var(--white);
     color: var(--black);
     font-size: 14px;
@@ -226,34 +226,34 @@
     }
   }
 
-  .auth-wallet-copy {
+  .auth-wallet-clear {
     position: absolute;
-    right: 26px;
+    right: 25px;
     top: 50%;
     transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
     border: 0;
     border-radius: 6px;
-    padding: 0 6px;
-    height: 22px;
-    min-width: 34px;
-    font-size: 12px;
-    line-height: 22px;
-    background: #eaf2ff;
-    color: #315f9f;
+    background: transparent;
+    color: #5d6b7d;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
     cursor: pointer;
-    transition:
-      background-color 0.16s ease,
-      color 0.16s ease;
+    overflow: visible;
 
-    &:hover:not(:disabled) {
-      background: #d9e8ff;
+    &:hover {
+      background: #edf3ff;
       color: #204f9e;
     }
 
-    &:disabled {
-      cursor: not-allowed;
-      background: #f0f4fb;
-      color: #97a6bd;
+    svg {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      overflow: visible;
     }
   }
 
