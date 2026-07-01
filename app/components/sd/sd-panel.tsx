@@ -20,6 +20,7 @@ import EditIcon from "@/app/icons/edit.svg";
 import DragIcon from "@/app/icons/drag.svg";
 import ResetIcon from "@/app/icons/reload.svg";
 import UploadIcon from "@/app/icons/upload.svg";
+import { getRouterPortalPricingUrl } from "@/app/utils/router-portal";
 
 function MaskPainter(props: {
   sourceImage: string;
@@ -1102,7 +1103,7 @@ export function SdPanel() {
             <span>{Locale.Sd.NoModelsText}</span>
             <a
               className={styles["empty-model-link"]}
-              href="https://router.yeying.pub"
+              href={getRouterPortalPricingUrl()}
               target="_blank"
               rel="noreferrer"
             >

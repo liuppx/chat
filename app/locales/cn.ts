@@ -981,12 +981,8 @@ const cn = {
   Setup: {
     Title: "模型配置",
     SubTitle: "当前工作区还不能开始对话，请先完成 Router 或模型访问配置。",
-    SectionTitle: "聊天能力",
-    SectionDesc: "检测到可用文本模型后，你就可以开始新建会话或继续已有对话。",
-    OpenSettings: "打开设置",
-    Continue: "前往新建会话",
-    ReadyTitle: "已检测到可用文本模型",
-    ReadyDesc: "当前工作区已经具备聊天能力，可以继续创建新会话。",
+    Purchase: "购买",
+    OpenCommunityRouter: "设置 Router",
   },
 
   Router: {
@@ -1187,7 +1183,7 @@ const cn = {
     Title: "AI 绘图",
     SubTitle: (count: number) => `共 ${count} 条绘画`,
     NoModelsText: "当前没有可用的图片模型，",
-    NoModelsAction: "点击购买。",
+    NoModelsAction: "购买",
     EndpointLabel: "端点",
     SourceLabel: "来源",
     Actions: {

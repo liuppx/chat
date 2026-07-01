@@ -1006,14 +1006,8 @@ const en: LocaleType = {
     Title: "Model Setup",
     SubTitle:
       "This workspace is not ready for chatting yet. Finish Router or model access setup first.",
-    SectionTitle: "Chat readiness",
-    SectionDesc:
-      "Once an available text model is detected, you can start a new session or continue existing conversations.",
-    OpenSettings: "Open Settings",
-    Continue: "Go to New Session",
-    ReadyTitle: "A text model is now available",
-    ReadyDesc:
-      "This workspace is ready for chatting now. You can continue by creating a new session.",
+    Purchase: "Buy",
+    OpenCommunityRouter: "Set Up Router",
   },
 
   Router: {
@@ -1219,7 +1213,7 @@ const en: LocaleType = {
     Title: "AI Images",
     SubTitle: (count: number) => `${count} images`,
     NoModelsText: "No image models are currently available, ",
-    NoModelsAction: "click to buy.",
+    NoModelsAction: "buy",
     EndpointLabel: "Endpoint",
     SourceLabel: "Source",
     Actions: {
