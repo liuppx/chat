@@ -349,6 +349,12 @@ function normalizeTags(tags?: readonly string[]): string[] {
   return normalized;
 }
 
+export function normalizeRouterRuntimeSupportedEndpoints(
+  item: Pick<RouterModelCard, "supported_endpoints">,
+): string[] {
+  return normalizeSupportedEndpoints(item.supported_endpoints);
+}
+
 function buildModelsFromProviderModels(
   items: RouterProviderModelsItem[],
 ): LLMModel[] {
@@ -371,6 +377,7 @@ function buildModelsFromProviderModels(
       const key = `${name}@${providerID}`;
       if (seen.has(key)) continue;
       seen.add(key);
+      const tags = normalizeTags(detail.tags);
 
       finalList.push({
         name,
@@ -378,7 +385,7 @@ function buildModelsFromProviderModels(
         available: true,
         sorted: seq++,
         ownedBy: providerID,
-        tags: normalizeTags(detail.tags),
+        tags,
         supportedEndpoints: normalizeSupportedEndpoints(
           detail.supported_endpoints,
         ),
@@ -567,9 +574,9 @@ export class RouterApi implements LLMApi {
       for (const item of list) {
         const name = item.id?.trim();
         if (!name) continue;
-        const supportedEndpoints = normalizeSupportedEndpoints(
-          item.supported_endpoints,
-        );
+        const supportedEndpoints =
+          normalizeRouterRuntimeSupportedEndpoints(item);
+        if (supportedEndpoints.length === 0) continue;
         const providerName = resolveProviderNameFromOwnedBy(
           item.owned_by || "",
           name,
