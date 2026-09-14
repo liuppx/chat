@@ -76,7 +76,7 @@ cp .env.build.template .env.build
    - `ROUTER_PORTAL_TOKEN_URL`：Router 令牌页地址（可选，默认继承 `ROUTER_PORTAL_URL`）
    - `ROUTER_PORTAL_RECHARGE_URL`：Router 充值页地址（可选，默认继承 `ROUTER_PORTAL_TOKEN_URL`）
    - `CENTRAL_UCAN_APP_ID`：中心化 UCAN 应用 AppId（在 Node 应用市场发布后获得）
-   - `CENTRAL_UCAN_REDIRECT_URI`：中心化 UCAN 授权回调地址；Tauri 本地包通常是 `http://tauri.localhost/central-ucan-callback.html`
+   - `CENTRAL_UCAN_REDIRECT_URI`：中心化 UCAN 授权回调地址；Tauri 本地包通常是 `https://tauri.localhost/central-ucan-callback.html`
    - `UCAN_LOGIN_FORCE_MODE`：登录路径强制模式（`auto`/`wallet`/`central`，默认 `auto`）
    - `WEBDAV_BACKEND_BASE_URL`：WebDAV 后端基础地址（按需配置，不含路径）
    - `WEBDAV_BACKEND_PREFIX`：WebDAV 路径前缀（默认 `/dav`，可选修改）
@@ -189,7 +189,7 @@ WEBDAV_BACKEND_PREFIX=/dav
 WEBDAV_APP_ID=localhost-3020
 CENTRAL_UCAN_AUTH_BASE_URL=http://127.0.0.1:8100
 CENTRAL_UCAN_APP_ID=<Node 中发布的 Chat 应用 ID>
-CENTRAL_UCAN_REDIRECT_URI=http://tauri.localhost/central-ucan-callback.html
+CENTRAL_UCAN_REDIRECT_URI=https://tauri.localhost/central-ucan-callback.html
 UCAN_LOGIN_FORCE_MODE=auto
 ```
 
