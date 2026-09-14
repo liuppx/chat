@@ -228,7 +228,7 @@ function validateDesktopAuthConfig() {
   }
 
   const expectedRedirectUri =
-    "http://tauri.localhost/central-ucan-callback.html";
+    "https://tauri.localhost/central-ucan-callback.html";
   if (readEnv("CENTRAL_UCAN_REDIRECT_URI") !== expectedRedirectUri) {
     throw new Error(
       `CENTRAL_UCAN_REDIRECT_URI must be ${expectedRedirectUri} for a Tauri desktop build.`,
