@@ -58,7 +58,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CENTRAL_UCAN_AUTH_BASE_URL: ${{ vars.CENTRAL_UCAN_AUTH_BASE_URL }}
           CENTRAL_UCAN_APP_ID: ${{ vars.CENTRAL_UCAN_APP_ID }}
-          CENTRAL_UCAN_REDIRECT_URI: ${{ vars.CENTRAL_UCAN_REDIRECT_URI || 'http://tauri.localhost/central-ucan-callback.html' }}
+          CENTRAL_UCAN_REDIRECT_URI: ${{ vars.CENTRAL_UCAN_REDIRECT_URI || 'https://tauri.localhost/central-ucan-callback.html' }}
         run: npm run app:build:release
 
       - name: Verify macOS installer
@@ -147,7 +147,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           CENTRAL_UCAN_AUTH_BASE_URL: ${{ vars.CENTRAL_UCAN_AUTH_BASE_URL }}
           CENTRAL_UCAN_APP_ID: ${{ vars.CENTRAL_UCAN_APP_ID }}
-          CENTRAL_UCAN_REDIRECT_URI: ${{ vars.CENTRAL_UCAN_REDIRECT_URI || 'http://tauri.localhost/central-ucan-callback.html' }}
+          CENTRAL_UCAN_REDIRECT_URI: ${{ vars.CENTRAL_UCAN_REDIRECT_URI || 'https://tauri.localhost/central-ucan-callback.html' }}
         run: npm run app:build:release
 
       - name: Prepare Windows release assets
@@ -232,7 +232,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           CENTRAL_UCAN_AUTH_BASE_URL: ${{ vars.CENTRAL_UCAN_AUTH_BASE_URL }}
           CENTRAL_UCAN_APP_ID: ${{ vars.CENTRAL_UCAN_APP_ID }}
-          CENTRAL_UCAN_REDIRECT_URI: ${{ vars.CENTRAL_UCAN_REDIRECT_URI || 'http://tauri.localhost/central-ucan-callback.html' }}
+          CENTRAL_UCAN_REDIRECT_URI: ${{ vars.CENTRAL_UCAN_REDIRECT_URI || 'https://tauri.localhost/central-ucan-callback.html' }}
         run: npm run app:build:release
 
       - name: Prepare Ubuntu 24.04 release assets
