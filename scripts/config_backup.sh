@@ -67,7 +67,7 @@ cleanup_path() {
 }
 
 main() {
-  local real_path deploy_name MODULE_NAME backup_name backup_path tmp_dir exit_code
+  local real_path deploy_name MODULE_NAME backup_name backup_path tmp_root tmp_dir exit_code
 
   real_path="$(realpath "${SCRIPT_DIR}/..")"
   deploy_name="$(basename "$real_path")"
@@ -87,7 +87,8 @@ main() {
 
   backup_name="${BACKUP_CONF_PREFIX}${deploy_name}${BACKUP_CONF_SUFFIX}"
   backup_path="${BACKUP_DIR}/${backup_name}"
-  tmp_dir="/tmp/${deploy_name}-conf"
+  tmp_root="/tmp/${deploy_name}-conf"
+  tmp_dir="${tmp_root}/${deploy_name}"
 
   log "config backup started for $deploy_name"
 
@@ -112,7 +113,7 @@ main() {
   fi
 
   mkdir -p "$BACKUP_DIR"
-  cleanup_path "$tmp_dir"
+  cleanup_path "$tmp_root"
   mkdir -p "$tmp_dir"
 
   exit_code=0
@@ -127,10 +128,10 @@ main() {
   if [[ "$exit_code" -eq 0 ]]; then
     gpg --batch --yes --symmetric --cipher-algo AES256 \
       --passphrase-file "$PASSPHRASE_FILE" \
-      -o "$backup_path" < <(tar czf - -C "$tmp_dir" .) || exit_code=1
+      -o "$backup_path" < <(tar czf - -C "$tmp_root" "$deploy_name") || exit_code=1
   fi
 
-  cleanup_path "$tmp_dir"
+  cleanup_path "$tmp_root"
 
   if [[ "$exit_code" -eq 0 ]]; then
     log "config backup completed: $backup_path"
