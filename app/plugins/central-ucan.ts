@@ -1,4 +1,5 @@
 import { getClientConfig } from "@/app/config/client";
+import { fetch as desktopAwareFetch } from "@/app/utils/stream";
 import {
   getCapabilityAction,
   getCapabilityResource,
@@ -522,7 +523,7 @@ async function requestCentralIssueSession(options?: { baseUrl?: string }) {
       throw new Error("中心化登录已过期，请重新登录");
     }
     const subject = getCentralAccount();
-    const response = await fetch(
+    const response = await desktopAwareFetch(
       buildApiUrl("/api/v1/public/auth/central/session", options?.baseUrl),
       {
         method: "POST",
@@ -577,7 +578,7 @@ async function issueCentralUcanByAudience(input: {
   ) as UcanCapability[];
 
   const invokeIssue = async (sessionToken: string) => {
-    const response = await fetch(
+    const response = await desktopAwareFetch(
       buildApiUrl("/api/v1/public/auth/central/issue", input.baseUrl),
       {
         method: "POST",
@@ -922,7 +923,7 @@ export async function createCentralAuthorizeRequest(input: {
   baseUrl?: string;
 }): Promise<CentralAuthorizeRequestResult> {
   const resolvedAppId = resolveCentralAppId(input.appId);
-  const response = await fetch(
+  const response = await desktopAwareFetch(
     buildApiUrl("/api/v1/public/identity/authorize/request", input.baseUrl),
     {
       method: "POST",
@@ -968,7 +969,7 @@ export async function exchangeCentralAuthorizeCode(input: {
   baseUrl?: string;
 }): Promise<CentralAuthorizeExchangeResult> {
   const resolvedAppId = resolveCentralAppId(input.appId);
-  const response = await fetch(
+  const response = await desktopAwareFetch(
     buildApiUrl("/api/v1/public/identity/authorize/exchange", input.baseUrl),
     {
       method: "POST",
