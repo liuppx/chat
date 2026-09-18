@@ -234,6 +234,28 @@ function validateDesktopAuthConfig() {
       `CENTRAL_UCAN_REDIRECT_URI must be ${expectedRedirectUri} for a Tauri desktop build.`,
     );
   }
+
+  if (releaseMode) {
+    let hostname = "";
+    try {
+      hostname = new URL(readEnv("CENTRAL_UCAN_AUTH_BASE_URL")).hostname;
+    } catch {
+      throw new Error(
+        "CENTRAL_UCAN_AUTH_BASE_URL must be a valid absolute URL for a release desktop build.",
+      );
+    }
+
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "[::1]" ||
+      hostname === "::1"
+    ) {
+      throw new Error(
+        "Release desktop builds cannot use a loopback CENTRAL_UCAN_AUTH_BASE_URL; configure the public Node authentication service URL.",
+      );
+    }
+  }
 }
 
 function requireMacosReleaseConfig() {
