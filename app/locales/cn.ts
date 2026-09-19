@@ -37,6 +37,7 @@ const cn = {
     SubTips: "可使用钱包插件或本地通行证授权",
     Input: "输入或选择钱包账户地址",
     Confirm: "登录",
+    PasskeyLogin: "使用通行证登录",
     Later: "稍后再说",
     Processing: "处理中...",
     EmptyHistory: "暂无历史地址",

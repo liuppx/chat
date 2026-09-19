@@ -12,11 +12,14 @@ const tempConfigPath = path.join(
 );
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 
+const inheritedEnvKeys = new Set(Object.keys(process.env));
+
 function loadEnvFile(filePath) {
   if (!existsSync(filePath)) return;
   for (const line of readFileSync(filePath, "utf8").split(/\r?\n/)) {
     const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
-    if (!match || process.env[match[1]] !== undefined) continue;
+    if (!match || inheritedEnvKeys.has(match[1])) continue;
+    if (process.env[match[1]] !== undefined) continue;
     let value = match[2];
     if (
       value.length >= 2 &&
@@ -29,7 +32,8 @@ function loadEnvFile(filePath) {
   }
 }
 
-loadEnvFile(path.join(rootDir, ".env"));
+// Desktop builds embed public runtime values in the static export. Do not load
+// the Web/standalone .env here; CI and command-line variables remain authoritative.
 loadEnvFile(path.join(rootDir, ".env.build"));
 
 function run(command, args, options = {}) {
@@ -210,10 +214,6 @@ function readEnv(name) {
 function validateDesktopAuthConfig() {
   // Static desktop builds cannot receive public config from a running Next server.
   // Validate the Node identity authorization values before producing an unusable application.
-  if (readEnv("UCAN_LOGIN_FORCE_MODE").toLowerCase() === "wallet") {
-    return;
-  }
-
   const required = [
     ["CENTRAL_UCAN_AUTH_BASE_URL", readEnv("CENTRAL_UCAN_AUTH_BASE_URL")],
     ["CENTRAL_UCAN_APP_ID", readEnv("CENTRAL_UCAN_APP_ID")],
@@ -222,13 +222,11 @@ function validateDesktopAuthConfig() {
   const missing = required.filter(([, value]) => !value).map(([name]) => name);
   if (missing.length > 0) {
     throw new Error(
-      `Desktop build requires Node identity login config: ${missing.join(", ")}. ` +
-        "Set UCAN_LOGIN_FORCE_MODE=wallet to explicitly disable passkey login.",
+      `Desktop build requires Node identity login config for the automatic wallet/Passkey login flow: ${missing.join(", ")}.`,
     );
   }
 
-  const expectedRedirectUri =
-    "https://tauri.localhost/central-ucan-callback.html";
+  const expectedRedirectUri = "chat://localhost/central-ucan-callback.html";
   if (readEnv("CENTRAL_UCAN_REDIRECT_URI") !== expectedRedirectUri) {
     throw new Error(
       `CENTRAL_UCAN_REDIRECT_URI must be ${expectedRedirectUri} for a Tauri desktop build.`,
@@ -236,14 +234,22 @@ function validateDesktopAuthConfig() {
   }
 
   if (releaseMode) {
-    let hostname = "";
+    let parsedUrl;
     try {
-      hostname = new URL(readEnv("CENTRAL_UCAN_AUTH_BASE_URL")).hostname;
+      parsedUrl = new URL(readEnv("CENTRAL_UCAN_AUTH_BASE_URL"));
     } catch {
       throw new Error(
         "CENTRAL_UCAN_AUTH_BASE_URL must be a valid absolute URL for a release desktop build.",
       );
     }
+
+    if (parsedUrl.protocol !== "https:") {
+      throw new Error(
+        "Release desktop builds require an HTTPS CENTRAL_UCAN_AUTH_BASE_URL; configure the public Node authentication service URL with a trusted certificate.",
+      );
+    }
+
+    const hostname = parsedUrl.hostname;
 
     if (
       hostname === "localhost" ||
@@ -256,6 +262,63 @@ function validateDesktopAuthConfig() {
       );
     }
   }
+
+  return {
+    baseUrl: readEnv("CENTRAL_UCAN_AUTH_BASE_URL").replace(/\/+$/, ""),
+    appId: readEnv("CENTRAL_UCAN_APP_ID"),
+    redirectUri: readEnv("CENTRAL_UCAN_REDIRECT_URI"),
+  };
+}
+
+async function validateDesktopAuthDeployment(config) {
+  if (!releaseMode || !config) return;
+
+  const endpoint = `${config.baseUrl}/api/v1/public/identity/authorize/validate`;
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        appId: config.appId,
+        redirectUri: config.redirectUri,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (error) {
+    throw new Error(
+      `Desktop authentication preflight could not reach ${endpoint}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || payload?.code !== 0) {
+    throw new Error(
+      `Desktop authentication preflight failed: ${payload?.message || `${response.status} ${response.statusText}`}. ` +
+        "Deploy the current Node identity API and register the exact AppId/redirectUris entry before building a release.",
+    );
+  }
+
+  const passkey = payload?.data?.passkey;
+  if (!passkey?.enabled || !passkey?.ready) {
+    throw new Error(
+      `Desktop authentication preflight failed: Node Passkey is not ready (${passkey?.error || "unknown error"}).`,
+    );
+  }
+  const issuer = payload?.data?.ucanIssuer;
+  if (
+    !issuer?.enabled ||
+    !issuer?.ready ||
+    (issuer.mode !== "issue" && issuer.mode !== "hybrid")
+  ) {
+    throw new Error(
+      `Desktop authentication preflight failed: Node UCAN issuer is not ready for issue mode (${issuer?.error || issuer?.mode || "unknown error"}).`,
+    );
+  }
+
+  console.log(
+    `[Tauri] desktop authentication validated for ${payload.data.appName || config.appId}`,
+  );
 }
 
 function requireMacosReleaseConfig() {
@@ -586,7 +649,8 @@ const macosReleaseConfig =
     ? requireMacosReleaseConfig()
     : null;
 
-validateDesktopAuthConfig();
+const desktopAuthConfig = validateDesktopAuthConfig();
+await validateDesktopAuthDeployment(desktopAuthConfig);
 await run("npm", ["run", "skill"]);
 
 const buildVersion = resolveBuildVersion();

@@ -39,6 +39,7 @@ const en: LocaleType = {
     SubTips: "Use the wallet extension or local passkey authorization",
     Input: "Enter or select wallet account address",
     Confirm: "Sign In",
+    PasskeyLogin: "Sign In with Passkey",
     Later: "Later",
     Processing: "Processing...",
     EmptyHistory: "No recent addresses",

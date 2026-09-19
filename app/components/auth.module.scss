@@ -77,7 +77,7 @@
     min-width: 0;
     flex-shrink: 0;
     display: grid;
-    grid-template-columns: minmax(0, 260px) auto;
+    grid-template-columns: minmax(0, 260px);
     justify-content: center;
     align-items: center;
     column-gap: 12px;
@@ -177,7 +177,8 @@
     background: var(--white);
     color: var(--black);
     font-size: 14px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     outline: none;
     appearance: none;
     -webkit-appearance: none;
@@ -194,10 +195,7 @@
     &[data-empty="true"] {
       color: #7a8aa0;
       font-family:
-        "PingFang SC",
-        "Hiragino Sans GB",
-        "Microsoft YaHei",
-        sans-serif;
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
     }
 
     &:hover,
@@ -323,7 +321,8 @@
     text-align: left;
     font-size: 13px;
     line-height: 1.4;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     cursor: pointer;
     transition: background-color 0.12s ease;
 

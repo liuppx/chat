@@ -1,6 +1,5 @@
 // hooks/useAuth.ts
 import { useEffect, useState } from "react";
-import { getClientConfig } from "../config/client";
 import { isCentralModeEnabled } from "../plugins/central-ucan";
 import { isValidUcanAuthorization, UCAN_AUTH_EVENT } from "../plugins/wallet";
 import { notifyError } from "../plugins/show_window";
@@ -11,10 +10,6 @@ export function useAuth(options?: { notify?: boolean }) {
   useEffect(() => {
     let cancelled = false;
     let checkToken = 0;
-    const loginMode = (getClientConfig()?.ucanLoginForceMode || "auto")
-      .trim()
-      .toLowerCase();
-    const shouldNotifyWalletMissing = shouldNotify && loginMode === "wallet";
     const check = async () => {
       const token = ++checkToken;
       if (
@@ -22,9 +17,6 @@ export function useAuth(options?: { notify?: boolean }) {
         localStorage.getItem("hasConnectedWallet") === "false"
       ) {
         if (!cancelled && token === checkToken) {
-          if (shouldNotifyWalletMissing) {
-            notifyError("未检测到钱包，请先安装并连接钱包");
-          }
           setIsAuthenticated(false);
         }
         return;
@@ -34,7 +26,7 @@ export function useAuth(options?: { notify?: boolean }) {
       if (!valid) {
         setIsAuthenticated(false);
         if (shouldNotify) {
-          notifyError("未完成授权，请连接钱包完成 UCAN 授权");
+          notifyError("未完成登录，请使用钱包或通行证完成授权");
         }
         return;
       }

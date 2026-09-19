@@ -81,24 +81,8 @@ const loadFunc = async () => {
   } catch (error) {
     console.error("钱包检测失败:", error);
     localStorage.setItem("hasConnectedWallet", "false");
-    const loginMode = (getClientConfig()?.ucanLoginForceMode || "auto")
-      .trim()
-      .toLowerCase();
-    if (loginMode === "wallet") {
-      const innerHTML = `
-        <p>❌ 未检测到钱包</p>
-        <p class="error">请确保：</p>
-        <ul>
-          <li>•已安装 YeYing Wallet 扩展</li>
-          <li>•已启用扩展</li>
-          <li>•已在扩展设置中允许访问文件 URL（如果使用 file:// 协议）</li>
-          <li>•刷新页面后重试</li>
-        </ul>
-      `;
-      useToastStore.getState().setPendingError(innerHTML);
-    } else {
-      useToastStore.getState().setPendingError(null);
-    }
+    // Missing wallet is expected: the login page can continue with Passkey.
+    useToastStore.getState().setPendingError(null);
   }
 };
 

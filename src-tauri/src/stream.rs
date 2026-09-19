@@ -1,10 +1,9 @@
 //
 //
 
-use reqwest::header::{HeaderMap, HeaderName};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::Client;
 use std::collections::HashMap;
-use std::error::Error;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tauri::Emitter;
@@ -44,7 +43,11 @@ pub async fn stream_fetch(
 
     let mut _headers = HeaderMap::new();
     for (key, value) in &headers {
-        _headers.insert(key.parse::<HeaderName>().unwrap(), value.parse().unwrap());
+        let name = HeaderName::from_bytes(key.as_bytes())
+            .map_err(|err| format!("failed to parse header name '{}': {}", key, err))?;
+        let value = HeaderValue::from_str(value)
+            .map_err(|err| format!("failed to parse header '{}': {}", key, err))?;
+        _headers.insert(name, value);
     }
 
     // println!("method: {:?}", method);
@@ -59,6 +62,7 @@ pub async fn stream_fetch(
         .default_headers(_headers)
         .redirect(reqwest::redirect::Policy::limited(3))
         .connect_timeout(Duration::new(3, 0))
+        .timeout(Duration::from_secs(30))
         .build()
         .map_err(|err| format!("failed to generate client: {}", err))?;
 
@@ -88,12 +92,12 @@ pub async fn stream_fetch(
             // get response and emit to client
             let mut headers = HashMap::new();
             for (name, value) in res.headers() {
-                headers.insert(
-                    name.as_str().to_string(),
-                    std::str::from_utf8(value.as_bytes()).unwrap().to_string(),
-                );
+                if let Ok(value) = value.to_str() {
+                    headers.insert(name.as_str().to_string(), value.to_string());
+                }
             }
             let status = res.status().as_u16();
+            let status_text = res.status().canonical_reason().unwrap_or("").to_string();
 
             tauri::async_runtime::spawn(async move {
                 let mut response = res;
@@ -123,15 +127,12 @@ pub async fn stream_fetch(
             StreamResponse {
                 request_id,
                 status,
-                status_text: "OK".to_string(),
+                status_text,
                 headers,
             }
         }
         Err(err) => {
-            let error: String = err
-                .source()
-                .map(|e| e.to_string())
-                .unwrap_or_else(|| "Unknown error occurred".to_string());
+            let error = format!("request failed: {}", err);
             println!("Error response: {:?}", error);
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = window.emit(

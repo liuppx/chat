@@ -519,7 +519,29 @@ export const useSyncStore = createPersistStore(
           );
           set({ lastSyncTime: Date.now(), lastProvider: provider });
         } catch (e) {
-          console.log("[Sync] failed to get remote state", e);
+          console.error("[Sync] failed to get remote state", {
+            provider,
+            authType:
+              provider === ProviderType.WebDAV
+                ? get().webdav.authType
+                : undefined,
+            baseUrl:
+              provider === ProviderType.WebDAV
+                ? get().webdav.baseUrl ||
+                  getClientConfig()?.webdavBackendBaseUrl ||
+                  ""
+                : undefined,
+            prefix:
+              provider === ProviderType.WebDAV
+                ? get().webdav.prefix ||
+                  getClientConfig()?.webdavBackendPrefix ||
+                  ""
+                : undefined,
+            error:
+              e instanceof Error
+                ? { name: e.name, message: e.message, stack: e.stack }
+                : e,
+          });
           throw e;
         }
       });

@@ -10,8 +10,24 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { check } from "@tauri-apps/plugin-updater";
 
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: unknown;
+    isTauri?: boolean;
+  }
+}
+
 export function isDesktopAppRuntime() {
-  return typeof window !== "undefined" && isTauri();
+  if (typeof window === "undefined") return false;
+
+  // `isTauri()` is the normal marker. Older WebView runtimes may expose the
+  // IPC object without the marker, so keep the protocol/host fallback for
+  // packaged apps using Tauri's HTTPS scheme.
+  if (isTauri() || window.__TAURI_INTERNALS__) return true;
+  return (
+    window.location.protocol === "tauri:" ||
+    window.location.hostname === "tauri.localhost"
+  );
 }
 
 export {

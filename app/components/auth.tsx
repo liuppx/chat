@@ -1,94 +1,70 @@
 import styles from "./auth.module.scss";
 import { IconButton } from "./button";
-import { useState, useEffect, useRef, type FocusEvent } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Path } from "../constant";
 import Locale from "../locales";
-import ClearIcon from "../icons/close.svg";
 import Delete from "../icons/close.svg";
 import Logo from "../icons/yeying.svg";
 import { useMobileScreen } from "@/app/utils";
 import { getClientConfig } from "../config/client";
 import { safeLocalStorage } from "@/app/utils";
 import clsx from "clsx";
+import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   UCAN_AUTH_EVENT,
-  getCurrentAccount,
   isValidUcanAuthorization,
-  loginWithUcan,
-  resolveWalletLoginAccount,
+  requestWalletIdentityAuthorization,
   waitForWallet,
 } from "../plugins/wallet";
 import {
+  approveCentralAuthorizePresentation,
   applyCentralAuthorizeExchange,
   consumeCentralAuthorizeSession,
   createCentralAuthorizeSession,
   createCentralAuthorizeRequest,
   exchangeCentralAuthorizeCode,
   getCentralAppId,
+  getCentralIdentityOwner,
+  resolveCentralAuthBaseUrl,
   setUcanAuthMode,
   UCAN_AUTH_MODE_CENTRAL,
-  UCAN_AUTH_MODE_WALLET,
 } from "../plugins/central-ucan";
-import { notifyError, notifyInfo, notifySuccess } from "../plugins/show_window";
-import { showModal } from "./ui-lib";
+import { notifyError, notifySuccess } from "../plugins/show_window";
+import { isDesktopAppRuntime } from "../tauri";
 
 const storage = safeLocalStorage();
-const WALLET_HISTORY_KEY = "walletAccountHistory";
-const WALLET_HISTORY_LIMIT = 10;
-type UcanLoginForceMode = "auto" | "wallet" | "central";
+const IDENTITY_LOGIN_SCOPES = [
+  "identity.basic",
+  "identity.wallet",
+  "identity.username",
+];
+const DESKTOP_CENTRAL_REDIRECT_URI =
+  "chat://localhost/central-ucan-callback.html";
 
-function normalizeAccount(account?: string | null) {
-  return (account ?? "").trim();
-}
+type CentralCallback = {
+  code: string;
+  state: string;
+};
 
-function formatAccountPreview(account?: string | null) {
-  const normalized = normalizeAccount(account);
-  if (!normalized) return "";
-  const prefixLength = 6;
-  const suffixLength = 6;
-  if (normalized.length <= prefixLength + suffixLength + 3) {
-    return normalized;
-  }
-  return `${normalized.slice(0, prefixLength)}...${normalized.slice(-suffixLength)}`;
-}
-
-function parseWalletHistory(raw: string | null) {
-  if (!raw) return [];
+function parseDesktopCentralCallback(raw: string): CentralCallback | null {
   try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    const seen = new Set<string>();
-    return parsed
-      .filter((item): item is string => typeof item === "string")
-      .map((item) => normalizeAccount(item))
-      .filter((item) => {
-        if (!item) return false;
-        const key = item.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .slice(0, WALLET_HISTORY_LIMIT);
+    const parsed = new URL(raw);
+    if (
+      parsed.protocol !== "chat:" ||
+      parsed.hostname !== "localhost" ||
+      parsed.pathname !== "/central-ucan-callback.html"
+    ) {
+      return null;
+    }
+    const code = (parsed.searchParams.get("code") || "").trim();
+    const state = (parsed.searchParams.get("state") || "").trim();
+    if (!code || !state) return null;
+    return { code, state };
   } catch {
-    return [];
+    return null;
   }
-}
-
-function loadWalletHistory() {
-  return parseWalletHistory(storage.getItem(WALLET_HISTORY_KEY));
-}
-
-function persistWalletHistory(history: string[]) {
-  storage.setItem(WALLET_HISTORY_KEY, JSON.stringify(history));
-}
-
-function mergeWalletHistory(account: string, history: string[]) {
-  if (!account) return history;
-  return [
-    account,
-    ...history.filter((item) => item.toLowerCase() !== account.toLowerCase()),
-  ].slice(0, WALLET_HISTORY_LIMIT);
 }
 
 function normalizeRedirectPath(raw: string | null | undefined) {
@@ -103,6 +79,9 @@ function normalizeRedirectPath(raw: string | null | undefined) {
 }
 
 function getCentralRedirectUri() {
+  // Packaged Tauri uses the registered custom protocol. Never let a stale
+  // build variable send its callback back to the WebView origin.
+  if (isDesktopAppRuntime()) return DESKTOP_CENTRAL_REDIRECT_URI;
   const configured = getClientConfig()?.centralUcanRedirectUri?.trim();
   if (configured) return configured;
   if (typeof window === "undefined") return "";
@@ -114,102 +93,53 @@ function formatCentralAuthError(error: unknown, redirectUri: string) {
   return redirectUri ? `${message} (redirectUri: ${redirectUri})` : message;
 }
 
-function getUcanLoginForceMode(): UcanLoginForceMode {
-  const mode = (getClientConfig()?.ucanLoginForceMode || "")
-    .trim()
-    .toLowerCase();
-  if (mode === "wallet" || mode === "central") {
-    return mode;
-  }
-  return "auto";
-}
-
-function renderWalletMismatchPrompt(
-  expectedAccount: string,
-  walletAccount: string,
-) {
-  return (
-    <div>
-      <div>{Locale.Auth.WalletMismatch.Description}</div>
-      <div style={{ marginTop: 12 }}>
-        {Locale.Auth.WalletMismatch.App}: <code>{expectedAccount}</code>
-      </div>
-      <div style={{ marginTop: 8 }}>
-        {Locale.Auth.WalletMismatch.Wallet}: <code>{walletAccount}</code>
-      </div>
-    </div>
-  );
-}
-
-function showWalletMismatchDecision(
-  expectedAccount: string,
-  walletAccount: string,
-) {
-  return new Promise<"wallet" | "switch" | "cancel">((resolve) => {
-    let settled = false;
-    const finish = (decision: "wallet" | "switch" | "cancel") => {
-      if (settled) return;
-      settled = true;
-      resolve(decision);
-    };
-    const closeModal = showModal({
-      title: Locale.Auth.WalletMismatch.Title,
-      actions: [
-        <IconButton
-          key="cancel"
-          text={Locale.UI.Cancel}
-          onClick={() => {
-            finish("cancel");
-            void closeModal();
-          }}
-          bordered
-          shadow
-        />,
-        <IconButton
-          key="switch"
-          text={Locale.Auth.WalletMismatch.Switch}
-          onClick={() => {
-            finish("switch");
-            void closeModal();
-          }}
-          bordered
-          shadow
-        />,
-        <IconButton
-          key="wallet"
-          text={Locale.Auth.WalletMismatch.UseWallet}
-          type="primary"
-          onClick={() => {
-            finish("wallet");
-            void closeModal();
-          }}
-          bordered
-          shadow
-        />,
-      ],
-      onClose: () => {
-        finish("cancel");
-      },
-      children: renderWalletMismatchPrompt(expectedAccount, walletAccount),
-    });
-  });
-}
-
 export function AuthPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [ucanStatus, setUcanStatus] = useState<
     "checking" | "authorized" | "expired" | "unauthorized"
   >("checking");
-  const [walletHistory, setWalletHistory] = useState<string[]>([]);
-  const [selectedWalletAccount, setSelectedWalletAccount] = useState("");
-  const [hasSelectedWalletAccount, setHasSelectedWalletAccount] =
-    useState(false);
-  const [isWalletAccountFocused, setIsWalletAccountFocused] = useState(false);
-  const [isWalletHistoryOpen, setIsWalletHistoryOpen] = useState(false);
   const [centralLoading, setCentralLoading] = useState(false);
   const exchangedCodeRef = useRef("");
-  const walletAccountInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCentralCallback = useCallback(
+    async (code: string, state: string | null | undefined) => {
+      if (!code || exchangedCodeRef.current === code) return;
+      exchangedCodeRef.current = code;
+      setUcanAuthMode(UCAN_AUTH_MODE_CENTRAL, { emit: false });
+
+      const session = consumeCentralAuthorizeSession(state);
+      const redirectPath = session
+        ? normalizeRedirectPath(session.redirectPath)
+        : normalizeRedirectPath(state);
+      const redirectUri = getCentralRedirectUri();
+
+      setCentralLoading(true);
+      try {
+        if (!session?.codeVerifier) {
+          throw new Error("钱包身份授权会话已失效，请重新登录");
+        }
+        const result = await exchangeCentralAuthorizeCode({
+          code,
+          appId: getCentralAppId(),
+          redirectUri,
+          codeVerifier: session.codeVerifier,
+        });
+        applyCentralAuthorizeExchange(result, { emit: false });
+        notifySuccess(Locale.Auth.CentralLoginSuccess);
+        navigate(redirectPath, { replace: true });
+        window.dispatchEvent(new Event(UCAN_AUTH_EVENT));
+      } catch (error) {
+        const message = Locale.Auth.CentralExchangeFailed(
+          formatCentralAuthError(error, redirectUri),
+        );
+        notifyError(message);
+      } finally {
+        setCentralLoading(false);
+      }
+    },
+    [navigate],
+  );
 
   useEffect(() => {
     const config = getClientConfig();
@@ -227,17 +157,12 @@ export function AuthPage() {
     let refreshToken = 0;
     const refreshStatus = async () => {
       const token = ++refreshToken;
-      const account = normalizeAccount(getCurrentAccount());
-      const history = mergeWalletHistory(account, loadWalletHistory());
+      const owner = getCentralIdentityOwner().trim();
       const valid = await isValidUcanAuthorization();
       if (cancelled || token !== refreshToken) return;
-      if (history.length > 0) {
-        persistWalletHistory(history);
-      }
-      setWalletHistory(history);
       if (valid) {
         setUcanStatus("authorized");
-      } else if (account) {
+      } else if (owner) {
         setUcanStatus("expired");
       } else {
         setUcanStatus("unauthorized");
@@ -262,48 +187,48 @@ export function AuthPage() {
     if (!code) {
       return;
     }
-    if (exchangedCodeRef.current === code) {
-      return;
-    }
-    exchangedCodeRef.current = code;
-    setUcanAuthMode(UCAN_AUTH_MODE_CENTRAL, { emit: false });
-
     const state = params.get("state");
-    const session = consumeCentralAuthorizeSession(state);
-    const redirectPath = session
-      ? normalizeRedirectPath(session.redirectPath)
-      : normalizeRedirectPath(state);
-    const redirectUri = getCentralRedirectUri();
+    void handleCentralCallback(code, state);
+  }, [handleCentralCallback, location.search]);
 
-    const run = async () => {
-      setCentralLoading(true);
-      try {
-        if (!session?.codeVerifier) {
-          throw new Error("钱包身份授权会话已失效，请重新登录");
-        }
-        const result = await exchangeCentralAuthorizeCode({
-          code,
-          appId: getCentralAppId(),
-          redirectUri,
-          codeVerifier: session.codeVerifier,
-        });
-        applyCentralAuthorizeExchange(result, { emit: false });
-        notifySuccess(Locale.Auth.CentralLoginSuccess);
-        const target = encodeURIComponent(redirectPath);
-        navigate(`${Path.Auth}?redirect=${target}`, { replace: true });
-        window.dispatchEvent(new Event(UCAN_AUTH_EVENT));
-      } catch (error) {
-        const message = Locale.Auth.CentralExchangeFailed(
-          formatCentralAuthError(error, redirectUri),
-        );
-        notifyError(message);
-      } finally {
-        setCentralLoading(false);
+  useEffect(() => {
+    if (!isDesktopAppRuntime()) return;
+
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    const handleUrls = (urls: string[]) => {
+      for (const raw of urls) {
+        const callback = parseDesktopCentralCallback(raw);
+        if (!callback) continue;
+        void handleCentralCallback(callback.code, callback.state);
+        break;
       }
     };
 
-    run();
-  }, [location.search, navigate]);
+    const subscribe = async () => {
+      try {
+        const removeListener = await onOpenUrl(handleUrls);
+        if (disposed) {
+          removeListener();
+          return;
+        }
+        unlisten = removeListener;
+        const currentUrls = await getCurrent();
+        if (!disposed && currentUrls?.length) {
+          handleUrls(currentUrls);
+        }
+      } catch (error) {
+        console.error("Failed to subscribe to desktop deep links", error);
+      }
+    };
+
+    void subscribe();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [handleCentralCallback]);
 
   const handleCentralAuthorizeLogin = async () => {
     const redirectUri = getCentralRedirectUri();
@@ -317,11 +242,15 @@ export function AuthPage() {
         redirectUri,
         state: session.state,
         codeChallenge: session.codeChallenge,
-        scopes: ["identity.basic", "identity.wallet", "identity.username"],
+        scopes: IDENTITY_LOGIN_SCOPES,
       });
       setUcanAuthMode(UCAN_AUTH_MODE_CENTRAL, { emit: false });
       notifySuccess(Locale.Auth.CentralRequestCreated);
-      window.location.href = request.verifyUrl;
+      if (isDesktopAppRuntime()) {
+        await openUrl(request.verifyUrl);
+      } else {
+        window.location.href = request.verifyUrl;
+      }
     } catch (error) {
       notifyError(
         Locale.Auth.CentralRequestFailed(
@@ -333,211 +262,91 @@ export function AuthPage() {
     }
   };
 
+  const handleWalletIdentityLogin = async (
+    provider: Awaited<ReturnType<typeof waitForWallet>>,
+  ) => {
+    const redirectUri = getCentralRedirectUri();
+    const params = new URLSearchParams(location.search);
+    const redirectPath = normalizeRedirectPath(params.get("redirect"));
+    const session = await createCentralAuthorizeSession(redirectPath);
+    setCentralLoading(true);
+    try {
+      const request = await createCentralAuthorizeRequest({
+        appId: getCentralAppId(),
+        redirectUri,
+        state: session.state,
+        codeChallenge: session.codeChallenge,
+        scopes: IDENTITY_LOGIN_SCOPES,
+      });
+      const presentation = await requestWalletIdentityAuthorization({
+        provider,
+        request,
+        issuerEndpoint: resolveCentralAuthBaseUrl(),
+      });
+      const approval = await approveCentralAuthorizePresentation({
+        requestId: request.requestId,
+        presentation,
+      });
+      const result = await exchangeCentralAuthorizeCode({
+        code: approval.authorizationCode,
+        appId: getCentralAppId(),
+        redirectUri,
+        codeVerifier: session.codeVerifier,
+      });
+      applyCentralAuthorizeExchange(result, { emit: false });
+      notifySuccess(Locale.Auth.CentralLoginSuccess);
+      navigate(redirectPath, { replace: true });
+      window.dispatchEvent(new Event(UCAN_AUTH_EVENT));
+    } finally {
+      consumeCentralAuthorizeSession(session.state);
+      setCentralLoading(false);
+    }
+  };
+
   const handlePrimaryLogin = async () => {
     if (centralLoading) return;
-    const preferredAddress = hasSelectedWalletAccount
-      ? normalizeAccount(selectedWalletAccount)
-      : "";
-    const forceMode = getUcanLoginForceMode();
-
-    if (forceMode === "central") {
+    if (isDesktopAppRuntime()) {
+      await handleCentralAuthorizeLogin();
+      return;
+    }
+    let provider: Awaited<ReturnType<typeof waitForWallet>>;
+    try {
+      provider = await waitForWallet();
+    } catch {
+      // A browser without a wallet uses the same Node Passkey flow as the
+      // desktop build. There is no address input or address-selection branch.
       await handleCentralAuthorizeLogin();
       return;
     }
 
     try {
-      await waitForWallet();
-      setUcanAuthMode(UCAN_AUTH_MODE_WALLET, { emit: false });
-      const resolution = await resolveWalletLoginAccount(
-        preferredAddress || undefined,
-      );
-
-      if (resolution.status === "pending") {
-        return;
-      }
-
-      if (resolution.status === "unavailable") {
-        notifyError(Locale.Auth.MissingWalletAccount);
-        return;
-      }
-
-      if (resolution.status === "mismatch") {
-        const decision = await showWalletMismatchDecision(
-          resolution.expectedAccount,
-          resolution.walletAccount,
-        );
-
-        if (decision === "switch") {
-          setSelectedWalletAccount(resolution.expectedAccount);
-          notifyInfo(Locale.Auth.SwitchToAppAccount);
-          return;
-        }
-
-        if (decision !== "wallet") {
-          notifyInfo(Locale.Auth.LoginCancelled);
-          return;
-        }
-        setSelectedWalletAccount(resolution.walletAccount);
-        setHasSelectedWalletAccount(true);
-        storage.setItem("currentAccount", resolution.walletAccount);
-        await loginWithUcan(resolution.provider, resolution.walletAccount, {
-          silent: false,
-          reload: false,
-        });
-        return;
-      }
-
-      storage.setItem("currentAccount", resolution.account);
-      setSelectedWalletAccount(resolution.account);
-      setHasSelectedWalletAccount(true);
-      await loginWithUcan(resolution.provider, resolution.account, {
-        silent: false,
-        reload: false,
-      });
-      return;
+      await handleWalletIdentityLogin(provider);
     } catch (error) {
-      if (forceMode === "wallet") {
-        notifyError(Locale.Auth.WalletLoginFailed(String(error)));
-        return;
-      }
-      // wallet not available, fallback to centralized UCAN service
+      notifyError(
+        Locale.Auth.WalletLoginFailed(
+          formatCentralAuthError(error, getCentralRedirectUri()),
+        ),
+      );
     }
-
-    await handleCentralAuthorizeLogin();
-  };
-
-  const handleWalletSelectWrapBlur = (event: FocusEvent<HTMLDivElement>) => {
-    const nextFocused = event.relatedTarget as Node | null;
-    if (nextFocused && event.currentTarget.contains(nextFocused)) {
-      return;
-    }
-    setIsWalletHistoryOpen(false);
-    setIsWalletAccountFocused(false);
-    setSelectedWalletAccount((value) => {
-      const normalized = normalizeAccount(value);
-      setHasSelectedWalletAccount(normalized.length > 0);
-      return normalized;
-    });
-  };
-
-  const handleWalletHistoryToggle = () => {
-    const nextOpen = !isWalletHistoryOpen;
-    setIsWalletHistoryOpen(nextOpen);
-    if (nextOpen) {
-      setIsWalletAccountFocused(true);
-      walletAccountInputRef.current?.focus();
-    } else {
-      walletAccountInputRef.current?.blur();
-    }
-  };
-
-  const handleWalletHistorySelect = (account: string) => {
-    setSelectedWalletAccount(account);
-    setHasSelectedWalletAccount(true);
-    setIsWalletHistoryOpen(false);
-    setIsWalletAccountFocused(false);
-    walletAccountInputRef.current?.blur();
-  };
-
-  const handleWalletAccountClear = () => {
-    setSelectedWalletAccount("");
-    setHasSelectedWalletAccount(false);
-    setIsWalletHistoryOpen(false);
-    walletAccountInputRef.current?.focus();
   };
 
   const isWalletConnectDisabled = ucanStatus === "authorized" || centralLoading;
-  const normalizedSelectedWalletAccount = normalizeAccount(
-    selectedWalletAccount,
-  );
-  const walletAccountInputValue = isWalletAccountFocused
-    ? selectedWalletAccount
-    : formatAccountPreview(
-        hasSelectedWalletAccount ? selectedWalletAccount : "",
-      );
-
+  const isDesktopApp = isDesktopAppRuntime();
   return (
     <div className={styles["auth-page"]}>
       <TopBanner></TopBanner>
-      <div className={styles["auth-wallet"]}>
-        <div
-          className={styles["auth-wallet-select-wrap"]}
-          onBlur={handleWalletSelectWrapBlur}
-        >
-          <input
-            ref={walletAccountInputRef}
-            className={styles["auth-wallet-select"]}
-            value={walletAccountInputValue}
-            onChange={(event) => {
-              const value = event.target.value;
-              setSelectedWalletAccount(value);
-              setHasSelectedWalletAccount(normalizeAccount(value).length > 0);
-              setIsWalletHistoryOpen(true);
-            }}
-            onFocus={() => {
-              setIsWalletAccountFocused(true);
-              setIsWalletHistoryOpen(true);
-            }}
-            data-empty={hasSelectedWalletAccount ? "false" : "true"}
-            aria-label={Locale.Auth.Input}
-            placeholder={Locale.Auth.Input}
-            autoComplete="off"
-            spellCheck={false}
-            title={hasSelectedWalletAccount ? selectedWalletAccount : ""}
-          />
-          {hasSelectedWalletAccount && (
-            <button
-              type="button"
-              className={styles["auth-wallet-clear"]}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={handleWalletAccountClear}
-              title={Locale.Auth.ClearSelection}
-              aria-label={Locale.Auth.ClearSelection}
-            >
-              <ClearIcon />
-            </button>
-          )}
-          {isWalletHistoryOpen && (
-            <div className={styles["auth-wallet-history-menu"]}>
-              {walletHistory.length > 0 ? (
-                walletHistory.map((account) => (
-                  <button
-                    key={account}
-                    type="button"
-                    className={styles["auth-wallet-history-option"]}
-                    data-active={
-                      account.toLowerCase() ===
-                      normalizedSelectedWalletAccount.toLowerCase()
-                    }
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => handleWalletHistorySelect(account)}
-                    title={account}
-                  >
-                    {formatAccountPreview(account)}
-                  </button>
-                ))
-              ) : (
-                <div className={styles["auth-wallet-history-empty"]}>
-                  {Locale.Auth.EmptyHistory}
-                </div>
-              )}
-            </div>
-          )}
-          <button
-            type="button"
-            className={styles["auth-wallet-arrow-button"]}
-            onClick={handleWalletHistoryToggle}
-            aria-label={Locale.Auth.ExpandAccountList}
-            title={Locale.Auth.ExpandAccountList}
-          >
-            <span
-              className={styles["auth-wallet-select-arrow"]}
-              data-open={isWalletHistoryOpen ? "true" : "false"}
-            />
-          </button>
-        </div>
+      <div
+        className={styles["auth-wallet"]}
+        data-runtime={isDesktopApp ? "desktop" : "web"}
+      >
         <IconButton
-          text={centralLoading ? Locale.Auth.Processing : Locale.Auth.Confirm}
+          text={
+            centralLoading
+              ? Locale.Auth.Processing
+              : isDesktopApp
+                ? Locale.Auth.PasskeyLogin
+                : Locale.Auth.Confirm
+          }
           type="primary"
           className={styles["auth-wallet-connect"]}
           onClick={handlePrimaryLogin}
