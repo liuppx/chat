@@ -30,7 +30,15 @@ function getWorkspaceSnapshotKey(owner: string) {
 }
 
 function getCurrentAccountOwner() {
-  return normalizeWorkspaceOwner(storage.getItem("currentAccount"));
+  // Centralized wallet/passkey login is keyed by the wallet identity DID.
+  // `currentAccount` is kept as a linked wallet-address compatibility field
+  // for existing UI and wallet APIs, so it must not partition the workspace.
+  const identityDid =
+    storage.getItem("currentIdentityDid") ||
+    storage.getItem("centralIdentityDid");
+  return normalizeWorkspaceOwner(
+    identityDid || storage.getItem("currentAccount"),
+  );
 }
 
 export function getAccountWorkspaceOwner() {
@@ -217,7 +225,16 @@ function bindAccountWorkspaceIsolation() {
   };
 
   const onStorage = (event: StorageEvent) => {
-    if (event.key && event.key !== "currentAccount") return;
+    if (
+      event.key &&
+      ![
+        "currentAccount",
+        "currentIdentityDid",
+        "centralIdentityDid",
+        "ucanAuthMode",
+      ].includes(event.key)
+    )
+      return;
     reconcile();
   };
 

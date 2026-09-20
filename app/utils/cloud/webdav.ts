@@ -19,6 +19,7 @@ import { ensureLocalUcanSession } from "@/app/plugins/ucan-session";
 import { invalidateUcanAuthorization } from "@/app/plugins/wallet";
 import {
   getCentralUcanAuthorizationHeaderForAudience,
+  getCentralIdentityOwner,
   isCentralModeEnabled,
 } from "@/app/plugins/central-ucan";
 import {
@@ -643,10 +644,7 @@ async function getUcanWebDavClient(store: SyncStore) {
   const invocationCaps = getWebdavCapabilities();
 
   if (isCentralModeEnabled()) {
-    const currentAccount =
-      typeof localStorage === "undefined"
-        ? ""
-        : (localStorage.getItem("currentAccount") || "").trim().toLowerCase();
+    const identityOwner = getCentralIdentityOwner().toLowerCase();
     const cacheKey = buildUcanWebdavCacheKey({
       backendUrl,
       webdavPrefix,
@@ -655,7 +653,7 @@ async function getUcanWebDavClient(store: SyncStore) {
       appId,
       appAction,
       invocationCapsKey: getUcanCapsKey(invocationCaps),
-      rootIss: `central:${currentAccount}`,
+      rootIss: `central:${identityOwner}`,
       rootExp: 0,
     });
     const cached = getValidCachedUcanWebdavClient(cacheKey);
@@ -663,10 +661,22 @@ async function getUcanWebDavClient(store: SyncStore) {
       return cached;
     }
 
-    const authorization = await getCentralUcanAuthorizationHeaderForAudience({
-      audience,
-      capabilities: invocationCaps,
-    });
+    let authorization: string | null;
+    try {
+      authorization = await getCentralUcanAuthorizationHeaderForAudience({
+        audience,
+        capabilities: invocationCaps,
+      });
+    } catch (error) {
+      console.error("[WebDav UCAN] failed to issue central token", {
+        audience,
+        appId,
+        capabilities: getUcanCapsKey(invocationCaps),
+        identityOwner,
+        error,
+      });
+      throw error;
+    }
     if (!authorization) {
       throw new Error("中心化 UCAN 未授权");
     }

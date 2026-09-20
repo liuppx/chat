@@ -17,59 +17,93 @@ type StreamResponse = {
   headers: Record<string, string>;
 };
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error) return error;
+  return "Tauri request failed";
+}
+
+function createErrorResponse(error: unknown) {
+  return new Response(getErrorMessage(error), {
+    status: 599,
+    statusText: "Tauri request failed",
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
+}
+
 export function fetch(url: string, options?: RequestInit): Promise<Response> {
-  if (isDesktopAppRuntime()) {
-    const {
-      signal,
-      method = "GET",
-      headers: _headers = {},
-      body = [],
-    } = options || {};
-    let unlisten: Function | undefined;
-    let setRequestId: Function | undefined;
-    const requestIdPromise = new Promise((resolve) => (setRequestId = resolve));
-    const ts = new TransformStream();
-    const writer = ts.writable.getWriter();
+  if (isDesktopAppRuntime()) return fetchFromTauri(url, options);
+  return window.fetch(url, options);
+}
 
-    let closed = false;
-    const close = () => {
-      if (closed) return;
-      closed = true;
-      unlisten && unlisten();
-      writer.ready.then(() => {
-        writer.close().catch((e) => console.error(e));
-      });
-    };
+async function fetchFromTauri(
+  url: string,
+  options?: RequestInit,
+): Promise<Response> {
+  const {
+    signal,
+    method = "GET",
+    headers: requestHeaders = {},
+    body = [],
+  } = options || {};
+  if (signal?.aborted) {
+    return createErrorResponse(new Error("The request was aborted"));
+  }
 
-    if (signal) {
-      signal.addEventListener("abort", () => close());
-    }
-    tauriListen<ResponseEvent>("stream-response", (event) =>
-      requestIdPromise.then((request_id) => {
-        const { request_id: rid, chunk, status } = event.payload || {};
-        if (request_id != rid) {
-          return;
-        }
+  let unlisten: (() => void) | undefined;
+  let resolveRequestId: ((requestId: number) => void) | undefined;
+  const requestIdPromise = new Promise<number>((resolve) => {
+    resolveRequestId = resolve;
+  });
+  const stream = new TransformStream<Uint8Array, Uint8Array>();
+  const writer = stream.writable.getWriter();
+  let closed = false;
+
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    unlisten?.();
+    void writer.ready
+      .then(() => writer.close())
+      .catch((error) => console.error("stream close error", error));
+  };
+
+  if (signal) {
+    signal.addEventListener("abort", close, { once: true });
+  }
+
+  try {
+    // Register before invoking Rust. The command starts emitting chunks as
+    // soon as the response headers arrive, so registering afterward can lose
+    // the response on fast connections.
+    unlisten = await tauriListen<ResponseEvent>("stream-response", (event) => {
+      void requestIdPromise.then((requestId) => {
+        const {
+          request_id: responseRequestId,
+          chunk,
+          status,
+        } = event.payload || {};
+        if (requestId !== responseRequestId || closed) return;
         if (chunk) {
-          writer.ready.then(() => {
-            writer.write(new Uint8Array(chunk));
-          });
+          void writer.ready
+            .then(() => writer.write(new Uint8Array(chunk)))
+            .catch((error) => console.error("stream write error", error));
         } else if (status === 0) {
-          // end of body
           close();
         }
-      }),
-    ).then((u: Function) => (unlisten = u));
+      });
+    });
 
     const headers: Record<string, string> = {
       Accept: "application/json, text/plain, */*",
       "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
       "User-Agent": navigator.userAgent,
     };
-    for (const item of new Headers(_headers || {})) {
+    for (const item of new Headers(requestHeaders || {})) {
       headers[item[0]] = item[1];
     }
-    return tauriInvoke<StreamResponse>("stream_fetch", {
+
+    const result = await tauriInvoke<StreamResponse>("stream_fetch", {
       method: method.toUpperCase(),
       url,
       headers,
@@ -78,25 +112,16 @@ export function fetch(url: string, options?: RequestInit): Promise<Response> {
         typeof body === "string"
           ? Array.from(new TextEncoder().encode(body))
           : [],
-    })
-      .then((res: StreamResponse) => {
-        const { request_id, status, status_text: statusText, headers } = res;
-        setRequestId?.(request_id);
-        const response = new Response(ts.readable, {
-          status,
-          statusText,
-          headers,
-        });
-        if (status >= 300) {
-          setTimeout(close, 100);
-        }
-        return response;
-      })
-      .catch((e) => {
-        console.error("stream error", e);
-        // throw e;
-        return new Response("", { status: 599 });
-      });
+    });
+    resolveRequestId?.(result.request_id);
+    return new Response(stream.readable, {
+      status: result.status,
+      statusText: result.status_text,
+      headers: result.headers,
+    });
+  } catch (error) {
+    console.error("stream error", error);
+    close();
+    return createErrorResponse(error);
   }
-  return window.fetch(url, options);
 }

@@ -52,9 +52,24 @@ is_valid_mode() {
 load_env_file() {
   local env_path="$1"
   if [ -f "${env_path}" ]; then
-    set -a
-    . "${env_path}"
-    set +a
+    local line=""
+    local key=""
+    local value=""
+    while IFS= read -r line || [ -n "${line}" ]; do
+      if [[ "${line}" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=[[:space:]]*(.*)[[:space:]]*$ ]]; then
+        key="${BASH_REMATCH[1]}"
+        value="${BASH_REMATCH[2]}"
+        # Command-line and CI variables are authoritative. Values loaded from
+        # an earlier env file also remain authoritative for this packaging run.
+        if declare -p "${key}" >/dev/null 2>&1; then
+          continue
+        fi
+        if [[ "${value}" = \"*\" && "${value}" = *\" ]] || [[ "${value}" = \'*\' && "${value}" = *\' ]]; then
+          value="${value:1:${#value}-2}"
+        fi
+        export "${key}=${value}"
+      fi
+    done < "${env_path}"
   fi
 }
 
@@ -97,7 +112,6 @@ load_build_env() {
     load_env_file "${BUILD_ENV_FILE}"
   elif [ -f "${BUILD_ENV_TEMPLATE}" ]; then
     BUILD_ENV_SOURCE="${BUILD_ENV_TEMPLATE}"
-    load_env_file "${BUILD_ENV_TEMPLATE}"
   else
     BUILD_ENV_SOURCE="none"
   fi
@@ -482,8 +496,13 @@ git checkout -q "${TARGET_TAG}"
 echo "Packaging mode: ${MODE}"
 echo "Packaging from tag: ${TARGET_TAG}"
 
-ensure_runtime_env
-load_build_env
+if [[ "${MODE}" = "app" || "${MODE}" = "app-release" ]]; then
+  # Desktop builds must not inherit Web/standalone runtime values from .env.
+  load_build_env
+else
+  ensure_runtime_env
+  load_build_env
+fi
 
 PROJECT_NAME="$(node -p "require('./package.json').name || 'app'")"
 SHORT_HASH="$(git rev-parse --short=7 HEAD)"

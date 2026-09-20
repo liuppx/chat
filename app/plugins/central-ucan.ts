@@ -123,6 +123,20 @@ export type CentralAuthorizeExchangeResult = {
   capabilities?: UcanCapability[];
   notBefore?: number;
   ucanExpiresAt?: number;
+  ucanSession?: {
+    sessionToken: string;
+    issuerDid?: string;
+    issuedAt?: number;
+    expiresAt?: number;
+  };
+};
+
+export type CentralAuthorizeApprovalResult = {
+  requestId: string;
+  did: string;
+  authorizationCode: string;
+  authorizationCodeExpiresAt: string | number;
+  redirectTo: string;
 };
 
 export type UcanAuthMode =
@@ -692,7 +706,7 @@ function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, "");
 }
 
-function resolveCentralAuthBaseUrl(baseUrlOverride?: string): string {
+export function resolveCentralAuthBaseUrl(baseUrlOverride?: string): string {
   const fromOverride = normalizeBaseUrl(baseUrlOverride || "");
   if (fromOverride) return fromOverride;
   const config = getClientConfig();
@@ -782,6 +796,21 @@ export function getCentralAccount(): string {
   ).trim();
 }
 
+/**
+ * The identity DID is the workspace owner for the centralized flow. The
+ * linked wallet address remains available through getCentralWalletAddress()
+ * for compatibility with wallet-facing UI and APIs, but it must not be used
+ * as the login/workspace key.
+ */
+export function getCentralIdentityOwner(): string {
+  if (typeof localStorage === "undefined") return "";
+  return (
+    localStorage.getItem(CURRENT_IDENTITY_DID_KEY) ||
+    localStorage.getItem(CENTRAL_IDENTITY_DID_KEY) ||
+    ""
+  ).trim();
+}
+
 export function getCentralIdentityDid(): string {
   if (typeof localStorage === "undefined") return "";
   return (localStorage.getItem(CENTRAL_IDENTITY_DID_KEY) || "").trim();
@@ -844,9 +873,16 @@ export function getCentralAccessToken(): string | null {
 
 export function isCentralUcanAuthorized(): boolean {
   if (!isCentralModeEnabled()) return false;
-  return Boolean(
-    getCentralIdentityDid() || (getCentralAccessToken() && getCentralAccount()),
-  );
+  const accessToken = getCentralAccessToken();
+  if (accessToken && getCentralAccount()) return true;
+
+  // A Passkey/Wallet identity exchange does not return the legacy access JWT.
+  // It returns a short-lived UCAN issuing session instead. Do not report the
+  // account as authorized when both that session and all issued UCANs are
+  // gone; doing so only defers the failure to the first sync request and
+  // leaves the user stuck on the generic workspace error screen.
+  if (!getCentralIdentityDid()) return false;
+  return Boolean(readSessionTokenFromStorage() || getCentralUcanToken());
 }
 
 export function getCentralUcanAuthorizationHeader(): string | null {
@@ -961,6 +997,35 @@ export async function createCentralAuthorizeRequest(input: {
   );
 }
 
+export async function approveCentralAuthorizePresentation(input: {
+  requestId: string;
+  presentation: unknown;
+  baseUrl?: string;
+}): Promise<CentralAuthorizeApprovalResult> {
+  const response = await desktopAwareFetch(
+    buildApiUrl("/api/v1/public/identity/authorize/approve", input.baseUrl),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        requestId: input.requestId,
+        presentation: input.presentation,
+      }),
+    },
+  );
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      parseApiErrorText(text, `钱包身份授权确认失败: ${response.status}`),
+    );
+  }
+  return parseEnvelope<CentralAuthorizeApprovalResult>(
+    text,
+    "钱包身份授权确认失败",
+  );
+}
+
 export async function exchangeCentralAuthorizeCode(input: {
   code: string;
   appId?: string;
@@ -980,6 +1045,7 @@ export async function exchangeCentralAuthorizeCode(input: {
         appId: resolvedAppId,
         redirectUri: input.redirectUri,
         codeVerifier: input.codeVerifier,
+        issueUcanSession: true,
       }),
     },
   );
@@ -1018,12 +1084,22 @@ export function applyCentralAuthorizeExchange(
       localStorage.setItem(CENTRAL_WALLET_ADDRESS_KEY, walletAddress);
       localStorage.setItem(CURRENT_WALLET_ADDRESS_KEY, walletAddress);
       localStorage.setItem("currentAccount", walletAddress);
+    } else {
+      // Never retain an address from a previous account when the identity
+      // service intentionally returns a DID-only result.
+      localStorage.removeItem(CENTRAL_WALLET_ADDRESS_KEY);
+      localStorage.removeItem(CURRENT_WALLET_ADDRESS_KEY);
+      localStorage.removeItem("currentAccount");
     }
     if (result.credentials) {
       localStorage.setItem(
         CENTRAL_IDENTITY_CREDENTIALS_KEY,
         JSON.stringify(result.credentials),
       );
+    }
+    const sessionToken = String(result.ucanSession?.sessionToken || "").trim();
+    if (sessionToken) {
+      persistSessionToken(sessionToken, result.ucanSession?.expiresAt);
     }
     if (result.token) {
       localStorage.setItem(CENTRAL_ACCESS_TOKEN_KEY, result.token);

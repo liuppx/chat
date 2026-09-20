@@ -16,10 +16,13 @@ import {
   onChainChanged,
   classifyWalletError,
   createRootUcan,
+  requestIdentityPresentation,
   getStoredUcanRoot,
   resolveUcanAuthorization,
   clearUcanSession,
   type Eip1193Provider,
+  type IdentityPresentation,
+  type IdentityPresentationScope,
   type UcanRootProof,
   type WalletAccountResolution as SdkWalletAccountResolution,
 } from "@yeying-community/web3-bs";
@@ -40,6 +43,7 @@ import {
   setUcanAuthMode,
   UCAN_AUTH_MODE_WALLET,
 } from "./central-ucan";
+import type { CentralAuthorizeRequestResult } from "./central-ucan";
 
 const providerOptions = {
   preferYeYing: true,
@@ -221,6 +225,12 @@ function bindWalletListeners(provider: Eip1193Provider) {
   listenersCleanup?.();
   let lastObservedAccount = getCurrentAccount();
   const handleAccountsChanged = async (accounts: string[]) => {
+    // Wallet identity and passkey logins share the centralized identity
+    // session. Provider account events must not replace that session with the
+    // legacy SIWE/UCAN flow.
+    if (isCentralModeEnabled()) {
+      return;
+    }
     if (!Array.isArray(accounts) || accounts.length === 0) {
       if (logoutInFlight) {
         logoutInFlight = false;
@@ -378,6 +388,66 @@ export async function resolveWalletLoginAccount(
     provider,
     ...resolution,
   };
+}
+
+function toIdentityChainKey(chainId: string) {
+  try {
+    return `eip155:${BigInt(chainId).toString(10)}`;
+  } catch {
+    throw new Error(`不支持的钱包网络: ${chainId}`);
+  }
+}
+
+export async function requestWalletIdentityAuthorization(input: {
+  provider: Eip1193Provider;
+  /**
+   * Optional compatibility override. New wallet-identity login must omit it
+   * so the Wallet resolves the active identity and linked account itself.
+   */
+  address?: string | null;
+  request: CentralAuthorizeRequestResult;
+  issuerEndpoint: string;
+}): Promise<IdentityPresentation> {
+  const scopes = input.request.scopes as IdentityPresentationScope[];
+  if (!input.request.nonce) {
+    throw new Error("钱包身份授权请求缺少 nonce");
+  }
+
+  await input.provider.request({
+    method: "wallet_requestPermissions",
+    params: [
+      {
+        wallet_identity: { scopes },
+      },
+    ],
+  });
+
+  const chainId = input.address
+    ? await getChainIdFromSdk(input.provider)
+    : null;
+  if (input.address && !chainId) {
+    throw new Error("未获取到钱包网络");
+  }
+
+  return await requestIdentityPresentation({
+    provider: input.provider,
+    appId: input.request.appId,
+    audience: input.request.audience,
+    nonce: input.request.nonce,
+    scopes,
+    ...(input.address && chainId
+      ? {
+          account: {
+            chainKey: toIdentityChainKey(chainId),
+            address: input.address,
+          },
+        }
+      : {}),
+    issuerEndpoint: input.issuerEndpoint,
+    expiresAt: String(input.request.expiresAt),
+    requestId: input.request.requestId,
+    ensureConnected: false,
+  });
 }
 
 // 连接钱包

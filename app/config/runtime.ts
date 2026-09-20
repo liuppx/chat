@@ -6,16 +6,6 @@ import {
 import { getBuildConfig, type BuildConfig } from "./build";
 import { getServerSideConfig } from "./server";
 
-export type UcanLoginForceMode = "auto" | "wallet" | "central";
-
-function normalizeUcanLoginForceMode(raw?: string): UcanLoginForceMode {
-  const mode = (raw || "").trim().toLowerCase();
-  if (mode === "wallet" || mode === "central") {
-    return mode;
-  }
-  return "auto";
-}
-
 function normalizeBaseUrl(raw: string): string {
   return raw.trim().replace(/\/+$/, "");
 }
@@ -81,7 +71,6 @@ export type RuntimePublicConfig = BuildConfig & {
   centralUcanAuthBaseUrl: string;
   centralUcanAppId: string;
   centralUcanRedirectUri: string;
-  ucanLoginForceMode: UcanLoginForceMode;
   marketplaceSkillPackagesUrl: string;
   marketplaceToolPackagesUrl: string;
 };
@@ -162,9 +151,6 @@ export function getRuntimePublicConfig(): RuntimePublicConfig {
       process.env.CENTRAL_UCAN_AUTH_BASE_URL?.trim() || "http://127.0.0.1:8100",
     centralUcanAppId: process.env.CENTRAL_UCAN_APP_ID?.trim() || "",
     centralUcanRedirectUri: process.env.CENTRAL_UCAN_REDIRECT_URI?.trim() || "",
-    ucanLoginForceMode: normalizeUcanLoginForceMode(
-      process.env.UCAN_LOGIN_FORCE_MODE,
-    ),
     marketplaceSkillPackagesUrl:
       process.env.MARKETPLACE_SKILL_PACKAGES_URL?.trim() ||
       COMMUNITY_MARKETPLACE_SKILL_PACKAGES_URL,

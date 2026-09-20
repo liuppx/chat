@@ -76,8 +76,7 @@ cp .env.build.template .env.build
    - `ROUTER_PORTAL_TOKEN_URL`：Router 令牌页地址（可选，默认继承 `ROUTER_PORTAL_URL`）
    - `ROUTER_PORTAL_RECHARGE_URL`：Router 充值页地址（可选，默认继承 `ROUTER_PORTAL_TOKEN_URL`）
    - `CENTRAL_UCAN_APP_ID`：中心化 UCAN 应用 AppId（在 Node 应用市场发布后获得）
-   - `CENTRAL_UCAN_REDIRECT_URI`：中心化 UCAN 授权回调地址；Tauri 本地包通常是 `https://tauri.localhost/central-ucan-callback.html`
-   - `UCAN_LOGIN_FORCE_MODE`：登录路径强制模式（`auto`/`wallet`/`central`，默认 `auto`）
+   - `CENTRAL_UCAN_REDIRECT_URI`：中心化 UCAN 授权回调地址；Tauri 本地包固定使用 `chat://localhost/central-ucan-callback.html`
    - `WEBDAV_BACKEND_BASE_URL`：WebDAV 后端基础地址（按需配置，不含路径）
    - `WEBDAV_BACKEND_PREFIX`：WebDAV 路径前缀（默认 `/dav`，可选修改）
    - `WEBDAV_APP_ID`：WebDAV/UCAN 应用空间 ID；桌面包如需复用本地 web 版数据，通常设置为 `localhost-3020`
@@ -189,9 +188,10 @@ WEBDAV_BACKEND_PREFIX=/dav
 WEBDAV_APP_ID=localhost-3020
 CENTRAL_UCAN_AUTH_BASE_URL=http://127.0.0.1:8100
 CENTRAL_UCAN_APP_ID=<Node 中发布的 Chat 应用 ID>
-CENTRAL_UCAN_REDIRECT_URI=https://tauri.localhost/central-ucan-callback.html
-UCAN_LOGIN_FORCE_MODE=auto
+CENTRAL_UCAN_REDIRECT_URI=chat://localhost/central-ucan-callback.html
 ```
+
+Web 版登录入口优先使用钱包插件，未检测到钱包时回退到 Node 通行证授权；桌面版不尝试钱包插件，只在系统浏览器中使用 Node 通行证授权。桌面构建仍需配置上述 Node 认证参数，不能通过关闭某个登录模式来绕过。
 
 修改这些前端公开配置后，需要重新打包桌面应用：
 
@@ -206,7 +206,7 @@ open src-tauri/target/release/bundle/macos/Chat.app
 2. 进入发现页的云端存储，点击“检查连接”和“立即同步”。
 3. 回到聊天首页，确认左侧会话列表能从 Warehouse/WebDAV 恢复。
 
-如果云端存储正常但会话列表为空，优先检查 `WEBDAV_APP_ID` 是否和网页版同一个应用空间一致，例如 `localhost-3020`。如果桌面端 WebDAV 请求失败，优先确认 Warehouse CORS 是否允许 `tauri://localhost`。
+如果云端存储正常但会话列表为空，优先检查 `WEBDAV_APP_ID` 是否和网页版同一个应用空间一致，例如 `localhost-3020`。如果桌面端 WebDAV 请求失败，优先确认 Warehouse CORS 是否允许 `https://tauri.localhost`；这只是桌面 WebView origin，不是登录回调地址。
 
 完整说明见：`docs/Tauri桌面端迁移清单.md`
 
