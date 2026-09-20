@@ -7,6 +7,7 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  background: color-mix(in srgb, var(--primary) 5%, var(--white));
   .top-banner {
     position: relative;
     width: 100%;
@@ -67,48 +68,123 @@
     }
   }
 
-  .auth-wallet {
-    margin-top: clamp(40px, 10vh, 120px);
-    margin-bottom: 0;
-    padding: 0;
-    border: none;
-    border-radius: 0;
+  .auth-card {
+    position: relative;
     width: min(420px, calc(100vw - 32px));
-    min-width: 0;
-    flex-shrink: 0;
-    display: grid;
-    grid-template-columns: minmax(0, 260px);
-    justify-content: center;
-    align-items: center;
-    column-gap: 12px;
+    min-height: 460px;
+    margin: clamp(40px, 10vh, 120px) auto 0;
+    padding: 32px;
+    box-sizing: border-box;
+    border: 1px solid color-mix(in srgb, var(--black) 14%, var(--white));
+    border-radius: 8px;
+    background: var(--white);
+    box-shadow:
+      0 12px 28px rgba(15, 23, 42, 0.1),
+      var(--card-shadow);
   }
 
-  .auth-mode-switch {
-    margin-top: 10vh;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
+  .auth-card-heading {
+    text-align: center;
 
-  .auth-mode-option {
-    border: 1px solid #d7e4fb;
-    background: #f6f9ff;
-    color: #26466f;
-    border-radius: 999px;
-    height: 34px;
-    padding: 0 14px;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.16s ease;
-
-    &[data-active="true"] {
-      border-color: #7aa3e7;
-      background: #dce9ff;
-      color: #1f4f99;
-      font-weight: 600;
+    h1 {
+      margin: 0;
+      color: var(--black);
+      font-size: 22px;
+      line-height: 1.35;
     }
+
+    p {
+      margin: 8px 0 0;
+      color: var(--black);
+      opacity: 0.65;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+  }
+
+  .auth-mode-corner {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 84px;
+    height: 84px;
+    padding: 9px 7px 38px 35px;
+    border: 0;
+    border-radius: 0;
+    background: #9dcc86;
+    color: var(--white);
+    cursor: pointer;
+    clip-path: polygon(100% 0, 100% 100%, 0 0);
+
+    &:hover {
+      background: #8cc474;
+    }
+
+    svg {
+      width: 28px;
+      height: 28px;
+    }
+  }
+
+  .auth-passkey-panel,
+  .auth-wallet-panel {
+    min-height: 280px;
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .auth-login-action {
+    width: 100%;
+    min-height: 42px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .auth-login-hint {
+    min-height: 46px;
+    margin: 0;
+    color: var(--black);
+    opacity: 0.62;
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .auth-passkey-qrcode {
+    width: 220px;
+    height: 220px;
+    max-width: 100%;
+    background: var(--white);
+  }
+
+  .auth-passkey-status {
+    max-width: 300px;
+    margin: 0;
+    color: var(--black);
+    opacity: 0.65;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .auth-passkey-open {
+    color: var(--primary);
+    font-size: 14px;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .auth-passkey-refresh {
+    min-height: 36px;
+    border-radius: 6px;
   }
 
   .auth-central {
@@ -353,24 +429,28 @@
   }
 
   @media (max-width: 600px) {
-    .auth-wallet {
-      margin-top: 12px;
+    .auth-card {
       width: min(360px, calc(100vw - 32px));
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 8px;
+      min-height: 430px;
+      margin-top: 24px;
+      padding: 24px 20px;
+    }
+
+    .auth-mode-corner {
+      width: 72px;
+      height: 72px;
+      padding: 8px 5px 32px 30px;
+
+      svg {
+        width: 24px;
+        height: 24px;
+      }
     }
 
     .auth-wallet-select-wrap {
       width: 100%;
       min-width: 0;
       max-width: none;
-    }
-
-    .auth-wallet-connect {
-      width: 100%;
-      min-width: 0;
     }
 
     .auth-central {

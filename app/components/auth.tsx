@@ -1,17 +1,19 @@
 import styles from "./auth.module.scss";
 import { IconButton } from "./button";
 import { useCallback, useState, useEffect, useRef } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Path } from "../constant";
 import Locale from "../locales";
 import Delete from "../icons/close.svg";
 import Logo from "../icons/yeying.svg";
+import Wallet from "../icons/wallet.svg";
+import ShortcutKey from "../icons/shortcutkey.svg";
 import { useMobileScreen } from "@/app/utils";
 import { getClientConfig } from "../config/client";
 import { safeLocalStorage } from "@/app/utils";
 import clsx from "clsx";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   UCAN_AUTH_EVENT,
   isValidUcanAuthorization,
@@ -42,6 +44,12 @@ const IDENTITY_LOGIN_SCOPES = [
 ];
 const DESKTOP_CENTRAL_REDIRECT_URI =
   "chat://localhost/central-ucan-callback.html";
+type LoginMode = "passkey" | "wallet";
+type PasskeyLoginState = {
+  loading: boolean;
+  verifyUrl: string;
+  message: string;
+};
 
 type CentralCallback = {
   code: string;
@@ -100,6 +108,14 @@ export function AuthPage() {
     "checking" | "authorized" | "expired" | "unauthorized"
   >("checking");
   const [centralLoading, setCentralLoading] = useState(false);
+  // The passkey flow is the primary desktop web experience. Wallet users can
+  // explicitly opt into the extension-based identity presentation.
+  const [loginMode, setLoginMode] = useState<LoginMode>("passkey");
+  const [passkeyLogin, setPasskeyLogin] = useState<PasskeyLoginState>({
+    loading: false,
+    verifyUrl: "",
+    message: "",
+  });
   const exchangedCodeRef = useRef("");
 
   const handleCentralCallback = useCallback(
@@ -230,11 +246,13 @@ export function AuthPage() {
     };
   }, [handleCentralCallback]);
 
-  const handleCentralAuthorizeLogin = async () => {
+  const startPasskeyLogin = useCallback(async () => {
+    if (centralLoading) return;
     const redirectUri = getCentralRedirectUri();
     const params = new URLSearchParams(location.search);
     const redirectPath = normalizeRedirectPath(params.get("redirect"));
     setCentralLoading(true);
+    setPasskeyLogin({ loading: true, verifyUrl: "", message: "" });
     try {
       const session = await createCentralAuthorizeSession(redirectPath);
       const request = await createCentralAuthorizeRequest({
@@ -245,22 +263,33 @@ export function AuthPage() {
         scopes: IDENTITY_LOGIN_SCOPES,
       });
       setUcanAuthMode(UCAN_AUTH_MODE_CENTRAL, { emit: false });
-      notifySuccess(Locale.Auth.CentralRequestCreated);
-      if (isDesktopAppRuntime()) {
-        await openUrl(request.verifyUrl);
-      } else {
-        window.location.href = request.verifyUrl;
-      }
+      setPasskeyLogin({
+        loading: false,
+        verifyUrl: request.verifyUrl,
+        message: "",
+      });
     } catch (error) {
-      notifyError(
-        Locale.Auth.CentralRequestFailed(
-          formatCentralAuthError(error, redirectUri),
-        ),
+      const message = Locale.Auth.CentralRequestFailed(
+        formatCentralAuthError(error, redirectUri),
       );
+      setPasskeyLogin({ loading: false, verifyUrl: "", message });
+      notifyError(message);
     } finally {
       setCentralLoading(false);
     }
-  };
+  }, [centralLoading, location.search]);
+
+  useEffect(() => {
+    if (
+      loginMode !== "passkey" ||
+      passkeyLogin.loading ||
+      passkeyLogin.verifyUrl ||
+      passkeyLogin.message
+    ) {
+      return;
+    }
+    void startPasskeyLogin();
+  }, [loginMode, passkeyLogin, startPasskeyLogin]);
 
   const handleWalletIdentityLogin = async (
     provider: Awaited<ReturnType<typeof waitForWallet>>,
@@ -303,19 +332,13 @@ export function AuthPage() {
     }
   };
 
-  const handlePrimaryLogin = async () => {
+  const handleWalletLogin = async () => {
     if (centralLoading) return;
-    if (isDesktopAppRuntime()) {
-      await handleCentralAuthorizeLogin();
-      return;
-    }
     let provider: Awaited<ReturnType<typeof waitForWallet>>;
     try {
       provider = await waitForWallet();
     } catch {
-      // A browser without a wallet uses the same Node Passkey flow as the
-      // desktop build. There is no address input or address-selection branch.
-      await handleCentralAuthorizeLogin();
+      notifyError(Locale.Auth.WalletUnavailable);
       return;
     }
 
@@ -330,29 +353,108 @@ export function AuthPage() {
     }
   };
 
-  const isWalletConnectDisabled = ucanStatus === "authorized" || centralLoading;
+  const isLoginDisabled = ucanStatus === "authorized" || centralLoading;
   const isDesktopApp = isDesktopAppRuntime();
+  const isPasskeyMode = loginMode === "passkey";
+  const toggleLoginMode = () => {
+    setLoginMode(isPasskeyMode ? "wallet" : "passkey");
+  };
   return (
     <div className={styles["auth-page"]}>
       <TopBanner></TopBanner>
-      <div
-        className={styles["auth-wallet"]}
+      <main
+        className={styles["auth-card"]}
         data-runtime={isDesktopApp ? "desktop" : "web"}
+        aria-labelledby="auth-title"
       >
-        <IconButton
-          text={
-            centralLoading
-              ? Locale.Auth.Processing
-              : isDesktopApp
-                ? Locale.Auth.PasskeyLogin
-                : Locale.Auth.Confirm
-          }
-          type="primary"
-          className={styles["auth-wallet-connect"]}
-          onClick={handlePrimaryLogin}
-          disabled={isWalletConnectDisabled}
-        />
-      </div>
+        {!isDesktopApp ? (
+          <button
+            type="button"
+            className={styles["auth-mode-corner"]}
+            onClick={toggleLoginMode}
+            title={
+              isPasskeyMode
+                ? Locale.Auth.SwitchToWalletLogin
+                : Locale.Auth.SwitchToPasskeyLogin
+            }
+            aria-label={
+              isPasskeyMode
+                ? Locale.Auth.SwitchToWalletLogin
+                : Locale.Auth.SwitchToPasskeyLogin
+            }
+          >
+            {isPasskeyMode ? <Wallet /> : <ShortcutKey />}
+          </button>
+        ) : null}
+        <div className={styles["auth-card-heading"]}>
+          <h1 id="auth-title">
+            {isPasskeyMode ? Locale.Auth.PasskeyTitle : Locale.Auth.WalletTitle}
+          </h1>
+          <p>
+            {isPasskeyMode
+              ? Locale.Auth.PasskeyDescription
+              : Locale.Auth.WalletDescription}
+          </p>
+        </div>
+        {isPasskeyMode ? (
+          <div className={styles["auth-passkey-panel"]}>
+            {passkeyLogin.verifyUrl ? (
+              <QRCodeSVG
+                className={styles["auth-passkey-qrcode"]}
+                value={passkeyLogin.verifyUrl}
+                size={220}
+                level="M"
+                includeMargin
+              />
+            ) : null}
+            {passkeyLogin.loading ? (
+              <p className={styles["auth-passkey-status"]}>
+                {Locale.Auth.PasskeyPreparing}
+              </p>
+            ) : null}
+            {passkeyLogin.message ? (
+              <>
+                <p className={styles["auth-passkey-status"]}>
+                  {passkeyLogin.message}
+                </p>
+                <IconButton
+                  text={Locale.Auth.PasskeyRefresh}
+                  bordered
+                  className={styles["auth-passkey-refresh"]}
+                  onClick={startPasskeyLogin}
+                />
+              </>
+            ) : null}
+            {passkeyLogin.verifyUrl ? (
+              <a
+                className={styles["auth-passkey-open"]}
+                href={passkeyLogin.verifyUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {Locale.Auth.PasskeyOpen}
+              </a>
+            ) : null}
+          </div>
+        ) : (
+          <div className={styles["auth-wallet-panel"]}>
+            <IconButton
+              text={
+                centralLoading
+                  ? Locale.Auth.Processing
+                  : Locale.Auth.WalletLogin
+              }
+              type="primary"
+              className={styles["auth-login-action"]}
+              onClick={handleWalletLogin}
+              disabled={isLoginDisabled}
+            />
+            <p className={styles["auth-login-hint"]}>
+              {Locale.Auth.WalletHint}
+            </p>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
