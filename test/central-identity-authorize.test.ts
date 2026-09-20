@@ -178,6 +178,99 @@ describe("central wallet identity authorization", () => {
     expect(isCentralUcanAuthorized()).toBe(true);
   });
 
+  test("renews an expired issue session with the identity refresh token", async () => {
+    window.__CHAT_RUNTIME_CONFIG__ = {
+      centralUcanAuthBaseUrl: "https://node.example",
+      centralUcanAppId: "chat",
+      centralUcanRedirectUri: "chat://localhost/central-ucan-callback.html",
+    } as any;
+    localStorage.setItem("ucanAuthMode", "central");
+    localStorage.setItem("centralIdentityDid", "did:yeying:wid_refresh_test");
+    localStorage.setItem("currentIdentityDid", "did:yeying:wid_refresh_test");
+    localStorage.setItem("centralIdentityRefreshToken", "refresh-old");
+    localStorage.setItem(
+      "centralIdentityRefreshExpiresAt",
+      String(Date.now() + 24 * 60 * 60 * 1000),
+    );
+    localStorage.setItem("centralIssueSessionToken", "expired-session");
+    localStorage.setItem(
+      "centralIssueSessionExpiresAt",
+      String(Date.now() - 1000),
+    );
+
+    const now = Math.floor(Date.now() / 1000);
+    const toBase64Url = (value: unknown) =>
+      btoa(JSON.stringify(value))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/g, "");
+    const token = `${toBase64Url({ alg: "EdDSA", typ: "UCAN" })}.${toBase64Url({ aud: "did:web:warehouse.example", exp: now + 600, nbf: now - 1, cap: [{ with: "app:all:chat", can: "write" }] })}.signature`;
+    const fetchMock = jest.fn(
+      async (url: RequestInfo | URL, init?: RequestInit) => {
+        const urlText = String(url);
+        const body = JSON.parse(String(init?.body || "{}"));
+        if (urlText.endsWith("/identity/session/refresh")) {
+          expect(body).toEqual({
+            refreshToken: "refresh-old",
+            appId: "chat",
+            redirectUri: "chat://localhost/central-ucan-callback.html",
+          });
+          return new TestResponse({
+            code: 0,
+            message: "ok",
+            data: {
+              did: "did:yeying:wid_refresh_test",
+              walletAddress: "0x1111111111111111111111111111111111111111",
+              refreshToken: "refresh-new",
+              refreshExpiresAt: Date.now() + 24 * 60 * 60 * 1000,
+              ucanSession: {
+                sessionToken: "renewed-session",
+                issuerDid: "did:key:zIdentityIssuer",
+                issuedAt: Date.now(),
+                expiresAt: Date.now() + 5 * 60 * 1000,
+              },
+            },
+            timestamp: Date.now(),
+          }) as unknown as Response;
+        }
+        expect(urlText).toContain("/api/v1/public/auth/central/issue");
+        expect(
+          String(
+            init?.headers &&
+              (init.headers as Record<string, string>).Authorization,
+          ),
+        ).toBe("Bearer renewed-session");
+        return new TestResponse({
+          code: 0,
+          message: "ok",
+          data: {
+            ucan: token,
+            audience: "did:web:warehouse.example",
+            capabilities: [{ with: "app:all:chat", can: "write" }],
+            expiresAt: (now + 600) * 1000,
+            notBefore: (now - 1) * 1000,
+          },
+          timestamp: Date.now(),
+        }) as unknown as Response;
+      },
+    ) as unknown as typeof fetch;
+    jest.spyOn(globalThis, "fetch").mockImplementation(fetchMock);
+
+    await expect(
+      getCentralUcanAuthorizationHeaderForAudience({
+        audience: "did:web:warehouse.example",
+        capabilities: [{ with: "app:all:chat", can: "write" }],
+      }),
+    ).resolves.toBe(`Bearer ${token}`);
+    expect(localStorage.getItem("centralIssueSessionToken")).toBe(
+      "renewed-session",
+    );
+    expect(localStorage.getItem("centralIdentityRefreshToken")).toBe(
+      "refresh-new",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   test("uses the exchange UCAN session to issue audience-specific tokens", async () => {
     window.__CHAT_RUNTIME_CONFIG__ = {
       centralUcanAuthBaseUrl: "https://node.example",

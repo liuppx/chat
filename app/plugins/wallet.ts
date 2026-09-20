@@ -40,6 +40,7 @@ import {
   clearCentralUcanAuth,
   isCentralModeEnabled,
   isCentralUcanAuthorized,
+  revokeCentralIdentitySession,
   setUcanAuthMode,
   UCAN_AUTH_MODE_WALLET,
 } from "./central-ucan";
@@ -719,6 +720,7 @@ export async function logoutWallet() {
   }
   clearUcanMeta();
   clearCachedUcanSession();
+  await revokeCentralIdentitySession();
   clearCentralUcanAuth({ emit: false });
   emitAuthChange();
   notifySuccess("已退出");
