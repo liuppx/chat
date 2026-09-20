@@ -18,6 +18,8 @@ const CENTRAL_ACCESS_EXPIRES_AT_KEY = "centralAccessExpiresAt";
 const CENTRAL_UCAN_TOKENS_KEY = "centralUcanTokensV1";
 const CENTRAL_SESSION_TOKEN_KEY = "centralIssueSessionToken";
 const CENTRAL_SESSION_EXPIRES_AT_KEY = "centralIssueSessionExpiresAt";
+const CENTRAL_REFRESH_TOKEN_KEY = "centralIdentityRefreshToken";
+const CENTRAL_REFRESH_EXPIRES_AT_KEY = "centralIdentityRefreshExpiresAt";
 const CENTRAL_SUBJECT_KEY = "centralAuthSubject";
 const CENTRAL_IDENTITY_DID_KEY = "centralIdentityDid";
 const CENTRAL_WALLET_ADDRESS_KEY = "centralWalletAddress";
@@ -117,6 +119,7 @@ export type CentralAuthorizeExchangeResult = {
   token?: string;
   expiresAt?: number;
   refreshExpiresAt?: number;
+  refreshToken?: string;
   ucan?: string;
   issuer?: string;
   audience?: string;
@@ -124,6 +127,20 @@ export type CentralAuthorizeExchangeResult = {
   notBefore?: number;
   ucanExpiresAt?: number;
   ucanSession?: {
+    sessionToken: string;
+    issuerDid?: string;
+    issuedAt?: number;
+    expiresAt?: number;
+  };
+};
+
+type CentralRefreshSessionResult = {
+  did: string;
+  walletAddress?: string;
+  scopes?: string[];
+  refreshToken: string;
+  refreshExpiresAt?: number;
+  ucanSession: {
     sessionToken: string;
     issuerDid?: string;
     issuedAt?: number;
@@ -147,6 +164,7 @@ type HttpError = Error & {
 };
 
 let centralSessionPromise: Promise<string> | null = null;
+let centralRefreshPromise: Promise<CentralRefreshSessionResult> | null = null;
 const centralIssuePromises = new Map<string, Promise<CentralUcanTokenRecord>>();
 
 export type CentralAuthorizeSession = {
@@ -367,6 +385,30 @@ function clearCentralSessionTokenCache() {
   localStorage.removeItem(CENTRAL_SESSION_EXPIRES_AT_KEY);
 }
 
+function clearCentralRefreshToken() {
+  if (typeof localStorage === "undefined") return;
+  localStorage.removeItem(CENTRAL_REFRESH_TOKEN_KEY);
+  localStorage.removeItem(CENTRAL_REFRESH_EXPIRES_AT_KEY);
+}
+
+function readCentralRefreshToken(): string | null {
+  if (typeof localStorage === "undefined") return null;
+  const token = (localStorage.getItem(CENTRAL_REFRESH_TOKEN_KEY) || "").trim();
+  if (!token) return null;
+  const expiresAt = parseStoredExpireAt(CENTRAL_REFRESH_EXPIRES_AT_KEY);
+  if (expiresAt && expiresAt <= Date.now() + TOKEN_SKEW_MS) {
+    clearCentralRefreshToken();
+    return null;
+  }
+  return token;
+}
+
+function persistCentralRefreshToken(token: string, expiresAt?: number) {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(CENTRAL_REFRESH_TOKEN_KEY, token);
+  storeExpireAt(CENTRAL_REFRESH_EXPIRES_AT_KEY, expiresAt);
+}
+
 function readSessionTokenFromStorage(): string | null {
   if (typeof localStorage === "undefined") return null;
   const token = (localStorage.getItem(CENTRAL_SESSION_TOKEN_KEY) || "").trim();
@@ -532,6 +574,18 @@ async function requestCentralIssueSession(options?: { baseUrl?: string }) {
     return await centralSessionPromise;
   }
   centralSessionPromise = (async () => {
+    const refreshToken = readCentralRefreshToken();
+    if (refreshToken) {
+      try {
+        const refreshed = await refreshCentralIdentitySession(options);
+        return refreshed.ucanSession.sessionToken;
+      } catch (error) {
+        const status = (error as HttpError)?.status;
+        if (status !== 401 && status !== 410) throw error;
+        clearCentralRefreshToken();
+      }
+    }
+
     const accessToken = getCentralAccessToken();
     if (!accessToken) {
       throw new Error("中心化登录已过期，请重新登录");
@@ -574,6 +628,113 @@ async function requestCentralIssueSession(options?: { baseUrl?: string }) {
     return await centralSessionPromise;
   } finally {
     centralSessionPromise = null;
+  }
+}
+
+export async function refreshCentralIdentitySession(options?: {
+  baseUrl?: string;
+}): Promise<CentralRefreshSessionResult> {
+  const refreshToken = readCentralRefreshToken();
+  if (!refreshToken) {
+    throw new Error("中心化登录续期凭证已过期，请重新登录");
+  }
+  if (centralRefreshPromise) return await centralRefreshPromise;
+
+  centralRefreshPromise = (async () => {
+    const response = await desktopAwareFetch(
+      buildApiUrl("/api/v1/public/identity/session/refresh", options?.baseUrl),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          refreshToken,
+          appId: getCentralAppId(),
+          redirectUri: (() => {
+            const configured =
+              getClientConfig()?.centralUcanRedirectUri?.trim();
+            if (configured) return configured;
+            if (typeof window !== "undefined") {
+              return `${window.location.origin}/central-ucan-callback.html`;
+            }
+            return "";
+          })(),
+        }),
+      },
+    );
+    const text = await response.text();
+    if (!response.ok) {
+      throw createHttpError(
+        parseApiErrorText(text, `中心化登录续期失败: ${response.status}`),
+        response.status,
+      );
+    }
+    const data = parseEnvelope<CentralRefreshSessionResult>(
+      text,
+      "中心化登录续期失败",
+    );
+    const sessionToken = String(data.ucanSession?.sessionToken || "").trim();
+    const nextRefreshToken = String(data.refreshToken || "").trim();
+    if (!sessionToken || !nextRefreshToken) {
+      throw new Error("中心化登录续期响应无效");
+    }
+    persistSessionToken(sessionToken, data.ucanSession?.expiresAt);
+    persistCentralRefreshToken(nextRefreshToken, data.refreshExpiresAt);
+    if (data.did) {
+      localStorage.setItem(CENTRAL_IDENTITY_DID_KEY, data.did);
+      localStorage.setItem(CURRENT_IDENTITY_DID_KEY, data.did);
+    }
+    if (data.walletAddress) {
+      localStorage.setItem(CENTRAL_WALLET_ADDRESS_KEY, data.walletAddress);
+      localStorage.setItem(CURRENT_WALLET_ADDRESS_KEY, data.walletAddress);
+      localStorage.setItem("currentAccount", data.walletAddress);
+    }
+    return data;
+  })();
+  try {
+    return await centralRefreshPromise;
+  } finally {
+    centralRefreshPromise = null;
+  }
+}
+
+export async function revokeCentralIdentitySession(options?: {
+  baseUrl?: string;
+}): Promise<void> {
+  const refreshToken = readCentralRefreshToken();
+  if (!refreshToken) return;
+  try {
+    const response = await desktopAwareFetch(
+      buildApiUrl("/api/v1/public/identity/session/revoke", options?.baseUrl),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          refreshToken,
+          appId: getCentralAppId(),
+          redirectUri: (() => {
+            const configured =
+              getClientConfig()?.centralUcanRedirectUri?.trim();
+            if (configured) return configured;
+            if (typeof window !== "undefined") {
+              return `${window.location.origin}/central-ucan-callback.html`;
+            }
+            return "";
+          })(),
+        }),
+      },
+    );
+    if (!response.ok) {
+      console.warn(
+        "[Central Auth] failed to revoke refresh session",
+        response.status,
+      );
+    }
+  } catch (error) {
+    console.warn("[Central Auth] failed to revoke refresh session", error);
+  } finally {
+    clearCentralRefreshToken();
   }
 }
 
@@ -766,6 +927,7 @@ export function clearCentralUcanAuth(options?: {
 }) {
   centralIssuePromises.clear();
   clearCentralSessionTokenCache();
+  centralRefreshPromise = null;
   if (typeof localStorage !== "undefined") {
     clearLegacyUcanToken();
     clearCentralUcanTokenStore();
@@ -775,6 +937,7 @@ export function clearCentralUcanAuth(options?: {
     localStorage.removeItem(CENTRAL_IDENTITY_DID_KEY);
     localStorage.removeItem(CENTRAL_WALLET_ADDRESS_KEY);
     localStorage.removeItem(CENTRAL_IDENTITY_CREDENTIALS_KEY);
+    clearCentralRefreshToken();
     localStorage.removeItem(CURRENT_IDENTITY_DID_KEY);
     localStorage.removeItem(CURRENT_WALLET_ADDRESS_KEY);
     if (!options?.preserveMode) {
@@ -882,7 +1045,11 @@ export function isCentralUcanAuthorized(): boolean {
   // gone; doing so only defers the failure to the first sync request and
   // leaves the user stuck on the generic workspace error screen.
   if (!getCentralIdentityDid()) return false;
-  return Boolean(readSessionTokenFromStorage() || getCentralUcanToken());
+  return Boolean(
+    readCentralRefreshToken() ||
+    readSessionTokenFromStorage() ||
+    getCentralUcanToken(),
+  );
 }
 
 export function getCentralUcanAuthorizationHeader(): string | null {
@@ -1100,6 +1267,12 @@ export function applyCentralAuthorizeExchange(
     const sessionToken = String(result.ucanSession?.sessionToken || "").trim();
     if (sessionToken) {
       persistSessionToken(sessionToken, result.ucanSession?.expiresAt);
+    }
+    const refreshToken = String(result.refreshToken || "").trim();
+    if (refreshToken) {
+      persistCentralRefreshToken(refreshToken, result.refreshExpiresAt);
+    } else {
+      clearCentralRefreshToken();
     }
     if (result.token) {
       localStorage.setItem(CENTRAL_ACCESS_TOKEN_KEY, result.token);
