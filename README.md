@@ -75,11 +75,11 @@ cp .env.build.template .env.build
    - `ROUTER_PORTAL_URL`：Router 管理中心地址（可选，默认 `https://router.yeying.pub`）
    - `ROUTER_PORTAL_TOKEN_URL`：Router 令牌页地址（可选，默认继承 `ROUTER_PORTAL_URL`）
    - `ROUTER_PORTAL_RECHARGE_URL`：Router 充值页地址（可选，默认继承 `ROUTER_PORTAL_TOKEN_URL`）
-   - `CENTRAL_UCAN_APP_ID`：中心化 UCAN 应用 AppId（在 Node 应用市场发布后获得）
+   - `CENTRAL_UCAN_APP_ID`：中心化 UCAN 应用 AppId（在 Node 应用中心发布后获得；版本升级应保持不变）
    - `CENTRAL_UCAN_REDIRECT_URI`：中心化 UCAN 授权回调地址；Tauri 本地包固定使用 `chat://localhost/central-ucan-callback.html`
    - `WEBDAV_BACKEND_BASE_URL`：WebDAV 后端基础地址（按需配置，不含路径）
    - `WEBDAV_BACKEND_PREFIX`：WebDAV 路径前缀（默认 `/dav`，可选修改）
-   - `WEBDAV_APP_ID`：WebDAV/UCAN 应用空间 ID；桌面包如需复用本地 web 版数据，通常设置为 `localhost-3020`
+   - `WEBDAV_APP_ID`：WebDAV/UCAN 应用空间 ID；应与同一应用的 Node AppId 一致，桌面包复用本地 web 版数据时过渡期通常设置为 `localhost-3020`
    - 以及你实际使用的 provider 配置（如 OpenAI / Gemini / Anthropic / Volcengine 等）
 3. 如需调整构建细节变量，配置 `.env.build`：
    - `DISABLE_CHUNK`

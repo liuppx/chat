@@ -181,7 +181,7 @@ CENTRAL_UCAN_REDIRECT_URI=chat://localhost/central-ucan-callback.html
 - 桌面构建时配置优先级为：命令行/CI 环境变量、`.env.build`
 - `CENTRAL_UCAN_REDIRECT_URI` 必须和 Node 中 Chat 应用配置的某一项 `redirectUris` 完全一致；桌面包固定使用 `chat://localhost/central-ucan-callback.html`
 - 桌面本地包的回调地址是 `chat://localhost/central-ucan-callback.html`，不是 `http://127.0.0.1:8100`
-- `WEBDAV_APP_ID=localhost-3020` 用来复用 web 版 `http://localhost:3020` 的云端同步目录；如果留空，桌面端会按 Tauri origin 推导出不同目录
+- 过渡期 `WEBDAV_APP_ID=localhost-3020` 用来复用 web 版 `http://localhost:3020` 的云端同步目录；生产环境应改用 Node 应用中心的稳定 AppId。留空虽然会触发 origin 推导，但不属于长期配置，会造成 Web 和桌面访问不同目录
 
 Warehouse 本地 CORS 至少应允许桌面 origin 和本地 Web origin：
 
@@ -621,12 +621,12 @@ macOS 主链已经具备 release 构建、updater manifest、DMG 签名、公证
 
 优先检查：
 
-1. `WEBDAV_APP_ID` 是否固定为网页版同一个应用空间，例如 `localhost-3020`
+1. `WEBDAV_APP_ID` 是否固定为 Node 应用中心 AppId，并且和网页版使用的应用空间一致；本地过渡环境通常是 `localhost-3020`
 2. Warehouse 中是否确实存在 `/apps/<WEBDAV_APP_ID>` 下的同步数据
 3. 登录地址是否和网页版使用的是同一个账户地址
 4. 当前打包产物是否包含中心化 UCAN 模式下不依赖钱包连接状态显示会话列表的修复
 
-如果 `WEBDAV_APP_ID` 留空，桌面端会按 Tauri origin 推导应用空间，表现上就是云端存储可连接、立即同步也能成功，但读到的是另一个空目录。
+如果 `WEBDAV_APP_ID` 留空，当前兼容逻辑会按 Tauri origin 推导应用空间，表现上就是云端存储可连接、立即同步也能成功，但读到的是另一个空目录；生产发布不得依赖该回退逻辑。
 
 ## 后续维护原则
 
