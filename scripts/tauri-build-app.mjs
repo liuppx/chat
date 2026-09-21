@@ -211,6 +211,80 @@ function readEnv(name) {
   return process.env[name]?.trim() || "";
 }
 
+const REQUIRED_DESKTOP_RUNTIME_CONFIG = [
+  "ROUTER_BACKEND_URL",
+  "WEBDAV_BACKEND_BASE_URL",
+  "WEBDAV_APP_ID",
+];
+
+function isLoopbackHostname(hostname) {
+  const normalized = hostname.trim().toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "[::1]" ||
+    normalized === "::1"
+  );
+}
+
+function validatePublicDesktopUrl(name, value, { requireHttps }) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(
+      `${name} must be a valid absolute URL for a desktop build.`,
+    );
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error(`${name} must use http or https.`);
+  }
+  if (requireHttps && parsed.protocol !== "https:") {
+    throw new Error(`${name} must use HTTPS in a release desktop build.`);
+  }
+  if (requireHttps && isLoopbackHostname(parsed.hostname)) {
+    throw new Error(
+      `${name} cannot use a loopback host in a release desktop build.`,
+    );
+  }
+}
+
+function validateDesktopRuntimeConfig() {
+  const missing = REQUIRED_DESKTOP_RUNTIME_CONFIG.filter(
+    (name) => !readEnv(name),
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `Desktop build requires Router/WebDAV runtime config: ${missing.join(", ")}. ` +
+        "Set these variables in .env.build or GitHub Actions Repository Variables.",
+    );
+  }
+
+  if (releaseMode) {
+    validatePublicDesktopUrl(
+      "ROUTER_BACKEND_URL",
+      readEnv("ROUTER_BACKEND_URL"),
+      {
+        requireHttps: true,
+      },
+    );
+    validatePublicDesktopUrl(
+      "WEBDAV_BACKEND_BASE_URL",
+      readEnv("WEBDAV_BACKEND_BASE_URL"),
+      { requireHttps: true },
+    );
+    for (const name of [
+      "ROUTER_PORTAL_URL",
+      "ROUTER_PORTAL_TOKEN_URL",
+      "ROUTER_PORTAL_RECHARGE_URL",
+    ]) {
+      const value = readEnv(name);
+      if (value) validatePublicDesktopUrl(name, value, { requireHttps: true });
+    }
+  }
+}
+
 function validateDesktopAuthConfig() {
   // Static desktop builds cannot receive public config from a running Next server.
   // Validate the Node identity authorization values before producing an unusable application.
@@ -650,6 +724,7 @@ const macosReleaseConfig =
     : null;
 
 const desktopAuthConfig = validateDesktopAuthConfig();
+validateDesktopRuntimeConfig();
 await validateDesktopAuthDeployment(desktopAuthConfig);
 await run("npm", ["run", "skill"]);
 

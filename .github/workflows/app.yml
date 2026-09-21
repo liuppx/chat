@@ -56,6 +56,14 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ENABLE_TOOLS: ${{ vars.ENABLE_TOOLS || '1' }}
+          ROUTER_BACKEND_URL: ${{ vars.ROUTER_BACKEND_URL }}
+          ROUTER_PORTAL_URL: ${{ vars.ROUTER_PORTAL_URL }}
+          ROUTER_PORTAL_TOKEN_URL: ${{ vars.ROUTER_PORTAL_TOKEN_URL }}
+          ROUTER_PORTAL_RECHARGE_URL: ${{ vars.ROUTER_PORTAL_RECHARGE_URL }}
+          WEBDAV_BACKEND_BASE_URL: ${{ vars.WEBDAV_BACKEND_BASE_URL }}
+          WEBDAV_BACKEND_PREFIX: ${{ vars.WEBDAV_BACKEND_PREFIX || '/dav' }}
+          WEBDAV_APP_ID: ${{ vars.WEBDAV_APP_ID }}
           CENTRAL_UCAN_AUTH_BASE_URL: ${{ vars.CENTRAL_UCAN_AUTH_BASE_URL }}
           CENTRAL_UCAN_APP_ID: ${{ vars.CENTRAL_UCAN_APP_ID }}
           CENTRAL_UCAN_REDIRECT_URI: ${{ vars.CENTRAL_UCAN_REDIRECT_URI || 'chat://localhost/central-ucan-callback.html' }}
@@ -145,6 +153,14 @@ jobs:
           BUILD_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.build_version }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          ENABLE_TOOLS: ${{ vars.ENABLE_TOOLS || '1' }}
+          ROUTER_BACKEND_URL: ${{ vars.ROUTER_BACKEND_URL }}
+          ROUTER_PORTAL_URL: ${{ vars.ROUTER_PORTAL_URL }}
+          ROUTER_PORTAL_TOKEN_URL: ${{ vars.ROUTER_PORTAL_TOKEN_URL }}
+          ROUTER_PORTAL_RECHARGE_URL: ${{ vars.ROUTER_PORTAL_RECHARGE_URL }}
+          WEBDAV_BACKEND_BASE_URL: ${{ vars.WEBDAV_BACKEND_BASE_URL }}
+          WEBDAV_BACKEND_PREFIX: ${{ vars.WEBDAV_BACKEND_PREFIX || '/dav' }}
+          WEBDAV_APP_ID: ${{ vars.WEBDAV_APP_ID }}
           CENTRAL_UCAN_AUTH_BASE_URL: ${{ vars.CENTRAL_UCAN_AUTH_BASE_URL }}
           CENTRAL_UCAN_APP_ID: ${{ vars.CENTRAL_UCAN_APP_ID }}
           CENTRAL_UCAN_REDIRECT_URI: ${{ vars.CENTRAL_UCAN_REDIRECT_URI || 'chat://localhost/central-ucan-callback.html' }}
@@ -230,6 +246,14 @@ jobs:
           BUILD_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.build_version }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          ENABLE_TOOLS: ${{ vars.ENABLE_TOOLS || '1' }}
+          ROUTER_BACKEND_URL: ${{ vars.ROUTER_BACKEND_URL }}
+          ROUTER_PORTAL_URL: ${{ vars.ROUTER_PORTAL_URL }}
+          ROUTER_PORTAL_TOKEN_URL: ${{ vars.ROUTER_PORTAL_TOKEN_URL }}
+          ROUTER_PORTAL_RECHARGE_URL: ${{ vars.ROUTER_PORTAL_RECHARGE_URL }}
+          WEBDAV_BACKEND_BASE_URL: ${{ vars.WEBDAV_BACKEND_BASE_URL }}
+          WEBDAV_BACKEND_PREFIX: ${{ vars.WEBDAV_BACKEND_PREFIX || '/dav' }}
+          WEBDAV_APP_ID: ${{ vars.WEBDAV_APP_ID }}
           CENTRAL_UCAN_AUTH_BASE_URL: ${{ vars.CENTRAL_UCAN_AUTH_BASE_URL }}
           CENTRAL_UCAN_APP_ID: ${{ vars.CENTRAL_UCAN_APP_ID }}
           CENTRAL_UCAN_REDIRECT_URI: ${{ vars.CENTRAL_UCAN_REDIRECT_URI || 'chat://localhost/central-ucan-callback.html' }}
