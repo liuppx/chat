@@ -32,7 +32,7 @@ describe("central wallet identity authorization", () => {
   test("creates identity authorize request without address subject", async () => {
     window.__CHAT_RUNTIME_CONFIG__ = {
       centralUcanAuthBaseUrl: "https://node.example",
-      centralUcanAppId: "chat",
+      chatApplicationUid: "chat",
     } as any;
 
     const fetchMock = jest.fn(
@@ -86,7 +86,7 @@ describe("central wallet identity authorization", () => {
   test("exchanges identity code with PKCE and stores DID result", async () => {
     window.__CHAT_RUNTIME_CONFIG__ = {
       centralUcanAuthBaseUrl: "https://node.example",
-      centralUcanAppId: "chat",
+      chatApplicationUid: "chat",
     } as any;
 
     const fetchMock = jest.fn(
@@ -156,7 +156,7 @@ describe("central wallet identity authorization", () => {
   test("uses the identity DID as the owner when exchange has no wallet address", () => {
     window.__CHAT_RUNTIME_CONFIG__ = {
       centralUcanAuthBaseUrl: "https://node.example",
-      centralUcanAppId: "chat",
+      chatApplicationUid: "chat",
     } as any;
     localStorage.setItem("currentAccount", "0xold");
 
@@ -181,7 +181,7 @@ describe("central wallet identity authorization", () => {
   test("renews an expired issue session with the identity refresh token", async () => {
     window.__CHAT_RUNTIME_CONFIG__ = {
       centralUcanAuthBaseUrl: "https://node.example",
-      centralUcanAppId: "chat",
+      chatApplicationUid: "chat",
       centralUcanRedirectUri: "chat://localhost/central-ucan-callback.html",
     } as any;
     localStorage.setItem("ucanAuthMode", "central");
@@ -274,7 +274,7 @@ describe("central wallet identity authorization", () => {
   test("uses the exchange UCAN session to issue audience-specific tokens", async () => {
     window.__CHAT_RUNTIME_CONFIG__ = {
       centralUcanAuthBaseUrl: "https://node.example",
-      centralUcanAppId: "chat",
+      chatApplicationUid: "chat",
     } as any;
     localStorage.setItem("ucanAuthMode", "central");
     localStorage.setItem("centralIdentityDid", "did:yeying:wid_sync");
@@ -335,7 +335,7 @@ describe("central wallet identity authorization", () => {
   test("approves an authorization request with a wallet identity presentation", async () => {
     window.__CHAT_RUNTIME_CONFIG__ = {
       centralUcanAuthBaseUrl: "https://node.example",
-      centralUcanAppId: "chat",
+      chatApplicationUid: "chat",
     } as any;
     const presentation = {
       version: 1,

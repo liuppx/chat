@@ -214,7 +214,6 @@ function readEnv(name) {
 const REQUIRED_DESKTOP_RUNTIME_CONFIG = [
   "ROUTER_BACKEND_URL",
   "WEBDAV_BACKEND_BASE_URL",
-  "WEBDAV_APP_ID",
 ];
 
 function isLoopbackHostname(hostname) {
@@ -261,6 +260,12 @@ function validateDesktopRuntimeConfig() {
     );
   }
 
+  if (!readEnv("CHAT_APPLICATION_UID")) {
+    throw new Error(
+      "Desktop build requires CHAT_APPLICATION_UID (Node applications.uid).",
+    );
+  }
+
   if (releaseMode) {
     validatePublicDesktopUrl(
       "ROUTER_BACKEND_URL",
@@ -288,9 +293,10 @@ function validateDesktopRuntimeConfig() {
 function validateDesktopAuthConfig() {
   // Static desktop builds cannot receive public config from a running Next server.
   // Validate the Node identity authorization values before producing an unusable application.
+  const applicationUid = readEnv("CHAT_APPLICATION_UID");
   const required = [
     ["CENTRAL_UCAN_AUTH_BASE_URL", readEnv("CENTRAL_UCAN_AUTH_BASE_URL")],
-    ["CENTRAL_UCAN_APP_ID", readEnv("CENTRAL_UCAN_APP_ID")],
+    ["CHAT_APPLICATION_UID", applicationUid],
     ["CENTRAL_UCAN_REDIRECT_URI", readEnv("CENTRAL_UCAN_REDIRECT_URI")],
   ];
   const missing = required.filter(([, value]) => !value).map(([name]) => name);
@@ -339,7 +345,7 @@ function validateDesktopAuthConfig() {
 
   return {
     baseUrl: readEnv("CENTRAL_UCAN_AUTH_BASE_URL").replace(/\/+$/, ""),
-    appId: readEnv("CENTRAL_UCAN_APP_ID"),
+    appId: applicationUid,
     redirectUri: readEnv("CENTRAL_UCAN_REDIRECT_URI"),
   };
 }

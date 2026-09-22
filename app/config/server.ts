@@ -98,9 +98,8 @@ declare global {
 
       WEBDAV_BACKEND_BASE_URL?: string;
       WEBDAV_BACKEND_PREFIX?: string;
-      WEBDAV_APP_ID?: string;
+      CHAT_APPLICATION_UID?: string;
       CENTRAL_UCAN_AUTH_BASE_URL?: string;
-      CENTRAL_UCAN_APP_ID?: string;
       CENTRAL_UCAN_REDIRECT_URI?: string;
     }
   }

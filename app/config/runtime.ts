@@ -67,9 +67,8 @@ export type RuntimePublicConfig = BuildConfig & {
   webdavBackendBaseUrl: string;
   webdavBackendPrefix: string;
   webdavBackendUrl: string;
-  webdavAppId: string;
+  chatApplicationUid: string;
   centralUcanAuthBaseUrl: string;
-  centralUcanAppId: string;
   centralUcanRedirectUri: string;
   marketplaceSkillPackagesUrl: string;
   marketplaceToolPackagesUrl: string;
@@ -128,6 +127,8 @@ export function getRuntimePublicConfig(): RuntimePublicConfig {
     process.env.ROUTER_PORTAL_RECHARGE_URL?.trim() || routerPortalTokenUrl,
   );
 
+  const chatApplicationUid = process.env.CHAT_APPLICATION_UID?.trim() || "";
+
   return {
     ...buildConfig,
     template: process.env.DEFAULT_INPUT_TEMPLATE ?? DEFAULT_INPUT_TEMPLATE,
@@ -146,10 +147,9 @@ export function getRuntimePublicConfig(): RuntimePublicConfig {
     webdavBackendBaseUrl,
     webdavBackendPrefix,
     webdavBackendUrl: joinBasePrefix(webdavBackendBaseUrl, webdavBackendPrefix),
-    webdavAppId: process.env.WEBDAV_APP_ID?.trim() || "",
+    chatApplicationUid,
     centralUcanAuthBaseUrl:
       process.env.CENTRAL_UCAN_AUTH_BASE_URL?.trim() || "http://127.0.0.1:8100",
-    centralUcanAppId: process.env.CENTRAL_UCAN_APP_ID?.trim() || "",
     centralUcanRedirectUri: process.env.CENTRAL_UCAN_REDIRECT_URI?.trim() || "",
     marketplaceSkillPackagesUrl:
       process.env.MARKETPLACE_SKILL_PACKAGES_URL?.trim() ||

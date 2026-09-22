@@ -63,9 +63,8 @@ jobs:
           ROUTER_PORTAL_RECHARGE_URL: ${{ vars.ROUTER_PORTAL_RECHARGE_URL }}
           WEBDAV_BACKEND_BASE_URL: ${{ vars.WEBDAV_BACKEND_BASE_URL }}
           WEBDAV_BACKEND_PREFIX: ${{ vars.WEBDAV_BACKEND_PREFIX || '/dav' }}
-          WEBDAV_APP_ID: ${{ vars.WEBDAV_APP_ID }}
+          CHAT_APPLICATION_UID: ${{ vars.CHAT_APPLICATION_UID }}
           CENTRAL_UCAN_AUTH_BASE_URL: ${{ vars.CENTRAL_UCAN_AUTH_BASE_URL }}
-          CENTRAL_UCAN_APP_ID: ${{ vars.CENTRAL_UCAN_APP_ID }}
           CENTRAL_UCAN_REDIRECT_URI: ${{ vars.CENTRAL_UCAN_REDIRECT_URI || 'chat://localhost/central-ucan-callback.html' }}
         run: npm run app:build:release
 
@@ -160,9 +159,8 @@ jobs:
           ROUTER_PORTAL_RECHARGE_URL: ${{ vars.ROUTER_PORTAL_RECHARGE_URL }}
           WEBDAV_BACKEND_BASE_URL: ${{ vars.WEBDAV_BACKEND_BASE_URL }}
           WEBDAV_BACKEND_PREFIX: ${{ vars.WEBDAV_BACKEND_PREFIX || '/dav' }}
-          WEBDAV_APP_ID: ${{ vars.WEBDAV_APP_ID }}
+          CHAT_APPLICATION_UID: ${{ vars.CHAT_APPLICATION_UID }}
           CENTRAL_UCAN_AUTH_BASE_URL: ${{ vars.CENTRAL_UCAN_AUTH_BASE_URL }}
-          CENTRAL_UCAN_APP_ID: ${{ vars.CENTRAL_UCAN_APP_ID }}
           CENTRAL_UCAN_REDIRECT_URI: ${{ vars.CENTRAL_UCAN_REDIRECT_URI || 'chat://localhost/central-ucan-callback.html' }}
         run: npm run app:build:release
 
@@ -253,9 +251,8 @@ jobs:
           ROUTER_PORTAL_RECHARGE_URL: ${{ vars.ROUTER_PORTAL_RECHARGE_URL }}
           WEBDAV_BACKEND_BASE_URL: ${{ vars.WEBDAV_BACKEND_BASE_URL }}
           WEBDAV_BACKEND_PREFIX: ${{ vars.WEBDAV_BACKEND_PREFIX || '/dav' }}
-          WEBDAV_APP_ID: ${{ vars.WEBDAV_APP_ID }}
+          CHAT_APPLICATION_UID: ${{ vars.CHAT_APPLICATION_UID }}
           CENTRAL_UCAN_AUTH_BASE_URL: ${{ vars.CENTRAL_UCAN_AUTH_BASE_URL }}
-          CENTRAL_UCAN_APP_ID: ${{ vars.CENTRAL_UCAN_APP_ID }}
           CENTRAL_UCAN_REDIRECT_URI: ${{ vars.CENTRAL_UCAN_REDIRECT_URI || 'chat://localhost/central-ucan-callback.html' }}
         run: npm run app:build:release
 

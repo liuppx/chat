@@ -7,7 +7,7 @@ describe("webdav UCAN app id", () => {
 
   test("uses configured webdav app id before deriving from location", () => {
     window.__CHAT_RUNTIME_CONFIG__ = {
-      webdavAppId: "localhost:3020",
+      chatApplicationUid: "localhost:3020",
     } as any;
 
     expect(getWebdavAppId()).toBe("localhost-3020");

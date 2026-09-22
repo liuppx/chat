@@ -161,7 +161,7 @@ export function AuthPage() {
     const config = getClientConfig();
     const params = new URLSearchParams(location.search);
     const hasCentralCallbackCode = Boolean((params.get("code") || "").trim());
-    const hasCentralAuthConfig = Boolean(config?.centralUcanAppId?.trim());
+    const hasCentralAuthConfig = Boolean(config?.chatApplicationUid?.trim());
     if (config?.isApp && !hasCentralCallbackCode && !hasCentralAuthConfig) {
       navigate(Path.Settings);
     }
