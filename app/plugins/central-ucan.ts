@@ -885,13 +885,13 @@ function buildApiUrl(path: string, baseUrlOverride?: string) {
 
 export function getCentralAppId() {
   const config = getClientConfig();
-  return config?.centralUcanAppId?.trim() || "";
+  return config?.chatApplicationUid?.trim() || "";
 }
 
 function resolveCentralAppId(appId?: string) {
   const resolved = (appId || getCentralAppId()).trim();
   if (!resolved) {
-    throw new Error("未配置 CENTRAL_UCAN_APP_ID");
+    throw new Error("未配置 CHAT_APPLICATION_UID");
   }
   return resolved;
 }

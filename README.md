@@ -75,11 +75,10 @@ cp .env.build.template .env.build
    - `ROUTER_PORTAL_URL`：Router 管理中心地址（可选，默认 `https://router.yeying.pub`）
    - `ROUTER_PORTAL_TOKEN_URL`：Router 令牌页地址（可选，默认继承 `ROUTER_PORTAL_URL`）
    - `ROUTER_PORTAL_RECHARGE_URL`：Router 充值页地址（可选，默认继承 `ROUTER_PORTAL_TOKEN_URL`）
-   - `CENTRAL_UCAN_APP_ID`：中心化 UCAN 应用 AppId（在 Node 应用中心发布后获得；版本升级应保持不变）
+   - `CHAT_APPLICATION_UID`：Node 应用中心中 Chat 应用的 `applications.uid`。它同时是登录 `appId`、UCAN 的 `app:all:<uid>` 资源和 Warehouse `/apps/<uid>` 目录标识。
    - `CENTRAL_UCAN_REDIRECT_URI`：中心化 UCAN 授权回调地址；Tauri 本地包固定使用 `chat://localhost/central-ucan-callback.html`
    - `WEBDAV_BACKEND_BASE_URL`：WebDAV 后端基础地址（按需配置，不含路径）
    - `WEBDAV_BACKEND_PREFIX`：WebDAV 路径前缀（默认 `/dav`，可选修改）
-   - `WEBDAV_APP_ID`：WebDAV/UCAN 应用空间 ID；应与同一应用的 Node AppId 一致，桌面包复用本地 web 版数据时过渡期通常设置为 `localhost-3020`
    - 以及你实际使用的 provider 配置（如 OpenAI / Gemini / Anthropic / Volcengine 等）
 3. 如需调整构建细节变量，配置 `.env.build`：
    - `DISABLE_CHUNK`
@@ -185,9 +184,8 @@ bash scripts/package.sh app-release
 ROUTER_BACKEND_URL=http://127.0.0.1:3011
 WEBDAV_BACKEND_BASE_URL=http://127.0.0.1:6065
 WEBDAV_BACKEND_PREFIX=/dav
-WEBDAV_APP_ID=localhost-3020
+CHAT_APPLICATION_UID=<Node 中 Chat 应用的 applications.uid>
 CENTRAL_UCAN_AUTH_BASE_URL=http://127.0.0.1:8100
-CENTRAL_UCAN_APP_ID=<Node 中发布的 Chat 应用 ID>
 CENTRAL_UCAN_REDIRECT_URI=chat://localhost/central-ucan-callback.html
 ```
 
@@ -206,7 +204,7 @@ open src-tauri/target/release/bundle/macos/Chat.app
 2. 进入发现页的云端存储，点击“检查连接”和“立即同步”。
 3. 回到聊天首页，确认左侧会话列表能从 Warehouse/WebDAV 恢复。
 
-如果云端存储正常但会话列表为空，优先检查 `WEBDAV_APP_ID` 是否和网页版同一个应用空间一致，例如 `localhost-3020`。如果桌面端 WebDAV 请求失败，优先确认 Warehouse CORS 是否允许 `https://tauri.localhost`；这只是桌面 WebView origin，不是登录回调地址。
+如果云端存储正常但会话列表为空，优先检查 `CHAT_APPLICATION_UID` 是否和网页版相同，以及 Warehouse 中是否存在对应 `/apps/<uid>` 目录。如果桌面端 WebDAV 请求失败，优先确认 Warehouse CORS 是否允许 `https://tauri.localhost`。
 
 完整说明见：`docs/Tauri桌面端迁移清单.md`
 

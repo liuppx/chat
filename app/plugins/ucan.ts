@@ -96,7 +96,7 @@ function getRouterCapabilityResource(): string {
 }
 
 export function getWebdavAppId(): string {
-  const configuredAppId = getClientConfig()?.webdavAppId?.trim();
+  const configuredAppId = getClientConfig()?.chatApplicationUid?.trim();
   const appId = configuredAppId || deriveAppIdFromLocation();
   return appId ? sanitizeAppId(appId) : "";
 }
