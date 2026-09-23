@@ -4,6 +4,10 @@ const GOOGLE_FONTS_BASE_URL = "https://fonts.googleapis.com";
 
 export const dynamic = "force-dynamic";
 
+const FONT_PROXY_TIMEOUT_MS = 5000;
+const FALLBACK_CSS =
+  "/* Google Fonts is unavailable; use the system font stack. */\n";
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
@@ -26,11 +30,43 @@ export async function GET(
   if (userAgent) headers.set("user-agent", userAgent);
   if (acceptLanguage) headers.set("accept-language", acceptLanguage);
 
-  const res = await fetch(upstreamUrl.toString(), {
-    method: "GET",
-    headers,
-    redirect: "follow",
-  });
+  let res: Response;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FONT_PROXY_TIMEOUT_MS);
+    try {
+      res = await fetch(upstreamUrl.toString(), {
+        method: "GET",
+        headers,
+        redirect: "follow",
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (error) {
+    // Fonts are an optional enhancement. A blocked or unavailable Google
+    // endpoint must not turn the application shell into a 500 response.
+    console.warn("[Google Fonts] upstream unavailable", error);
+    return new Response(FALLBACK_CSS, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/css; charset=utf-8",
+        "Cache-Control": "public, max-age=300",
+      },
+    });
+  }
+
+  if (!res.ok) {
+    console.warn("[Google Fonts] upstream returned an error", res.status);
+    return new Response(FALLBACK_CSS, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/css; charset=utf-8",
+        "Cache-Control": "public, max-age=300",
+      },
+    });
+  }
 
   const newHeaders = new Headers(res.headers);
   // Avoid content-encoding mismatch when downstream applies its own compression.
