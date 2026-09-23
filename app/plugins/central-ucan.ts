@@ -874,7 +874,7 @@ export function resolveCentralAuthBaseUrl(baseUrlOverride?: string): string {
   const fromConfig = normalizeBaseUrl(config?.centralUcanAuthBaseUrl || "");
   if (fromConfig) return fromConfig;
   const fallback = normalizeBaseUrl(config?.routerBackendUrl || "");
-  return fallback || "http://127.0.0.1:8100";
+  return fallback || "http://localhost:8100";
 }
 
 function buildApiUrl(path: string, baseUrlOverride?: string) {

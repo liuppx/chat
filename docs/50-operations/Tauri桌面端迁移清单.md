@@ -158,15 +158,15 @@ npm run app:dev
 | 服务                | 本地常用地址            | 作用                                                    |
 | ------------------- | ----------------------- | ------------------------------------------------------- |
 | Node / central UCAN | `http://localhost:8100` | 处理中心化登录、Passkey 授权、授权回调和 UCAN 换发      |
-| Router              | `http://127.0.0.1:3011` | 校验 Router audience/capability，并转发大模型调用       |
-| Warehouse           | `http://127.0.0.1:6065` | 校验 WebDAV audience/capability，保存同步快照和媒体文件 |
+| Router              | `http://localhost:3011` | 校验 Router audience/capability，并转发大模型调用       |
+| Warehouse           | `http://localhost:6065` | 校验 WebDAV audience/capability，保存同步快照和媒体文件 |
 | Chat Desktop        | `https://tauri.localhost` | 承载前端 UI；不是 API 服务                              |
 
 本地桌面包推荐从 `.env.build.template` 创建 `.env.build`，使用桌面专用配置：
 
 ```dotenv
-ROUTER_BACKEND_URL=http://127.0.0.1:3011
-WEBDAV_BACKEND_BASE_URL=http://127.0.0.1:6065
+ROUTER_BACKEND_URL=http://localhost:3011
+WEBDAV_BACKEND_BASE_URL=http://localhost:6065
 WEBDAV_BACKEND_PREFIX=/dav
 CHAT_APPLICATION_UID=<Node 中 Chat 应用的 applications.uid>
 CENTRAL_UCAN_AUTH_BASE_URL=http://localhost:8100
@@ -179,7 +179,7 @@ CENTRAL_UCAN_REDIRECT_URI=chat://localhost/central-ucan-callback.html
 - 修改 `.env.build` 后，已经打出的 `Chat.app` 不会自动读取新值，需要重新执行 `npm run app:build`
 - 桌面构建时配置优先级为：命令行/CI 环境变量、`.env.build`
 - `CENTRAL_UCAN_REDIRECT_URI` 必须和 Node 中 Chat 应用配置的某一项 `redirectUris` 完全一致；桌面包固定使用 `chat://localhost/central-ucan-callback.html`
-- 桌面本地包的回调地址是 `chat://localhost/central-ucan-callback.html`，不是 `http://127.0.0.1:8100`
+- 桌面本地包的回调地址是 `chat://localhost/central-ucan-callback.html`，不是 `http://localhost:8100`
 - `CHAT_APPLICATION_UID` 是 Node 应用中心 Chat 应用的 `applications.uid`；它同时决定登录 appId、`app:all:<uid>` capability 和 Warehouse `/apps/<uid>` 目录
 
 Warehouse 本地 CORS 至少应允许桌面 origin 和本地 Web origin：
@@ -190,14 +190,13 @@ cors:
   credentials: true
   allowed_origins:
     - "https://tauri.localhost"
-    - "http://127.0.0.1:3020"
     - "http://localhost:3020"
 ```
 
 改完 Warehouse 配置后需要重启 Warehouse。可以用下面命令检查桌面 origin 是否已允许：
 
 ```bash
-curl -i -sS -X OPTIONS 'http://127.0.0.1:6065/api/v1/public/webdav/quota' \
+curl -i -sS -X OPTIONS 'http://localhost:6065/api/v1/public/webdav/quota' \
   -H 'Origin: https://tauri.localhost' \
   -H 'Access-Control-Request-Method: GET' \
   -H 'Access-Control-Request-Headers: authorization,content-type'

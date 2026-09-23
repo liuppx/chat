@@ -139,11 +139,11 @@ bash scripts/starter.sh start
 ```bash
 scripts/health-check.sh
 scripts/health-check.sh --level liveness
-scripts/health-check.sh --level all --base-url http://127.0.0.1:3020
+scripts/health-check.sh --level all --base-url http://localhost:3020
 scripts/health-check.sh --level readiness --format json
 ```
 
-默认无参数等同于 `--level readiness`，服务地址默认读取 `HEALTH_BASE_URL`，未设置时使用 `http://127.0.0.1:${PORT:-3020}`。
+默认无参数等同于 `--level readiness`，服务地址默认读取 `HEALTH_BASE_URL`，未设置时使用 `http://localhost:${PORT:-3020}`。
 
 - `liveness`：检查 `.chat.pid` / 本地监听进程，必要时回退到 HTTP 根路径。
 - `readiness`：在存活检查基础上检查 `GET /` 和 `GET /health/ready`。
@@ -181,11 +181,11 @@ bash scripts/package.sh app-release
 本地桌面包依赖 Node / Router / Warehouse 三个外部服务，不是离线后端。常用本地配置如下：
 
 ```dotenv
-ROUTER_BACKEND_URL=http://127.0.0.1:3011
-WEBDAV_BACKEND_BASE_URL=http://127.0.0.1:6065
+ROUTER_BACKEND_URL=http://localhost:3011
+WEBDAV_BACKEND_BASE_URL=http://localhost:6065
 WEBDAV_BACKEND_PREFIX=/dav
 CHAT_APPLICATION_UID=<Node 中 Chat 应用的 applications.uid>
-CENTRAL_UCAN_AUTH_BASE_URL=http://127.0.0.1:8100
+CENTRAL_UCAN_AUTH_BASE_URL=http://localhost:8100
 CENTRAL_UCAN_REDIRECT_URI=chat://localhost/central-ucan-callback.html
 ```
 

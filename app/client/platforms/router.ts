@@ -236,7 +236,7 @@ function getHeadersForRouterModelAccess(url: string) {
 
 function getRouterBackendBaseUrl() {
   const routerBackendUrl =
-    getClientConfig()?.routerBackendUrl?.trim() || "http://127.0.0.1:3011";
+    getClientConfig()?.routerBackendUrl?.trim() || "http://localhost:3011";
   return routerBackendUrl.replace(/\/+$/, "");
 }
 

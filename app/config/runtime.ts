@@ -83,7 +83,7 @@ export function getRuntimePublicConfig(): RuntimePublicConfig {
 
   const buildConfig = getBuildConfig();
   const serverConfig = getServerSideConfig();
-  const defaultRouterBackendUrl = "http://127.0.0.1:3011";
+  const defaultRouterBackendUrl = "http://localhost:3011";
 
   const webdavBackendBaseUrlEnv =
     process.env.WEBDAV_BACKEND_BASE_URL?.trim() || "";
@@ -149,7 +149,7 @@ export function getRuntimePublicConfig(): RuntimePublicConfig {
     webdavBackendUrl: joinBasePrefix(webdavBackendBaseUrl, webdavBackendPrefix),
     chatApplicationUid,
     centralUcanAuthBaseUrl:
-      process.env.CENTRAL_UCAN_AUTH_BASE_URL?.trim() || "http://127.0.0.1:8100",
+      process.env.CENTRAL_UCAN_AUTH_BASE_URL?.trim() || "http://localhost:8100",
     centralUcanRedirectUri: process.env.CENTRAL_UCAN_REDIRECT_URI?.trim() || "",
     marketplaceSkillPackagesUrl:
       process.env.MARKETPLACE_SKILL_PACKAGES_URL?.trim() ||
