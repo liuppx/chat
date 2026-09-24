@@ -75,13 +75,15 @@ const loadFunc = async () => {
   try {
     const provider = await initWalletListeners({ refresh: true });
     if (!provider) {
-      throw new Error("❌未检测到钱包");
+      localStorage.setItem("hasConnectedWallet", "false");
+      // A wallet extension is optional: passkey login remains available.
+      useToastStore.getState().setPendingError(null);
+      return;
     }
     localStorage.setItem("hasConnectedWallet", "true");
   } catch (error) {
-    console.error("钱包检测失败:", error);
+    console.error("钱包初始化失败:", error);
     localStorage.setItem("hasConnectedWallet", "false");
-    // Missing wallet is expected: the login page can continue with Passkey.
     useToastStore.getState().setPendingError(null);
   }
 };
