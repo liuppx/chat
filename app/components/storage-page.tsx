@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { getClientConfig } from "../config/client";
+import { resolveEffectiveWebdavAddress } from "../utils/cloud/webdav-config";
 import { Path, STORAGE_KEY } from "../constant";
 import CloseIcon from "../icons/close.svg";
 import ConnectionIcon from "../icons/connection.svg";
@@ -71,10 +72,14 @@ export function StoragePage() {
   const webdavEnvBaseUrl =
     getClientConfig()?.webdavBackendBaseUrl?.trim() || "";
   const webdavEnvPrefix = getClientConfig()?.webdavBackendPrefix?.trim() || "";
-  const webdavBaseUrl = syncStore.webdav.baseUrl || webdavEnvBaseUrl;
-  const webdavPrefix = syncStore.webdav.baseUrl.trim()
-    ? syncStore.webdav.prefix
-    : syncStore.webdav.prefix || webdavEnvPrefix;
+  const ucanAddressManaged =
+    syncStore.webdav.authType === "ucan" && Boolean(webdavEnvBaseUrl);
+  const { baseUrl: webdavBaseUrl, prefix: webdavPrefix } =
+    resolveEffectiveWebdavAddress(
+      syncStore.webdav,
+      webdavEnvBaseUrl,
+      webdavEnvPrefix,
+    );
   const workspaceAccount = (getCurrentAccount() || "").trim();
 
   const stateOverview = useMemo(() => {
@@ -416,6 +421,7 @@ export function StoragePage() {
                 <input
                   type="text"
                   value={webdavBaseUrl}
+                  disabled={ucanAddressManaged}
                   onChange={(e) => {
                     syncStore.update(
                       (config) =>
@@ -436,6 +442,7 @@ export function StoragePage() {
                   type="text"
                   placeholder="/dav"
                   value={webdavPrefix}
+                  disabled={ucanAddressManaged}
                   onChange={(e) => {
                     syncStore.update(
                       (config) =>

@@ -29,6 +29,7 @@ import {
   refreshUcanSignLock,
   releaseUcanSignLock,
 } from "@/app/plugins/ucan-sign-lock";
+import { resolveEffectiveWebdavAddress } from "@/app/utils/cloud/webdav-config";
 
 export type WebDAVConfig = SyncStore["webdav"];
 export type WebDavClient = ReturnType<typeof createWebDavClient>;
@@ -142,20 +143,6 @@ function normalizeBaseUrl(raw: string): string {
   return raw.trim().replace(/\/+$/, "");
 }
 
-function splitBaseUrlAndPrefix(raw: string): {
-  baseUrl: string;
-  prefix: string;
-} {
-  try {
-    const url = new URL(raw);
-    const baseUrl = `${url.protocol}//${url.host}`;
-    const pathname = url.pathname.replace(/\/+$/, "");
-    return { baseUrl, prefix: pathname === "/" ? "" : pathname };
-  } catch {
-    return { baseUrl: normalizeBaseUrl(raw), prefix: "" };
-  }
-}
-
 function normalizePrefix(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed || trimmed === "/") return "";
@@ -177,49 +164,6 @@ function getEnvWebdavBaseUrl(): string {
 
 function getEnvWebdavPrefix(): string {
   return getClientConfig()?.webdavBackendPrefix?.trim() || "";
-}
-
-function resolveWebdavBaseUrl(store: SyncStore, fallbackBaseUrl = ""): string {
-  const config = store.webdav;
-  if (config.baseUrl.trim()) {
-    return splitBaseUrlAndPrefix(config.baseUrl).baseUrl;
-  }
-  if (fallbackBaseUrl.trim()) return normalizeBaseUrl(fallbackBaseUrl);
-  const endpoint = config.endpoint?.trim();
-  if (!endpoint) return "";
-  try {
-    const url = new URL(endpoint);
-    return `${url.protocol}//${url.host}`;
-  } catch {
-    return endpoint;
-  }
-}
-
-function resolveWebdavPrefix(
-  store: SyncStore,
-  fallbackPrefix = "",
-  fallbackBaseUrl = "",
-): string {
-  const config = store.webdav;
-  const storePrefix = config.prefix.trim();
-  const storeBase = config.baseUrl.trim();
-  if (storeBase) {
-    if (storePrefix) return normalizePrefix(storePrefix);
-    return splitBaseUrlAndPrefix(storeBase).prefix;
-  }
-  if (fallbackBaseUrl.trim()) {
-    return normalizePrefix(storePrefix || fallbackPrefix);
-  }
-  if (storePrefix) return normalizePrefix(storePrefix);
-  const endpoint = config.endpoint?.trim();
-  if (!endpoint) return "";
-  try {
-    const url = new URL(endpoint);
-    const pathname = url.pathname.replace(/\/+$/, "");
-    return pathname === "/" ? "" : pathname;
-  } catch {
-    return "";
-  }
 }
 
 function normalizeSyncStateKey(key?: string) {
@@ -300,8 +244,11 @@ function createBasicWebDavClient(store: SyncStore) {
     store.useProxy && store.proxyUrl.length > 0 ? store.proxyUrl : "";
   const envBaseUrl = getEnvWebdavBaseUrl();
   const envPrefix = getEnvWebdavPrefix();
-  const baseUrl = resolveWebdavBaseUrl(store, envBaseUrl);
-  const prefix = resolveWebdavPrefix(store, envPrefix, envBaseUrl);
+  const { baseUrl, prefix } = resolveEffectiveWebdavAddress(
+    store.webdav,
+    envBaseUrl,
+    envPrefix,
+  );
   const endpoint = joinBasePrefix(baseUrl, prefix);
 
   return {
@@ -625,11 +572,11 @@ async function getUcanWebDavClient(store: SyncStore) {
       authType: store.webdav.authType,
     });
   }
-  const backendUrl = resolveWebdavBaseUrl(store, envBaseUrl);
+  const { baseUrl: backendUrl, prefix: webdavPrefix } =
+    resolveEffectiveWebdavAddress(store.webdav, envBaseUrl, envPrefix);
   if (!backendUrl) {
     throw new Error("WEBDAV_BACKEND_BASE_URL is not configured");
   }
-  const webdavPrefix = resolveWebdavPrefix(store, envPrefix, envBaseUrl);
   const audience = getWebdavAudience(backendUrl);
   if (!audience) {
     throw new Error("WebDAV UCAN audience is not configured");
@@ -1180,7 +1127,11 @@ export async function uploadFileToWebDavAndCreateShareLink(params: {
   }
   await basicClient.uploadMedia(objectName, params.file, contentType);
   const envBaseUrl = getEnvWebdavBaseUrl();
-  const backendUrl = resolveWebdavBaseUrl(params.store, envBaseUrl);
+  const backendUrl = resolveEffectiveWebdavAddress(
+    params.store.webdav,
+    envBaseUrl,
+    getEnvWebdavPrefix(),
+  ).baseUrl;
   if (!backendUrl) {
     throw new Error("WEBDAV_BACKEND_BASE_URL is not configured");
   }
