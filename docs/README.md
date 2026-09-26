@@ -8,6 +8,7 @@
 - [用户文档](./10-user/用户使用手册.md)
 - [产品与能力](./20-product/网页版与桌面版产品定位.md)
 - [架构设计](./30-architecture/用户登录方案.md)
+- [运行时配置与桌面服务设置方案](./30-architecture/运行时配置与桌面服务设置方案.md)
 - [开发与质量](./40-development/网页版主链路验收清单.md)
 - [部署与运维](./50-operations/运行时配置与发包.md)
 - [Skill、Tool 与市场](./60-skills-marketplace/技能规范.md)
