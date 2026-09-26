@@ -1,12 +1,15 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { loadBuildEnvironment } from "./build-env.mjs";
 
 const rootDir = process.cwd();
 const appDir = path.join(rootDir, "app");
 const disabledSuffix = ".export-disabled";
 const toolActionsPath = path.join(appDir, "tools", "actions.ts");
 const toolActionsExportPath = path.join(appDir, "tools", "actions.export.ts");
+
+loadBuildEnvironment(rootDir);
 
 async function findRouteFiles(dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -63,7 +66,11 @@ function run(command, args, env = process.env) {
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`${command} ${args.join(" ")} failed with exit code ${code}`));
+        reject(
+          new Error(
+            `${command} ${args.join(" ")} failed with exit code ${code}`,
+          ),
+        );
       }
     });
 
@@ -169,7 +176,14 @@ try {
   await run("npm", ["run", "skill"]);
   await run(
     "npx",
-    ["cross-env", "BUILD_MODE=export", "BUILD_APP=1", "next", "build", "--webpack"],
+    [
+      "cross-env",
+      "BUILD_MODE=export",
+      "BUILD_APP=1",
+      "next",
+      "build",
+      "--webpack",
+    ],
     { ...process.env, BUILD_MODE: "export", BUILD_APP: "1" },
   );
 } finally {

@@ -14,13 +14,15 @@
 
 ## 构建与发包
 
-| 文件                            | 用途                                                                                                                                                                                |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `package.sh`                    | 统一打包入口，支持 `standalone`、`export`、`app`、`app-release` 等模式；负责加载环境变量、执行构建、整理产物并输出到 `output/` 或指定目录。                                         |
-| `export-app.mjs`                | 静态导出构建辅助脚本，会临时禁用 Next.js API route 并切换工具 actions 文件，完成 export 模式构建后恢复现场。                                                                        |
-| `tauri-build-app.mjs`           | Tauri 桌面端构建入口，只读取 `.env.build`（命令行/CI 环境变量优先），生成临时 Tauri 配置并执行桌面端构建；release 模式下校验 Node、Router、WebDAV 生产配置并处理 updater 相关配置。 |
-| `generate-updater-manifest.mjs` | 根据 release tag、仓库地址和 Tauri updater 签名产物生成 `latest.json`，供桌面端自动更新使用。                                                                                       |
-| `fetch-prompts.mjs`             | 从外部 prompt 数据源抓取中英文提示词，过滤不需要的内容后生成 `public/prompts.json`。                                                                                                |
+| 文件                            | 用途                                                                                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package.sh`                    | 统一打包入口，支持 `standalone`、`export`、`app`、`app-release` 等模式；构建参数只从进程环境和 `.env.build` 获取，不加载 `.env`，并负责整理产物。 |
+| `build-env.mjs`                 | 统一构建环境加载器；实施“命令行/CI > `.env.build` > 代码默认值”，并隔离 Next 自动扫描到的 Web `.env` 变量。                                       |
+| `next-build.mjs`                | standalone 构建入口，只允许真正的构建参数参与编译，不把 Web 运行地址、开关或密钥固化进部署产物。                                                  |
+| `export-app.mjs`                | 静态导出构建辅助脚本，只加载构建环境，并临时禁用 Next.js API route、切换工具 actions 文件，完成后恢复现场。                                       |
+| `tauri-build-app.mjs`           | Tauri 桌面构建入口，只读取进程环境和 `.env.build`，生成临时 Tauri 配置并执行构建；release 模式下校验生产配置并处理 updater。                      |
+| `generate-updater-manifest.mjs` | 根据 release tag、仓库地址和 Tauri updater 签名产物生成 `latest.json`，供桌面端自动更新使用。                                                     |
+| `fetch-prompts.mjs`             | 从外部 prompt 数据源抓取中英文提示词，过滤不需要的内容后生成 `public/prompts.json`。                                                              |
 
 ## 部署与运行
 

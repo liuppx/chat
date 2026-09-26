@@ -21,6 +21,7 @@ AGENTS.md
 
 # misc
 .DS_Store
+*.swp
 *.pem
 
 # debug

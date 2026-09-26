@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
-import { existsSync, promises as fs, readFileSync } from "node:fs";
+import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
 import tauriConfig from "../src-tauri/tauri.conf.json" with { type: "json" };
+import { loadBuildEnvironment } from "./build-env.mjs";
 
 const rootDir = process.cwd();
 const releaseMode = process.argv.includes("--release-updater");
@@ -12,29 +13,9 @@ const tempConfigPath = path.join(
 );
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 
-const inheritedEnvKeys = new Set(Object.keys(process.env));
-
-function loadEnvFile(filePath) {
-  if (!existsSync(filePath)) return;
-  for (const line of readFileSync(filePath, "utf8").split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
-    if (!match || inheritedEnvKeys.has(match[1])) continue;
-    if (process.env[match[1]] !== undefined) continue;
-    let value = match[2];
-    if (
-      value.length >= 2 &&
-      ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'")))
-    ) {
-      value = value.slice(1, -1);
-    }
-    process.env[match[1]] = value;
-  }
-}
-
 // Desktop builds embed public runtime values in the static export. Do not load
 // the Web/standalone .env here; CI and command-line variables remain authoritative.
-loadEnvFile(path.join(rootDir, ".env.build"));
+loadBuildEnvironment(rootDir);
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {

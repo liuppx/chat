@@ -155,11 +155,11 @@ npm run app:dev
 
 桌面端本地包不是一套新的后端。它是一个静态 Tauri 前端，登录、模型调用和云端同步仍然依赖外部服务：
 
-| 服务                | 本地常用地址            | 作用                                                    |
-| ------------------- | ----------------------- | ------------------------------------------------------- |
-| Node / central UCAN | `http://localhost:8100` | 处理中心化登录、Passkey 授权、授权回调和 UCAN 换发      |
-| Router              | `http://localhost:3011` | 校验 Router audience/capability，并转发大模型调用       |
-| Warehouse           | `http://localhost:6065` | 校验 WebDAV audience/capability，保存同步快照和媒体文件 |
+| 服务                | 本地常用地址              | 作用                                                    |
+| ------------------- | ------------------------- | ------------------------------------------------------- |
+| Node / central UCAN | `http://localhost:8100`   | 处理中心化登录、Passkey 授权、授权回调和 UCAN 换发      |
+| Router              | `http://localhost:3011`   | 校验 Router audience/capability，并转发大模型调用       |
+| Warehouse           | `http://localhost:6065`   | 校验 WebDAV audience/capability，保存同步快照和媒体文件 |
 | Chat Desktop        | `https://tauri.localhost` | 承载前端 UI；不是 API 服务                              |
 
 本地桌面包推荐从 `.env.build.template` 创建 `.env.build`，使用桌面专用配置：
@@ -177,7 +177,7 @@ CENTRAL_UCAN_REDIRECT_URI=chat://localhost/central-ucan-callback.html
 
 - 桌面包的前端公开配置会在 `npm run app:build` 时写入 `out/`，再进入 `.app`
 - 当前版本没有应用内服务地址覆盖设置。修改 `.env.build` 后，已经打出的 `Chat.app` 不会自动读取新值，需要重新执行 `npm run app:build`
-- 桌面构建时配置优先级为：命令行/CI 环境变量、`.env.build`
+- 桌面构建时配置优先级为：命令行/CI 环境变量 > `.env.build` > 代码默认值；`.env` 即使被 Next 构建日志列出也不会参与桌面配置
 - `CENTRAL_UCAN_REDIRECT_URI` 必须和 Node 中 Chat 应用配置的某一项 `redirectUris` 完全一致；桌面包固定使用 `chat://localhost/central-ucan-callback.html`
 - 桌面本地包的回调地址是 `chat://localhost/central-ucan-callback.html`，不是 `http://localhost:8100`
 - `CHAT_APPLICATION_UID` 是 Node 应用中心 Chat 应用的 `applications.uid`；它同时决定登录 appId、`app:all:<uid>` capability 和 Warehouse `/apps/<uid>` 目录

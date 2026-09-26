@@ -4,13 +4,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 OUTPUT_DIR="${ROOT_DIR}/output"
-ENV_FILE="${ROOT_DIR}/.env"
 ENV_TEMPLATE="${ROOT_DIR}/.env.template"
 BUILD_ENV_FILE="${ROOT_DIR}/.env.build"
 BUILD_ENV_TEMPLATE="${ROOT_DIR}/.env.build.template"
 MODE_FILE="${ROOT_DIR}/build.mode"
 VALID_MODES=("standalone" "export" "app" "app-release")
-RUNTIME_ENV_SOURCE=""
 BUILD_ENV_SOURCE=""
 MODE_SOURCE="default"
 
@@ -89,21 +87,6 @@ write_package_version() {
     data.version = version.replace(/^v/, "");
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n");
   ' "${file_path}" "${value}"
-}
-
-ensure_runtime_env() {
-  if [ ! -f "${ENV_FILE}" ]; then
-    if [ ! -f "${ENV_TEMPLATE}" ]; then
-      echo "Error: ${ENV_FILE} not found and ${ENV_TEMPLATE} is missing." >&2
-      exit 1
-    fi
-    cp "${ENV_TEMPLATE}" "${ENV_FILE}"
-    CREATED_ENV="true"
-    echo "Generated ${ENV_FILE} from template for build."
-  fi
-
-  RUNTIME_ENV_SOURCE="${ENV_FILE}"
-  load_env_file "${ENV_FILE}"
 }
 
 load_build_env() {
@@ -187,7 +170,7 @@ print_package_config() {
   echo "  tag: ${TARGET_TAG}"
   echo "  output_dir: ${OUTPUT_DIR}"
   echo "  package_name: ${PACKAGE_NAME}"
-  echo "  runtime_env: ${RUNTIME_ENV_SOURCE}"
+  echo "  runtime_env: not loaded during build"
   echo "  build_env: ${BUILD_ENV_SOURCE}"
   echo "  build_entry: ${build_entry}"
   echo "  effective_BUILD_MODE: ${effective_build_mode}"
@@ -428,12 +411,7 @@ fi
 
 ORIGINAL_REF="$(git symbolic-ref --quiet --short HEAD || git rev-parse HEAD)"
 RESTORE_REF="false"
-CREATED_ENV="false"
-
 cleanup() {
-  if [ "${CREATED_ENV}" = "true" ] && [ -f "${ENV_FILE}" ]; then
-    rm -f "${ENV_FILE}"
-  fi
   if [ "${RESTORE_REF}" = "true" ]; then
     git checkout -q "${ORIGINAL_REF}" >/dev/null 2>&1 || true
   fi
@@ -496,13 +474,9 @@ git checkout -q "${TARGET_TAG}"
 echo "Packaging mode: ${MODE}"
 echo "Packaging from tag: ${TARGET_TAG}"
 
-if [[ "${MODE}" = "app" || "${MODE}" = "app-release" ]]; then
-  # Desktop builds must not inherit Web/standalone runtime values from .env.
-  load_build_env
-else
-  ensure_runtime_env
-  load_build_env
-fi
+# Build parameters always come from .env.build. Web runtime values in .env are
+# loaded only when the standalone service starts, never while packaging.
+load_build_env
 
 PROJECT_NAME="$(node -p "require('./package.json').name || 'app'")"
 SHORT_HASH="$(git rev-parse --short=7 HEAD)"

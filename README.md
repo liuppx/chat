@@ -56,10 +56,11 @@ cp .env.build.template .env.build
 
 - `.env.template` / `.env`
   - Web standalone 服务的运行期配置
+  - 不作为任何构建或发包命令的配置来源
   - Web 服务启动后动态读取；公开配置下发给浏览器
   - 修改后重启服务并刷新页面，不需要重新构建 Web 代码
 - `.env.build.template` / `.env.build`
-  - 构建期和发包期配置
+  - 所有构建期和发包期配置的唯一文件来源（命令行/CI 变量仍可覆盖）
   - 桌面包出厂服务默认值也在这里，并会嵌入安装包
   - 普通桌面用户的运行时服务地址目标是通过 Chat 设置页覆盖
   - 不再手工配置 `BUILD_MODE` / `BUILD_APP`
@@ -81,9 +82,12 @@ cp .env.build.template .env.build
    - `WEBDAV_BACKEND_BASE_URL`：WebDAV 后端基础地址（按需配置，不含路径）
    - `WEBDAV_BACKEND_PREFIX`：WebDAV 路径前缀（默认 `/dav`，可选修改）
    - 以及你实际使用的 provider 配置（如 OpenAI / Gemini / Anthropic / Volcengine 等）
-3. 如需调整构建细节变量，配置 `.env.build`：
+3. 如需调整构建或发包参数，配置 `.env.build`：
+   - `BUILD_VERSION`
    - `DISABLE_CHUNK`
    - Tauri 签名相关变量
+
+`.env` 不参与构建。Web 运行地址和服务端密钥只需在部署目录的 `.env` 中配置，重启 standalone 服务后生效。
 
 ## 推荐发包方式（standalone）
 

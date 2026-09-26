@@ -8,7 +8,7 @@
     "dev": "concurrently -r \"npm run skill:watch\" \"next dev --webpack -p 3020\"",
     "dev:marketplace": "bash ./scripts/dev-marketplace.sh",
     "marketplace:snapshot": "bash ./scripts/sync-marketplace-snapshot.sh",
-    "build": "npm run skill && cross-env BUILD_MODE=standalone next build --webpack",
+    "build": "npm run skill && node ./scripts/next-build.mjs",
     "start": "PORT=3020 node .next/standalone/server.js",
     "lint": "eslint .",
     "export": "node ./scripts/export-app.mjs",
