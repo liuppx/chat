@@ -35,6 +35,7 @@ import {
 } from "../plugins/central-ucan";
 import { notifyError, notifySuccess } from "../plugins/show_window";
 import { isDesktopAppRuntime } from "../tauri";
+import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
 const storage = safeLocalStorage();
 let pendingDesktopDeepLinks: string[][] = [];
@@ -248,6 +249,7 @@ export function AuthPage() {
     if (!isDesktopAppRuntime()) return;
 
     let disposed = false;
+    let unlisten: (() => void) | undefined;
 
     const handleUrls = (urls: string[]) => {
       for (const raw of urls) {
@@ -262,17 +264,37 @@ export function AuthPage() {
     };
 
     const subscribe = async () => {
+      const removeInternalListener = subscribeDesktopDeepLinks(handleUrls);
       try {
-        const removeListener = subscribeDesktopDeepLinks(handleUrls);
-        if (disposed) removeListener();
+        unlisten = await onOpenUrl((urls) => {
+          if (!disposed) handleUrls(urls);
+        });
+        if (disposed) unlisten();
       } catch (error) {
         console.error("Failed to subscribe to desktop deep links", error);
       }
+
+      // The callback can arrive while the browser is launching a second
+      // instance. Read the launch URL as well as subscribing to future events.
+      try {
+        const urls = await getCurrent();
+        if (!disposed && urls?.length) handleUrls(urls);
+      } catch (error) {
+        console.error("Failed to read desktop deep links", error);
+      }
+
+      return removeInternalListener;
     };
 
-    void subscribe();
+    let removeInternalListener: (() => void) | undefined;
+    void subscribe().then((remove) => {
+      if (disposed) remove();
+      else removeInternalListener = remove;
+    });
     return () => {
       disposed = true;
+      unlisten?.();
+      removeInternalListener?.();
     };
   }, [handleCentralCallback]);
 
