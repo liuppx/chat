@@ -98,6 +98,7 @@ export type CentralAuthorizeRequestResult = {
   scopes: string[];
   expiresAt: string | number;
   verifyUrl: string;
+  clientType?: "web" | "desktop";
   codeChallengeMethod?: string;
 };
 
@@ -1128,6 +1129,7 @@ export function getCentralUcanExpiresAt(): number | null {
 export async function createCentralAuthorizeRequest(input: {
   appId?: string;
   redirectUri: string;
+  clientType?: "web" | "desktop";
   state?: string;
   codeChallenge: string;
   codeChallengeMethod?: "S256";
@@ -1145,6 +1147,7 @@ export async function createCentralAuthorizeRequest(input: {
       body: JSON.stringify({
         appId: resolvedAppId,
         redirectUri: input.redirectUri,
+        ...(input.clientType ? { clientType: input.clientType } : {}),
         state: input.state || undefined,
         codeChallenge: input.codeChallenge,
         codeChallengeMethod: input.codeChallengeMethod || "S256",

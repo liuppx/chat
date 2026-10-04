@@ -8,8 +8,8 @@ mod log;
 
 fn main() {
     tauri::Builder::default()
-        // Register this first so Windows/Linux deep-link launches are forwarded
-        // to the existing process instead of opening a second window.
+        // Register this first so a second app launch is forwarded to the
+        // existing process instead of opening a second window.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
@@ -18,7 +18,6 @@ fn main() {
             }
         }))
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
