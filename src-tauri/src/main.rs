@@ -4,6 +4,7 @@
 use tauri::Manager;
 
 mod stream;
+mod log;
 
 fn main() {
     tauri::Builder::default()
@@ -23,7 +24,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![stream::stream_fetch])
+        .invoke_handler(tauri::generate_handler![stream::stream_fetch, log::append_log])
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
