@@ -66,6 +66,7 @@ function normalizeRedirectPath(raw: string | null | undefined) {
 }
 
 function getCentralRedirectUri() {
+  if (isDesktopAppRuntime()) return "";
   const configured = getClientConfig()?.centralUcanRedirectUri?.trim();
   if (configured) return configured;
   if (typeof window === "undefined") return "";
