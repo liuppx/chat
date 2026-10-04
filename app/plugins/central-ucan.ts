@@ -1147,7 +1147,7 @@ export async function createCentralAuthorizeRequest(input: {
       body: JSON.stringify({
         appId: resolvedAppId,
         redirectUri: input.redirectUri,
-        clientType: input.clientType || "web",
+        ...(input.clientType ? { clientType: input.clientType } : {}),
         state: input.state || undefined,
         codeChallenge: input.codeChallenge,
         codeChallengeMethod: input.codeChallengeMethod || "S256",

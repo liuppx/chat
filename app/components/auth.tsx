@@ -273,7 +273,7 @@ export function AuthPage() {
       const request = await createCentralAuthorizeRequest({
         appId: getCentralAppId(),
         redirectUri,
-        clientType: isDesktopAppRuntime() ? "desktop" : "web",
+        clientType: isDesktopAppRuntime() ? "desktop" : undefined,
         state: session.state,
         codeChallenge: session.codeChallenge,
         scopes: IDENTITY_LOGIN_SCOPES,
@@ -322,7 +322,7 @@ export function AuthPage() {
       const request = await createCentralAuthorizeRequest({
         appId: getCentralAppId(),
         redirectUri,
-        clientType: isDesktopAppRuntime() ? "desktop" : "web",
+        clientType: isDesktopAppRuntime() ? "desktop" : undefined,
         state: session.state,
         codeChallenge: session.codeChallenge,
         scopes: IDENTITY_LOGIN_SCOPES,
