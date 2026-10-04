@@ -1,6 +1,7 @@
 import styles from "./auth.module.scss";
 import { IconButton } from "./button";
 import { useCallback, useState, useEffect, useRef } from "react";
+import type { MouseEvent } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Path } from "../constant";
@@ -408,6 +409,17 @@ export function AuthPage() {
   const isLoginDisabled = ucanStatus === "authorized" || centralLoading;
   const isDesktopApp = isDesktopAppRuntime();
   const isPasskeyMode = loginMode === "passkey";
+  const openPasskeyVerification = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault();
+      const url = passkeyLogin.verifyUrl;
+      if (!url) return;
+      const opened = window.open(url, "_blank");
+      if (opened) opened.opener = null;
+      else window.location.assign(url);
+    },
+    [passkeyLogin.verifyUrl],
+  );
   const toggleLoginMode = () => {
     setLoginMode(isPasskeyMode ? "wallet" : "passkey");
   };
@@ -483,6 +495,7 @@ export function AuthPage() {
                 href={passkeyLogin.verifyUrl}
                 target="_blank"
                 rel="noreferrer"
+                onClick={openPasskeyVerification}
               >
                 {Locale.Auth.PasskeyOpen}
               </a>
