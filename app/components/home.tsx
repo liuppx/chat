@@ -73,6 +73,11 @@ import { IconButton } from "./button";
 import ReloadIcon from "../icons/reload.svg";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { isDesktopAppRuntime } from "../tauri";
+import { installDesktopLogging } from "../utils/desktop-log";
+
+if (typeof window !== "undefined") {
+  installDesktopLogging();
+}
 
 const loadFunc = async () => {
   try {

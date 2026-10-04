@@ -1174,6 +1174,29 @@ export async function createCentralAuthorizeRequest(input: {
   );
 }
 
+export async function getCentralAuthorizeRequest(
+  requestId: string,
+  baseUrl?: string,
+): Promise<CentralAuthorizeRequestResult> {
+  const response = await desktopAwareFetch(
+    buildApiUrl(
+      `/api/v1/public/identity/authorize/request/${encodeURIComponent(requestId)}`,
+      baseUrl,
+    ),
+    { credentials: "include" },
+  );
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      parseApiErrorText(text, `读取中心化授权请求失败: ${response.status}`),
+    );
+  }
+  return parseEnvelope<CentralAuthorizeRequestResult>(
+    text,
+    "读取中心化授权请求失败",
+  );
+}
+
 export async function approveCentralAuthorizePresentation(input: {
   requestId: string;
   presentation: unknown;
@@ -1240,6 +1263,41 @@ export async function exchangeCentralAuthorizeCode(input: {
   return parseEnvelope<CentralAuthorizeExchangeResult>(
     text,
     "中心化授权码兑换失败",
+  );
+}
+
+export async function exchangeCentralAuthorizeRequest(input: {
+  requestId: string;
+  appId?: string;
+  redirectUri: string;
+  codeVerifier: string;
+  baseUrl?: string;
+}): Promise<CentralAuthorizeExchangeResult> {
+  const resolvedAppId = resolveCentralAppId(input.appId);
+  const response = await desktopAwareFetch(
+    buildApiUrl("/api/v1/public/identity/authorize/exchange", input.baseUrl),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        requestId: input.requestId,
+        appId: resolvedAppId,
+        redirectUri: input.redirectUri,
+        codeVerifier: input.codeVerifier,
+        issueUcanSession: true,
+      }),
+    },
+  );
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      parseApiErrorText(text, `中心化授权请求兑换失败: ${response.status}`),
+    );
+  }
+  return parseEnvelope<CentralAuthorizeExchangeResult>(
+    text,
+    "中心化授权请求兑换失败",
   );
 }
 

@@ -23,6 +23,7 @@ Chat（UCAN 定制版）
 - AI Native 能力分层架构：[AI Native 能力分层架构](docs/20-product/AI-Native能力分层架构.md)
 - 运行时配置与发包：[运行时配置与发包](docs/50-operations/运行时配置与发包.md)
 - Tauri 桌面端打包发布说明：[Tauri 桌面端迁移清单](docs/50-operations/Tauri桌面端迁移清单.md)
+- 桌面端日志位置见：[Tauri 桌面端迁移清单](docs/50-operations/Tauri桌面端迁移清单.md#桌面端日志位置)
 - Skill / Tool 运行机制：[Chat Skill 与 Tool 运行机制](docs/60-skills-marketplace/Chat%20Skill与Tool运行机制.md)
 
 # 环境要求

@@ -1,6 +1,7 @@
 import styles from "./auth.module.scss";
 import { IconButton } from "./button";
 import { useCallback, useState, useEffect, useRef } from "react";
+import type { MouseEvent } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Path } from "../constant";
@@ -26,6 +27,8 @@ import {
   createCentralAuthorizeSession,
   createCentralAuthorizeRequest,
   exchangeCentralAuthorizeCode,
+  exchangeCentralAuthorizeRequest,
+  getCentralAuthorizeRequest,
   getCentralAuthorizeSession,
   getCentralAppId,
   getCentralIdentityOwner,
@@ -35,6 +38,7 @@ import {
 } from "../plugins/central-ucan";
 import { notifyError, notifySuccess } from "../plugins/show_window";
 import { isDesktopAppRuntime } from "../tauri";
+import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
 const storage = safeLocalStorage();
 let pendingDesktopDeepLinks: string[][] = [];
@@ -143,6 +147,14 @@ export function AuthPage() {
   });
   const exchangedCodeRef = useRef("");
   const exchangingCodeRef = useRef("");
+  const desktopAuthorizePollRef = useRef<number | null>(null);
+
+  const stopDesktopAuthorizePolling = useCallback(() => {
+    if (desktopAuthorizePollRef.current !== null) {
+      window.clearTimeout(desktopAuthorizePollRef.current);
+      desktopAuthorizePollRef.current = null;
+    }
+  }, []);
 
   const handleCentralCallback = useCallback(
     async (code: string, state: string | null | undefined) => {
@@ -193,6 +205,64 @@ export function AuthPage() {
     },
     [navigate],
   );
+
+  const startDesktopAuthorizePolling = useCallback(
+    (requestId: string, state: string) => {
+      stopDesktopAuthorizePolling();
+      let attempts = 0;
+      const poll = async () => {
+        try {
+          const request = await getCentralAuthorizeRequest(requestId);
+          if (request.status === "approved") {
+            const session = getCentralAuthorizeSession(state);
+            if (!session?.codeVerifier) {
+              throw new Error("钱包身份授权会话已失效，请重新登录");
+            }
+            setCentralLoading(true);
+            const result = await exchangeCentralAuthorizeRequest({
+              requestId,
+              appId: getCentralAppId(),
+              redirectUri: getCentralRedirectUri(),
+              codeVerifier: session.codeVerifier,
+            });
+            consumeCentralAuthorizeSession(state);
+            applyCentralAuthorizeExchange(result, { emit: false });
+            notifySuccess(Locale.Auth.CentralLoginSuccess);
+            navigate(normalizeRedirectPath(session.redirectPath), {
+              replace: true,
+            });
+            window.dispatchEvent(new Event(UCAN_AUTH_EVENT));
+            stopDesktopAuthorizePolling();
+            return;
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          const transient =
+            message.includes("AUTHORIZATION_REQUEST_PENDING") ||
+            message.includes("Failed to fetch") ||
+            message.includes("Load failed") ||
+            message.includes("网络");
+          if (!transient) {
+            stopDesktopAuthorizePolling();
+            setCentralLoading(false);
+            notifyError(Locale.Auth.CentralExchangeFailed(message));
+            return;
+          }
+        } finally {
+          setCentralLoading(false);
+        }
+        attempts += 1;
+        if (attempts < 600) {
+          desktopAuthorizePollRef.current = window.setTimeout(poll, 500);
+        }
+      };
+      desktopAuthorizePollRef.current = window.setTimeout(poll, 500);
+    },
+    [navigate, stopDesktopAuthorizePolling],
+  );
+
+  useEffect(() => stopDesktopAuthorizePolling, [stopDesktopAuthorizePolling]);
 
   useEffect(() => {
     const config = getClientConfig();
@@ -248,6 +318,7 @@ export function AuthPage() {
     if (!isDesktopAppRuntime()) return;
 
     let disposed = false;
+    let unlisten: (() => void) | undefined;
 
     const handleUrls = (urls: string[]) => {
       for (const raw of urls) {
@@ -262,17 +333,37 @@ export function AuthPage() {
     };
 
     const subscribe = async () => {
+      const removeInternalListener = subscribeDesktopDeepLinks(handleUrls);
       try {
-        const removeListener = subscribeDesktopDeepLinks(handleUrls);
-        if (disposed) removeListener();
+        unlisten = await onOpenUrl((urls) => {
+          if (!disposed) handleUrls(urls);
+        });
+        if (disposed) unlisten();
       } catch (error) {
         console.error("Failed to subscribe to desktop deep links", error);
       }
+
+      // The callback can arrive while the browser is launching a second
+      // instance. Read the launch URL as well as subscribing to future events.
+      try {
+        const urls = await getCurrent();
+        if (!disposed && urls?.length) handleUrls(urls);
+      } catch (error) {
+        console.error("Failed to read desktop deep links", error);
+      }
+
+      return removeInternalListener;
     };
 
-    void subscribe();
+    let removeInternalListener: (() => void) | undefined;
+    void subscribe().then((remove) => {
+      if (disposed) remove();
+      else removeInternalListener = remove;
+    });
     return () => {
       disposed = true;
+      unlisten?.();
+      removeInternalListener?.();
     };
   }, [handleCentralCallback]);
 
@@ -298,6 +389,9 @@ export function AuthPage() {
         verifyUrl: request.verifyUrl,
         message: "",
       });
+      if (isDesktopAppRuntime()) {
+        startDesktopAuthorizePolling(request.requestId, session.state);
+      }
     } catch (error) {
       const message = Locale.Auth.CentralRequestFailed(
         formatCentralAuthError(error, redirectUri),
@@ -307,7 +401,7 @@ export function AuthPage() {
     } finally {
       setCentralLoading(false);
     }
-  }, [centralLoading, location.search]);
+  }, [centralLoading, location.search, startDesktopAuthorizePolling]);
 
   useEffect(() => {
     if (
@@ -386,6 +480,17 @@ export function AuthPage() {
   const isLoginDisabled = ucanStatus === "authorized" || centralLoading;
   const isDesktopApp = isDesktopAppRuntime();
   const isPasskeyMode = loginMode === "passkey";
+  const openPasskeyVerification = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault();
+      const url = passkeyLogin.verifyUrl;
+      if (!url) return;
+      const opened = window.open(url, "_blank");
+      if (opened) opened.opener = null;
+      else window.location.assign(url);
+    },
+    [passkeyLogin.verifyUrl],
+  );
   const toggleLoginMode = () => {
     setLoginMode(isPasskeyMode ? "wallet" : "passkey");
   };
@@ -461,6 +566,7 @@ export function AuthPage() {
                 href={passkeyLogin.verifyUrl}
                 target="_blank"
                 rel="noreferrer"
+                onClick={openPasskeyVerification}
               >
                 {Locale.Auth.PasskeyOpen}
               </a>
