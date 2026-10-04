@@ -184,6 +184,18 @@ CENTRAL_UCAN_REDIRECT_URI=chat://localhost/central-ucan-callback.html
 
 桌面端运行配置的目标是由 Chat 设置页覆盖 Router、Warehouse/WebDAV 和 Node 身份服务地址，并将覆盖值保存在当前操作系统用户的 Chat 配置中。用户不应被要求编辑 `.env`、`.env.build` 或安装目录文件。`CHAT_APPLICATION_UID` 和 `CENTRAL_UCAN_REDIRECT_URI` 是固定应用身份/协议，不属于可编辑服务地址。设置页功能尚未实现前，继续按上面的 `.env.build` 配置和重新打包流程操作。设计依据见[运行时配置与桌面服务设置方案](../30-architecture/运行时配置与桌面服务设置方案.md)。
 
+## 桌面端日志位置
+
+桌面版会将前端 `console.warn`、`console.error`、未捕获异常和未处理的 Promise rejection 写入本机日志文件。日志目录按操作系统固定为：
+
+| 操作系统 | 默认日志文件 |
+| --- | --- |
+| macOS | `~/Library/Logs/chat.yeying.pub/chat.log` |
+| Windows | `%LOCALAPPDATA%\chat.yeying.pub\logs\chat.log` |
+| Linux | `$XDG_STATE_HOME/chat.yeying.pub/logs/chat.log`；未设置 `XDG_STATE_HOME` 时为 `~/.local/state/chat.yeying.pub/logs/chat.log` |
+
+日志由桌面应用运行时写入，首次启动时自动创建目录。排查登录、深链回调、Router 请求或 WebDAV 同步问题时，应先关闭并重新打开 Chat，再查看对应平台的日志文件；日志内容可能包含请求地址和错误信息，不要公开上传未经脱敏的完整日志。
+
 Warehouse 本地 CORS 至少应允许桌面 origin 和本地 Web origin：
 
 ```yaml
