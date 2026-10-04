@@ -39,6 +39,7 @@ import {
 import { notifyError, notifySuccess } from "../plugins/show_window";
 import { isDesktopAppRuntime } from "../tauri";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 const storage = safeLocalStorage();
 let pendingDesktopDeepLinks: string[][] = [];
@@ -482,12 +483,17 @@ export function AuthPage() {
   const isPasskeyMode = loginMode === "passkey";
   const openPasskeyVerification = useCallback(
     (event: MouseEvent<HTMLAnchorElement>) => {
+      if (!isDesktopAppRuntime()) return;
       event.preventDefault();
       const url = passkeyLogin.verifyUrl;
       if (!url) return;
-      const opened = window.open(url, "_blank");
-      if (opened) opened.opener = null;
-      else window.location.assign(url);
+      void openUrl(url).catch((error) => {
+        console.error(
+          "Failed to open passkey verification in system browser",
+          error,
+        );
+        window.location.assign(url);
+      });
     },
     [passkeyLogin.verifyUrl],
   );
