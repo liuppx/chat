@@ -267,7 +267,7 @@ export function ToolMarketPage() {
     try {
       const result = await getClientTools(id);
       if (result) {
-        setTools(result);
+        setTools(result.tools);
       } else {
         throw new Error("Failed to load tools");
       }
