@@ -27,6 +27,8 @@ import {
   createCentralAuthorizeSession,
   createCentralAuthorizeRequest,
   exchangeCentralAuthorizeCode,
+  exchangeCentralAuthorizeRequest,
+  getCentralAuthorizeRequest,
   getCentralAuthorizeSession,
   getCentralAppId,
   getCentralIdentityOwner,
@@ -145,6 +147,14 @@ export function AuthPage() {
   });
   const exchangedCodeRef = useRef("");
   const exchangingCodeRef = useRef("");
+  const desktopAuthorizePollRef = useRef<number | null>(null);
+
+  const stopDesktopAuthorizePolling = useCallback(() => {
+    if (desktopAuthorizePollRef.current !== null) {
+      window.clearTimeout(desktopAuthorizePollRef.current);
+      desktopAuthorizePollRef.current = null;
+    }
+  }, []);
 
   const handleCentralCallback = useCallback(
     async (code: string, state: string | null | undefined) => {
@@ -195,6 +205,64 @@ export function AuthPage() {
     },
     [navigate],
   );
+
+  const startDesktopAuthorizePolling = useCallback(
+    (requestId: string, state: string) => {
+      stopDesktopAuthorizePolling();
+      let attempts = 0;
+      const poll = async () => {
+        try {
+          const request = await getCentralAuthorizeRequest(requestId);
+          if (request.status === "approved") {
+            const session = getCentralAuthorizeSession(state);
+            if (!session?.codeVerifier) {
+              throw new Error("钱包身份授权会话已失效，请重新登录");
+            }
+            setCentralLoading(true);
+            const result = await exchangeCentralAuthorizeRequest({
+              requestId,
+              appId: getCentralAppId(),
+              redirectUri: getCentralRedirectUri(),
+              codeVerifier: session.codeVerifier,
+            });
+            consumeCentralAuthorizeSession(state);
+            applyCentralAuthorizeExchange(result, { emit: false });
+            notifySuccess(Locale.Auth.CentralLoginSuccess);
+            navigate(normalizeRedirectPath(session.redirectPath), {
+              replace: true,
+            });
+            window.dispatchEvent(new Event(UCAN_AUTH_EVENT));
+            stopDesktopAuthorizePolling();
+            return;
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          const transient =
+            message.includes("AUTHORIZATION_REQUEST_PENDING") ||
+            message.includes("Failed to fetch") ||
+            message.includes("Load failed") ||
+            message.includes("网络");
+          if (!transient) {
+            stopDesktopAuthorizePolling();
+            setCentralLoading(false);
+            notifyError(Locale.Auth.CentralExchangeFailed(message));
+            return;
+          }
+        } finally {
+          setCentralLoading(false);
+        }
+        attempts += 1;
+        if (attempts < 600) {
+          desktopAuthorizePollRef.current = window.setTimeout(poll, 500);
+        }
+      };
+      desktopAuthorizePollRef.current = window.setTimeout(poll, 500);
+    },
+    [navigate, stopDesktopAuthorizePolling],
+  );
+
+  useEffect(() => stopDesktopAuthorizePolling, [stopDesktopAuthorizePolling]);
 
   useEffect(() => {
     const config = getClientConfig();
@@ -321,6 +389,9 @@ export function AuthPage() {
         verifyUrl: request.verifyUrl,
         message: "",
       });
+      if (isDesktopAppRuntime()) {
+        startDesktopAuthorizePolling(request.requestId, session.state);
+      }
     } catch (error) {
       const message = Locale.Auth.CentralRequestFailed(
         formatCentralAuthError(error, redirectUri),
@@ -330,7 +401,7 @@ export function AuthPage() {
     } finally {
       setCentralLoading(false);
     }
-  }, [centralLoading, location.search]);
+  }, [centralLoading, location.search, startDesktopAuthorizePolling]);
 
   useEffect(() => {
     if (
