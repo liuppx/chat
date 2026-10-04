@@ -287,10 +287,23 @@ function validateDesktopAuthConfig() {
     );
   }
 
-  const expectedRedirectUri = "chat://localhost/central-ucan-callback.html";
-  if (readEnv("CENTRAL_UCAN_REDIRECT_URI") !== expectedRedirectUri) {
+  const redirectUri = readEnv("CENTRAL_UCAN_REDIRECT_URI");
+  let parsedRedirectUri;
+  try {
+    parsedRedirectUri = new URL(redirectUri);
+  } catch {
     throw new Error(
-      `CENTRAL_UCAN_REDIRECT_URI must be ${expectedRedirectUri} for a Tauri desktop build.`,
+      "CENTRAL_UCAN_REDIRECT_URI must be a valid absolute HTTP(S) URL for a Tauri desktop build.",
+    );
+  }
+  if (!['http:', 'https:'].includes(parsedRedirectUri.protocol)) {
+    throw new Error(
+      "CENTRAL_UCAN_REDIRECT_URI must use HTTP or HTTPS; desktop login completes by polling the authorization request.",
+    );
+  }
+  if (releaseMode && parsedRedirectUri.protocol !== "https:") {
+    throw new Error(
+      "Release desktop builds require an HTTPS CENTRAL_UCAN_REDIRECT_URI registered in the Node application center.",
     );
   }
 

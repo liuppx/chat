@@ -182,7 +182,7 @@ describe("central wallet identity authorization", () => {
     window.__CHAT_RUNTIME_CONFIG__ = {
       centralUcanAuthBaseUrl: "https://node.example",
       chatApplicationUid: "chat",
-      centralUcanRedirectUri: "chat://localhost/central-ucan-callback.html",
+      centralUcanRedirectUri: "https://chat.yeying.pub/central-ucan-desktop-callback.html",
     } as any;
     localStorage.setItem("ucanAuthMode", "central");
     localStorage.setItem("centralIdentityDid", "did:yeying:wid_refresh_test");
@@ -213,7 +213,7 @@ describe("central wallet identity authorization", () => {
           expect(body).toEqual({
             refreshToken: "refresh-old",
             appId: "chat",
-            redirectUri: "chat://localhost/central-ucan-callback.html",
+            redirectUri: "https://chat.yeying.pub/central-ucan-desktop-callback.html",
           });
           return new TestResponse({
             code: 0,

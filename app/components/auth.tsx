@@ -38,72 +38,21 @@ import {
 } from "../plugins/central-ucan";
 import { notifyError, notifySuccess } from "../plugins/show_window";
 import { isDesktopAppRuntime } from "../tauri";
-import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
 const storage = safeLocalStorage();
-let pendingDesktopDeepLinks: string[][] = [];
-const desktopDeepLinkListeners = new Set<(urls: string[]) => void>();
-
-export function publishDesktopDeepLinks(urls: string[]) {
-  if (!urls.length) return;
-  if (desktopDeepLinkListeners.size === 0) {
-    pendingDesktopDeepLinks.push(urls);
-    if (pendingDesktopDeepLinks.length > 8) {
-      pendingDesktopDeepLinks = pendingDesktopDeepLinks.slice(-8);
-    }
-    return;
-  }
-  for (const listener of desktopDeepLinkListeners) {
-    listener(urls);
-  }
-}
-
-function subscribeDesktopDeepLinks(listener: (urls: string[]) => void) {
-  desktopDeepLinkListeners.add(listener);
-  const pending = pendingDesktopDeepLinks;
-  pendingDesktopDeepLinks = [];
-  for (const urls of pending) listener(urls);
-  return () => desktopDeepLinkListeners.delete(listener);
-}
 
 const IDENTITY_LOGIN_SCOPES = [
   "identity.basic",
   "identity.wallet",
   "identity.username",
 ];
-const DESKTOP_CENTRAL_REDIRECT_URI =
-  "chat://localhost/central-ucan-callback.html";
 type LoginMode = "passkey" | "wallet";
 type PasskeyLoginState = {
   loading: boolean;
   verifyUrl: string;
   message: string;
 };
-
-type CentralCallback = {
-  code: string;
-  state: string;
-};
-
-function parseDesktopCentralCallback(raw: string): CentralCallback | null {
-  try {
-    const parsed = new URL(raw);
-    if (
-      parsed.protocol !== "chat:" ||
-      parsed.hostname !== "localhost" ||
-      parsed.pathname !== "/central-ucan-callback.html"
-    ) {
-      return null;
-    }
-    const code = (parsed.searchParams.get("code") || "").trim();
-    const state = (parsed.searchParams.get("state") || "").trim();
-    if (!code || !state) return null;
-    return { code, state };
-  } catch {
-    return null;
-  }
-}
 
 function normalizeRedirectPath(raw: string | null | undefined) {
   const value = (raw || "").trim();
@@ -117,9 +66,6 @@ function normalizeRedirectPath(raw: string | null | undefined) {
 }
 
 function getCentralRedirectUri() {
-  // Packaged Tauri uses the registered custom protocol. Never let a stale
-  // build variable send its callback back to the WebView origin.
-  if (isDesktopAppRuntime()) return DESKTOP_CENTRAL_REDIRECT_URI;
   const configured = getClientConfig()?.centralUcanRedirectUri?.trim();
   if (configured) return configured;
   if (typeof window === "undefined") return "";
@@ -315,59 +261,6 @@ export function AuthPage() {
     void handleCentralCallback(code, state);
   }, [handleCentralCallback, location.search]);
 
-  useEffect(() => {
-    if (!isDesktopAppRuntime()) return;
-
-    let disposed = false;
-    let unlisten: (() => void) | undefined;
-
-    const handleUrls = (urls: string[]) => {
-      for (const raw of urls) {
-        const callback = parseDesktopCentralCallback(
-          raw.trim().replace(/^["']|["']$/g, ""),
-        );
-        if (!callback) continue;
-        void handleCentralCallback(callback.code, callback.state);
-        return true;
-      }
-      return false;
-    };
-
-    const subscribe = async () => {
-      const removeInternalListener = subscribeDesktopDeepLinks(handleUrls);
-      try {
-        unlisten = await onOpenUrl((urls) => {
-          if (!disposed) handleUrls(urls);
-        });
-        if (disposed) unlisten();
-      } catch (error) {
-        console.error("Failed to subscribe to desktop deep links", error);
-      }
-
-      // The callback can arrive while the browser is launching a second
-      // instance. Read the launch URL as well as subscribing to future events.
-      try {
-        const urls = await getCurrent();
-        if (!disposed && urls?.length) handleUrls(urls);
-      } catch (error) {
-        console.error("Failed to read desktop deep links", error);
-      }
-
-      return removeInternalListener;
-    };
-
-    let removeInternalListener: (() => void) | undefined;
-    void subscribe().then((remove) => {
-      if (disposed) remove();
-      else removeInternalListener = remove;
-    });
-    return () => {
-      disposed = true;
-      unlisten?.();
-      removeInternalListener?.();
-    };
-  }, [handleCentralCallback]);
-
   const startPasskeyLogin = useCallback(async () => {
     if (centralLoading) return;
     const redirectUri = getCentralRedirectUri();
@@ -380,6 +273,7 @@ export function AuthPage() {
       const request = await createCentralAuthorizeRequest({
         appId: getCentralAppId(),
         redirectUri,
+        clientType: isDesktopAppRuntime() ? "desktop" : "web",
         state: session.state,
         codeChallenge: session.codeChallenge,
         scopes: IDENTITY_LOGIN_SCOPES,
@@ -428,6 +322,7 @@ export function AuthPage() {
       const request = await createCentralAuthorizeRequest({
         appId: getCentralAppId(),
         redirectUri,
+        clientType: isDesktopAppRuntime() ? "desktop" : "web",
         state: session.state,
         codeChallenge: session.codeChallenge,
         scopes: IDENTITY_LOGIN_SCOPES,
