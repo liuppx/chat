@@ -85,9 +85,11 @@ export function AuthPage() {
     "checking" | "authorized" | "expired" | "unauthorized"
   >("checking");
   const [centralLoading, setCentralLoading] = useState(false);
-  // The passkey flow is the primary desktop web experience. Wallet users can
-  // explicitly opt into the extension-based identity presentation.
-  const [loginMode, setLoginMode] = useState<LoginMode>("passkey");
+  // Web starts with wallet identity authorization; desktop builds use the
+  // passkey flow because the wallet extension is not available there.
+  const [loginMode, setLoginMode] = useState<LoginMode>(() =>
+    getClientConfig()?.isApp ? "passkey" : "wallet",
+  );
   const [passkeyLogin, setPasskeyLogin] = useState<PasskeyLoginState>({
     loading: false,
     verifyUrl: "",
