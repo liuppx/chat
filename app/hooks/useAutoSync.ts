@@ -9,7 +9,11 @@ import { useAccessStore, useAppConfig, useChatStore } from "../store";
 import { useSkillStore } from "../store/skill";
 import { usePromptStore } from "../store/prompt";
 import { useSyncStore } from "../store/sync";
-import { UCAN_AUTH_EVENT } from "../plugins/wallet";
+import {
+  isUcanAuthTransitioning,
+  isValidUcanAuthorization,
+  UCAN_AUTH_EVENT,
+} from "../plugins/wallet";
 import {
   isUcanSignPending,
   isUcanSignPendingError,
@@ -40,8 +44,8 @@ export function useAutoSync() {
     getAccountWorkspaceStatus,
     getAccountWorkspaceStatus,
   );
-  const [authTick, setAuthTick] = useState(0);
-  const canSync = cloudSync() && authTick >= 0;
+  const [authReady, setAuthReady] = useState(false);
+  const canSync = cloudSync();
   const debounceMs = autoSyncDebounceMs ?? 2000;
   const intervalMs = autoSyncIntervalMs ?? 5 * 60 * 1000;
 
@@ -51,20 +55,37 @@ export function useAutoSync() {
   const skillUpdate = useSkillStore((state) => state.lastUpdateTime);
   const promptUpdate = usePromptStore((state) => state.lastUpdateTime);
 
-  const enabled = autoSyncEnabled && hasHydrated && canSync;
+  const enabled =
+    autoSyncEnabled &&
+    hasHydrated &&
+    canSync &&
+    authReady &&
+    !isUcanAuthTransitioning();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const onAuthChange = () => {
-      setAuthTick((value) => value + 1);
+    let cancelled = false;
+    const refreshAuth = async () => {
+      if (isUcanAuthTransitioning()) {
+        if (!cancelled) setAuthReady(false);
+        return;
+      }
+      const authorized = await isValidUcanAuthorization();
+      if (!cancelled) setAuthReady(authorized);
     };
+    const onAuthChange = () => {
+      setAuthReady(false);
+      void refreshAuth();
+    };
+    if (hasHydrated) void refreshAuth();
     window.addEventListener(UCAN_AUTH_EVENT, onAuthChange);
     window.addEventListener("storage", onAuthChange);
     return () => {
+      cancelled = true;
       window.removeEventListener(UCAN_AUTH_EVENT, onAuthChange);
       window.removeEventListener("storage", onAuthChange);
     };
-  }, []);
+  }, [hasHydrated]);
 
   const triggerSync = useCallback(
     async (reason: string) => {
@@ -73,7 +94,7 @@ export function useAutoSync() {
       const initialSyncOwner = initialWorkspaceSyncPending
         ? getAccountWorkspaceInitialSyncOwner()
         : null;
-      if (!enabled) return;
+      if (!enabled || isUcanAuthTransitioning()) return;
       // Account workspace isolation must finish switching before sync reads
       // provider state. Otherwise the auth event can start a sync against the
       // previous account's workspace during the first login.

@@ -107,17 +107,6 @@ jobs:
           path: src-tauri/target/release/bundle/macos/latest.json
           if-no-files-found: error
 
-      - name: Upload release assets
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.release.tag_name }}
-          files: |
-            src-tauri/target/release/bundle/macos/*.dmg
-            src-tauri/target/release/bundle/macos/*.app.tar.gz
-            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
-            src-tauri/target/release/bundle/macos/latest.json
-
   build-windows-verification:
     runs-on: windows-latest
     permissions:
@@ -191,13 +180,6 @@ jobs:
           name: windows-desktop-verification
           path: release-assets/*.msi
           if-no-files-found: error
-
-      - name: Upload Windows release assets
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.release.tag_name }}
-          files: release-assets/*.msi
 
   build-ubuntu24-04-verification:
     name: build-ubuntu24.04-verification
@@ -285,9 +267,57 @@ jobs:
           path: release-assets/*.deb
           if-no-files-found: error
 
-      - name: Upload Ubuntu 24.04 release assets
-        if: github.event_name == 'release'
+
+  publish-release-assets:
+    name: publish-release-assets
+    if: github.event_name == 'release'
+    needs:
+      - build-macos-release
+      - build-windows-verification
+      - build-ubuntu24-04-verification
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download macOS desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-desktop-release
+          path: release-assets
+
+      - name: Download macOS updater manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-updater-manifest
+          path: release-assets
+
+      - name: Download Windows desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-desktop-verification
+          path: release-assets
+
+      - name: Download Ubuntu desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ubuntu24.04-desktop-verification
+          path: release-assets
+
+      - name: Verify complete release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release-assets/latest.json
+          test -s release-assets/Chat.app.tar.gz
+          test -s release-assets/Chat.app.tar.gz.sig
+          find release-assets -name '*.dmg' -type f -size +0c | grep -q .
+          find release-assets -name '*.msi' -type f -size +0c | grep -q .
+          find release-assets -name '*.deb' -type f -size +0c | grep -q .
+          node -e "const fs=require('fs'); const manifest=JSON.parse(fs.readFileSync('release-assets/latest.json','utf8')); if (!manifest.version || !manifest.platforms?.['darwin-aarch64']?.url || !manifest.platforms?.['darwin-aarch64']?.signature) throw new Error('Invalid macOS updater manifest');"
+
+      - name: Upload complete release assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: release-assets/*.deb
+          files: release-assets/*
