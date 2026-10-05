@@ -13,7 +13,6 @@ import clsx from "clsx";
 import { resolveImageModels } from "./image-registry";
 import { ImageFormMode } from "./image-endpoint-schemas";
 import { IconButton } from "@/app/components/button";
-import DeleteIcon from "@/app/icons/delete.svg";
 import EyeIcon from "@/app/icons/eye.svg";
 import EyeOffIcon from "@/app/icons/eye-off.svg";
 import EditIcon from "@/app/icons/edit.svg";
@@ -502,6 +501,78 @@ function MaskPainter(props: {
   );
 }
 
+function loadImageElement(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+// 把遮罩叠在源图上：遮罩透明（将被重绘）的区域用半透明红色高亮
+function MaskOverlayPreview(props: {
+  source: string;
+  mask: string;
+  className?: string;
+}) {
+  const [overlayUrl, setOverlayUrl] = React.useState("");
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setOverlayUrl("");
+    Promise.all([loadImageElement(props.source), loadImageElement(props.mask)])
+      .then(([source, mask]) => {
+        if (cancelled) return;
+        const maxSide = 512;
+        const scale = Math.min(
+          1,
+          maxSide / Math.max(source.naturalWidth, source.naturalHeight),
+        );
+        const width = Math.max(1, Math.round(source.naturalWidth * scale));
+        const height = Math.max(1, Math.round(source.naturalHeight * scale));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(source, 0, 0, width, height);
+
+        const tint = document.createElement("canvas");
+        tint.width = width;
+        tint.height = height;
+        const tintCtx = tint.getContext("2d");
+        if (!tintCtx) return;
+        tintCtx.fillStyle = "rgba(255, 59, 48, 0.42)";
+        tintCtx.fillRect(0, 0, width, height);
+        // 遮罩不透明处 = 保留区域，把这些位置的红色抠掉
+        tintCtx.globalCompositeOperation = "destination-out";
+        tintCtx.drawImage(mask, 0, 0, width, height);
+
+        ctx.drawImage(tint, 0, 0);
+        setOverlayUrl(canvas.toDataURL("image/png"));
+      })
+      .catch(() => {
+        // 跨域污染或加载失败时退回只显示源图
+        if (!cancelled) setOverlayUrl("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [props.source, props.mask]);
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={overlayUrl || props.source}
+      alt="mask-overlay"
+      className={props.className}
+    />
+  );
+}
+
 export function ControlParamItem(props: {
   title: string;
   subTitle?: string;
@@ -628,7 +699,7 @@ function PanelSection(props: {
 
 function splitPromptSegments(prompt: string) {
   return (prompt || "")
-    .split(",")
+    .split(/[,，]/)
     .map((segment) => segment.trim())
     .filter(Boolean);
 }
@@ -641,7 +712,11 @@ function StyleChips(props: {
     () => Object.values(Locale.SdPanel.Styles),
     [],
   );
+  const [collapsed, setCollapsed] = React.useState(true);
   const segments = splitPromptSegments(props.prompt);
+  const selectedCount = styleList.filter((style) =>
+    segments.includes(style),
+  ).length;
 
   const toggleStyle = (style: string) => {
     const isActive = segments.includes(style);
@@ -653,22 +728,47 @@ function StyleChips(props: {
   };
 
   return (
-    <div className={styles["style-chips"]}>
-      {styleList.map((style) => {
-        const active = segments.includes(style);
-        return (
-          <button
-            key={style}
-            type="button"
-            className={clsx(styles["style-chip"], {
-              [styles["style-chip-active"]]: active,
-            })}
-            onClick={() => toggleStyle(style)}
-          >
-            {style}
-          </button>
-        );
-      })}
+    <div className={styles["style-chips-block"]}>
+      <div className={styles["style-chips-header"]}>
+        <span className={styles["section-label"]}>
+          {Locale.SdPanel.StylePresets}
+          {selectedCount > 0 && (
+            <span className={styles["style-chips-count"]}>
+              {Locale.SdPanel.StylePresetsSelected(selectedCount)}
+            </span>
+          )}
+        </span>
+        <button
+          type="button"
+          className={styles["style-chips-toggle"]}
+          onClick={() => setCollapsed((prev) => !prev)}
+        >
+          {collapsed
+            ? Locale.SdPanel.StylePresetsShowAll(styleList.length)
+            : Locale.SdPanel.StylePresetsShowLess}
+        </button>
+      </div>
+      <div
+        className={clsx(styles["style-chips"], {
+          [styles["style-chips-collapsed"]]: collapsed,
+        })}
+      >
+        {styleList.map((style) => {
+          const active = segments.includes(style);
+          return (
+            <button
+              key={style}
+              type="button"
+              className={clsx(styles["style-chip"], {
+                [styles["style-chip-active"]]: active,
+              })}
+              onClick={() => toggleStyle(style)}
+            >
+              {style}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -931,6 +1031,21 @@ export function SdPanel() {
     () => (getParams?.(currentModel, params) as any[]) || [],
     [currentModel, params],
   );
+  const promptParam = React.useMemo(
+    () => modelParams.find((item) => item.value === "prompt"),
+    [modelParams],
+  );
+  const coreParams = React.useMemo(
+    () =>
+      modelParams.filter(
+        (item) => item.value !== "prompt" && item.group !== "advanced",
+      ),
+    [modelParams],
+  );
+  const advancedParams = React.useMemo(
+    () => modelParams.filter((item) => item.group === "advanced"),
+    [modelParams],
+  );
   React.useEffect(() => {
     if (imageModels.length === 0) return;
     const matched = imageModels.find(
@@ -1066,10 +1181,7 @@ export function SdPanel() {
         </button>
       </PanelSection>
       {currentMode === "editing" && (
-        <PanelSection
-          title={Locale.SdPanel.SourceType}
-          subTitle={Locale.SdPanel.MaskImageSubTitle}
-        >
+        <PanelSection title={Locale.SdPanel.SourceType}>
           <input
             ref={fileInputRef}
             className={styles["hidden-file-input"]}
@@ -1077,93 +1189,122 @@ export function SdPanel() {
             accept="image/*"
             onChange={(e) => handleUploadImage(e.target.files?.[0])}
           />
-          <button
-            type="button"
-            className={styles["source-upload-button"]}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <UploadIcon />
-            <span>{Locale.SdPanel.UploadImage}</span>
-          </button>
-          {editSourceImage && (
-            <div className={styles["asset-preview"]}>
-              <div className={styles["asset-preview-header"]}>
-                <div className={styles["asset-preview-title"]}>
-                  {editSourceName || Locale.SdPanel.UploadImage}
-                </div>
-              </div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={editSourceImage}
-                alt={editSourceName || "edit-source"}
-                className={styles["asset-preview-image"]}
-              />
-            </div>
-          )}
-          <ControlParamItem
-            title={Locale.SdPanel.MaskImage}
-            subTitle={Locale.SdPanel.MaskImageSubTitle}
-          >
-            <input
-              ref={maskFileInputRef}
-              className={styles["hidden-file-input"]}
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleUploadMask(e.target.files?.[0])}
-            />
-            <div className={styles["mask-actions"]}>
-              <button
-                type="button"
-                className={styles["secondary-action-button"]}
-                onClick={() => maskFileInputRef.current?.click()}
-              >
-                {Locale.SdPanel.MaskImage}
-              </button>
-              <button
-                type="button"
-                className={styles["primary-inline-button"]}
-                onClick={openMaskPainter}
-              >
-                {Locale.SdPanel.DrawMask}
-              </button>
-              {editMaskImage && (
+          <input
+            ref={maskFileInputRef}
+            className={styles["hidden-file-input"]}
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleUploadMask(e.target.files?.[0])}
+          />
+          <div className={styles["edit-assets"]}>
+            <div className={styles["edit-asset"]}>
+              {editSourceImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={editSourceImage}
+                  alt={editSourceName || "edit-source"}
+                  className={styles["edit-asset-thumb"]}
+                />
+              ) : (
                 <button
                   type="button"
-                  className={styles["danger-inline-button"]}
-                  onClick={() => {
-                    setEditMaskImage("", "");
-                    if (maskFileInputRef.current) {
-                      maskFileInputRef.current.value = "";
-                    }
-                  }}
+                  className={styles["edit-asset-placeholder"]}
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  {Locale.SdPanel.ClearMask}
+                  <UploadIcon />
+                  <span>{Locale.SdPanel.UploadImage}</span>
                 </button>
               )}
+              <div className={styles["edit-asset-meta"]}>
+                <span
+                  className={styles["edit-asset-name"]}
+                  title={editSourceName || undefined}
+                >
+                  {editSourceName || Locale.SdPanel.UploadImage}
+                </span>
+                {editSourceImage && (
+                  <button
+                    type="button"
+                    className={styles["edit-asset-link"]}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {Locale.SdPanel.ReplaceImage}
+                  </button>
+                )}
+              </div>
             </div>
-            {editMaskImage && (
-              <div className={styles["mask-preview"]}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={editMaskImage} alt={editMaskName || "edit-mask"} />
-                <div className={styles["mask-preview-meta"]}>
-                  <div className={styles["ctrl-param-item-sub-title"]}>
-                    {editMaskName || Locale.SdPanel.MaskImage}
-                  </div>
-                  <IconButton
-                    icon={<DeleteIcon />}
-                    bordered
-                    title={Locale.Sd.Actions.Delete}
+            <div className={styles["edit-asset"]}>
+              {editSourceImage && editMaskImage ? (
+                <MaskOverlayPreview
+                  source={editSourceImage}
+                  mask={editMaskImage}
+                  className={styles["edit-asset-thumb"]}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className={styles["edit-asset-placeholder"]}
+                  disabled={!editSourceImage}
+                  onClick={openMaskPainter}
+                >
+                  <EditIcon />
+                  <span>{Locale.SdPanel.DrawMask}</span>
+                </button>
+              )}
+              <div className={styles["edit-asset-meta"]}>
+                <span
+                  className={styles["edit-asset-name"]}
+                  title={editMaskName || undefined}
+                >
+                  {editMaskImage
+                    ? editMaskName || Locale.SdPanel.MaskRegion
+                    : Locale.SdPanel.MaskRegion}
+                </span>
+                {editMaskImage && (
+                  <button
+                    type="button"
+                    className={clsx(
+                      styles["edit-asset-link"],
+                      styles["edit-asset-link-danger"],
+                    )}
                     onClick={() => {
                       setEditMaskImage("", "");
                       if (maskFileInputRef.current) {
                         maskFileInputRef.current.value = "";
                       }
                     }}
-                  />
-                </div>
+                  >
+                    {Locale.SdPanel.ClearMask}
+                  </button>
+                )}
               </div>
-            )}
-          </ControlParamItem>
+            </div>
+          </div>
+          <div className={styles["edit-asset-actions"]}>
+            <button
+              type="button"
+              className={styles["primary-inline-button"]}
+              disabled={!editSourceImage}
+              onClick={openMaskPainter}
+            >
+              {Locale.SdPanel.DrawMask}
+            </button>
+            <button
+              type="button"
+              className={styles["secondary-action-button"]}
+              disabled={!editSourceImage}
+              onClick={() => maskFileInputRef.current?.click()}
+            >
+              {Locale.SdPanel.MaskImage}
+            </button>
+          </div>
+          <div className={styles["ctrl-param-item-sub-title"]}>
+            {editMaskImage
+              ? Locale.SdPanel.MaskOverlayHint
+              : editSourceImage
+                ? Locale.SdPanel.NoMaskYet
+                : Locale.SdPanel.MaskImageSubTitle}
+          </div>
         </PanelSection>
       )}
       {!hasImageModels && (
@@ -1181,23 +1322,45 @@ export function SdPanel() {
           </div>
         </PanelSection>
       )}
-      {hasImageModels &&
-        modelParams.some((item) => item.value === "prompt") && (
-          <PanelSection title={Locale.SdPanel.StylePresets}>
-            <StyleChips
-              prompt={params.prompt || ""}
-              onToggle={(nextPrompt) => handleValueChange("prompt", nextPrompt)}
-            />
-          </PanelSection>
-        )}
       {hasImageModels && (
         <PanelSection title={Locale.Sd.GenerateParams} hideTitle>
+          {promptParam && (
+            <>
+              <ControlParam
+                columns={[promptParam]}
+                data={params}
+                onChange={handleValueChange}
+                compact
+              ></ControlParam>
+              <StyleChips
+                prompt={params.prompt || ""}
+                onToggle={(nextPrompt) =>
+                  handleValueChange("prompt", nextPrompt)
+                }
+              />
+            </>
+          )}
           <ControlParam
-            columns={modelParams}
+            columns={coreParams}
             data={params}
             onChange={handleValueChange}
             compact
           ></ControlParam>
+          {advancedParams.length > 0 && (
+            <details className={styles["advanced-section"]}>
+              <summary className={styles["section-label"]}>
+                {Locale.SdPanel.AdvancedParams}
+              </summary>
+              <div className={styles["advanced-section-body"]}>
+                <ControlParam
+                  columns={advancedParams}
+                  data={params}
+                  onChange={handleValueChange}
+                  compact
+                ></ControlParam>
+              </div>
+            </details>
+          )}
         </PanelSection>
       )}
     </>

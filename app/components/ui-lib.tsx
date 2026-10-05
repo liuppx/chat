@@ -82,7 +82,7 @@ async function getImageBlob(src: string) {
   return await response.blob();
 }
 
-async function downloadImage(src: string) {
+export async function downloadImage(src: string) {
   try {
     const blob = await getImageBlob(src);
     const extension = getImageFileExtension(blob, src);

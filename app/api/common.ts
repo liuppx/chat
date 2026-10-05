@@ -62,9 +62,12 @@ export async function requestOpenai(req: NextRequest) {
 
   const fetchUrl = cloudflareAIGatewayUrl(`${baseUrl}/${path}`);
   console.log("fetchUrl", fetchUrl);
+  // 透传原始 Content-Type：/v1/images/edits 是 multipart/form-data，
+  // 写死 application/json 会让上游把 multipart 边界当 JSON 解析而报错
+  const contentType = req.headers.get("Content-Type") || "application/json";
   const fetchOptions: RequestInit = {
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": contentType,
       "Cache-Control": "no-store",
       [authHeaderName]: authValue,
       ...(serverConfig.openaiOrgId && {

@@ -1203,8 +1203,11 @@ const en: LocaleType = {
     SourceType: "Image Source",
     UploadImage: "Upload Image",
     MaskImage: "Upload Mask",
-    MaskImageSubTitle:
-      "Transparent areas will be regenerated, or open the painter to brush a mask directly.",
+    MaskImageSubTitle: "Transparent areas will be regenerated.",
+    MaskRegion: "Edit Region",
+    MaskOverlayHint: "Highlighted area will be regenerated",
+    ReplaceImage: "Replace",
+    NoMaskYet: "No mask — the whole image may be edited",
     DrawMask: "Paint Mask",
     ClearMask: "Clear Mask",
     SaveMask: "Save Mask",
@@ -1256,6 +1259,10 @@ const en: LocaleType = {
     Submit: "Submit",
     ParamIsRequired: (name: string) => `${name} is required`,
     StylePresets: "Style Presets",
+    StylePresetsShowAll: (n: number) => `Show all ${n}`,
+    StylePresetsShowLess: "Show less",
+    StylePresetsSelected: (n: number) => `${n} selected`,
+    AdvancedParams: "Advanced",
     SeedRandom: "Randomize",
     Styles: {
       D3Model: "3d-model",
@@ -1295,6 +1302,7 @@ const en: LocaleType = {
     Actions: {
       Params: "See Params",
       Copy: "Copy Prompt",
+      Download: "Download",
       Delete: "Delete",
       Retry: "Retry",
       EditAgain: "Continue Editing",
@@ -1302,6 +1310,8 @@ const en: LocaleType = {
       History: "History",
     },
     EmptyRecord: "No images yet",
+    EmptyHint:
+      "Pick a model and describe your image on the left, then hit Submit to start.",
     Status: {
       Name: "Status",
       Success: "Success",

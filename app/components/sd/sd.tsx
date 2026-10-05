@@ -19,7 +19,8 @@ import MaxIcon from "@/app/icons/max.svg";
 import { getClientConfig } from "@/app/config/client";
 import DeleteIcon from "@/app/icons/clear.svg";
 import CopyIcon from "@/app/icons/copy.svg";
-import PromptIcon from "@/app/icons/prompt.svg";
+import SettingsIcon from "@/app/icons/settings.svg";
+import DownloadIcon from "@/app/icons/download.svg";
 import ResetIcon from "@/app/icons/reload.svg";
 import EditIcon from "@/app/icons/edit.svg";
 import { useSdStore } from "@/app/store/sd";
@@ -28,6 +29,7 @@ import ErrorIcon from "@/app/icons/delete.svg";
 import SDIcon from "@/app/icons/sd.svg";
 import { Property } from "csstype";
 import {
+  downloadImage,
   showConfirm,
   showImageModal,
   showModal,
@@ -237,7 +239,7 @@ export function Sd() {
                         </div>
                         <div className={styles["sd-img-actions"]}>
                           <IconButton
-                            icon={<PromptIcon />}
+                            icon={<SettingsIcon />}
                             bordered
                             title={Locale.Sd.Actions.Params}
                             onClick={() => {
@@ -309,6 +311,14 @@ export function Sd() {
                           />
                           {item.status === "success" && !!item.img_data && (
                             <IconButton
+                              icon={<DownloadIcon />}
+                              bordered
+                              title={Locale.Sd.Actions.Download}
+                              onClick={() => void downloadImage(item.img_data)}
+                            />
+                          )}
+                          {item.status === "success" && !!item.img_data && (
+                            <IconButton
                               icon={<EditIcon />}
                               bordered
                               title={Locale.Sd.Actions.EditAgain}
@@ -358,7 +368,15 @@ export function Sd() {
                   );
                 })
               ) : (
-                <div>{Locale.Sd.EmptyRecord}</div>
+                <div className={styles["sd-empty"]}>
+                  <SDIcon width={48} height={48} />
+                  <div className={styles["sd-empty-title"]}>
+                    {Locale.Sd.EmptyRecord}
+                  </div>
+                  <div className={styles["sd-empty-hint"]}>
+                    {Locale.Sd.EmptyHint}
+                  </div>
+                </div>
               )}
             </div>
           </div>

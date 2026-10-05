@@ -172,6 +172,14 @@ function withSpan(
   return { ...schema, span };
 }
 
+function withGroup(
+  schema: ImageParamSchema | undefined,
+  group: "core" | "advanced",
+): ImageParamSchema | undefined {
+  if (!schema) return undefined;
+  return { ...schema, group };
+}
+
 function buildSpecParam(
   key: string,
   parameter: ModelParameterSpecification | undefined,
@@ -196,9 +204,15 @@ function buildSpecParam(
     case "height":
       return withControl(numberParam("Height", key, parameter), "slider");
     case "n":
-      return withControl(numberParam("N", key, parameter), "slider");
+      return withGroup(
+        withControl(numberParam("N", key, parameter), "slider"),
+        "advanced",
+      );
     case "seed":
-      return withSpan(numberParam("Seed", key, parameter), "full");
+      return withGroup(
+        withSpan(numberParam("Seed", key, parameter), "full"),
+        "advanced",
+      );
     case "negative_prompt":
       return textareaParam(Locale.SdPanel.NegativePrompt, key, parameter);
     default:

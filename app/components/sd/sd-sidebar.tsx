@@ -16,7 +16,7 @@ import {
   useHotKey,
 } from "@/app/components/sidebar";
 
-import { getParams, getModelParamBasicData } from "./sd-panel";
+import { getParams } from "./sd-panel";
 import { useSdStore } from "@/app/store/sd";
 import { showToast } from "@/app/components/ui-lib";
 import { useMobileScreen } from "@/app/utils";
@@ -39,7 +39,6 @@ export function SideBar(props: { className?: string }) {
   const editMaskImage = sdStore.editMaskImage;
   const currentModel = sdStore.currentModel;
   const params = sdStore.currentParams;
-  const setParams = sdStore.setCurrentParams;
   const currentSessionId = sdStore.currentSessionId;
   const paramColumns = getParams?.(currentModel, params) || [];
   const hasModelSelection = !!currentModel.value && paramColumns.length > 0;
@@ -85,7 +84,6 @@ export function SideBar(props: { className?: string }) {
       img_data: "",
     };
     sdStore.sendTask(data, () => {
-      setParams(getModelParamBasicData(columns, params, true));
       navigate(Path.Sd);
     });
   };
