@@ -1,5 +1,6 @@
 import { getClientConfig } from "@/app/config/client";
 import { fetch as desktopAwareFetch } from "@/app/utils/stream";
+import { isDesktopAppRuntime } from "@/app/tauri";
 import {
   getCapabilityAction,
   getCapabilityResource,
@@ -134,6 +135,16 @@ export type CentralAuthorizeExchangeResult = {
     expiresAt?: number;
   };
 };
+
+function resolveCentralRedirectUri(): string {
+  if (isDesktopAppRuntime()) return "";
+  const configured = getClientConfig()?.centralUcanRedirectUri?.trim();
+  if (configured) return configured;
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/central-ucan-callback.html`;
+  }
+  return "";
+}
 
 type CentralRefreshSessionResult = {
   did: string;
@@ -661,15 +672,7 @@ export async function refreshCentralIdentitySession(options?: {
         body: JSON.stringify({
           refreshToken,
           appId: getCentralAppId(),
-          redirectUri: (() => {
-            const configured =
-              getClientConfig()?.centralUcanRedirectUri?.trim();
-            if (configured) return configured;
-            if (typeof window !== "undefined") {
-              return `${window.location.origin}/central-ucan-callback.html`;
-            }
-            return "";
-          })(),
+          redirectUri: resolveCentralRedirectUri() || undefined,
         }),
       },
     );
@@ -724,15 +727,7 @@ export async function revokeCentralIdentitySession(options?: {
         body: JSON.stringify({
           refreshToken,
           appId: getCentralAppId(),
-          redirectUri: (() => {
-            const configured =
-              getClientConfig()?.centralUcanRedirectUri?.trim();
-            if (configured) return configured;
-            if (typeof window !== "undefined") {
-              return `${window.location.origin}/central-ucan-callback.html`;
-            }
-            return "";
-          })(),
+          redirectUri: resolveCentralRedirectUri() || undefined,
         }),
       },
     );
@@ -1128,7 +1123,7 @@ export function getCentralUcanExpiresAt(): number | null {
 
 export async function createCentralAuthorizeRequest(input: {
   appId?: string;
-  redirectUri: string;
+  redirectUri?: string;
   clientType?: "web" | "desktop";
   state?: string;
   codeChallenge: string;
@@ -1146,7 +1141,7 @@ export async function createCentralAuthorizeRequest(input: {
       credentials: "include",
       body: JSON.stringify({
         appId: resolvedAppId,
-        redirectUri: input.redirectUri,
+        ...(input.redirectUri ? { redirectUri: input.redirectUri } : {}),
         ...(input.clientType ? { clientType: input.clientType } : {}),
         state: input.state || undefined,
         codeChallenge: input.codeChallenge,
@@ -1232,7 +1227,7 @@ export async function approveCentralAuthorizePresentation(input: {
 export async function exchangeCentralAuthorizeCode(input: {
   code: string;
   appId?: string;
-  redirectUri: string;
+  redirectUri?: string;
   codeVerifier: string;
   baseUrl?: string;
 }): Promise<CentralAuthorizeExchangeResult> {
@@ -1246,7 +1241,7 @@ export async function exchangeCentralAuthorizeCode(input: {
       body: JSON.stringify({
         code: input.code,
         appId: resolvedAppId,
-        redirectUri: input.redirectUri,
+        ...(input.redirectUri ? { redirectUri: input.redirectUri } : {}),
         codeVerifier: input.codeVerifier,
         issueUcanSession: true,
       }),
@@ -1272,7 +1267,7 @@ export async function exchangeCentralAuthorizeCode(input: {
 export async function exchangeCentralAuthorizeRequest(input: {
   requestId: string;
   appId?: string;
-  redirectUri: string;
+  redirectUri?: string;
   codeVerifier: string;
   baseUrl?: string;
 }): Promise<CentralAuthorizeExchangeResult> {
@@ -1286,7 +1281,7 @@ export async function exchangeCentralAuthorizeRequest(input: {
       body: JSON.stringify({
         requestId: input.requestId,
         appId: resolvedAppId,
-        redirectUri: input.redirectUri,
+        ...(input.redirectUri ? { redirectUri: input.redirectUri } : {}),
         codeVerifier: input.codeVerifier,
         issueUcanSession: true,
       }),
