@@ -358,6 +358,14 @@ export function Sd() {
                                     : Promise.resolve();
                                 cleanup.finally(() => {
                                   sdStore.deleteDraw(item.id);
+                                  // 删除的正是当前编辑源图时一并清掉，避免残留失效引用
+                                  if (
+                                    item.img_data &&
+                                    sdStore.editSourceImage === item.img_data
+                                  ) {
+                                    sdStore.setEditSourceImage("", "");
+                                    sdStore.setEditMaskImage("", "");
+                                  }
                                 });
                               }
                             }}

@@ -1211,6 +1211,7 @@ const en: LocaleType = {
     MaskOverlayHint: "Highlighted area will be regenerated",
     ReplaceImage: "Replace",
     NoMaskYet: "No mask — the whole image may be edited",
+    SourceImageBroken: "Source image is no longer available — upload again",
     MaskUnsupportedHint:
       "This model edits by instruction only and does not support masked inpainting. Describe the region to change in the prompt.",
     DrawMask: "Paint Mask",

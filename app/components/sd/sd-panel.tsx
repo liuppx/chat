@@ -1215,6 +1215,12 @@ export function SdPanel() {
                   src={editSourceImage}
                   alt={editSourceName || "edit-source"}
                   className={styles["edit-asset-thumb"]}
+                  onError={() => {
+                    // 源图引用已失效（如历史记录被删、缓存被清）：清掉并提示重新上传
+                    setEditSourceImage("", "");
+                    setEditMaskImage("", "");
+                    showToast(Locale.SdPanel.SourceImageBroken);
+                  }}
                 />
               ) : (
                 <button

@@ -390,9 +390,9 @@
   gap: 10px;
 }
 
-// 模型不支持遮罩时只剩源图一格
+// 模型不支持遮罩时只剩源图一格：保持与双格相同的半宽，避免视觉突变
 .edit-assets-single {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .edit-asset {
