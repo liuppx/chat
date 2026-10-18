@@ -28,14 +28,14 @@
 | P1 Skill / Tool 闭环 | Skill 声明依赖，Tool Runtime 在支持环境中可配置、可发现、可排障 | 用户能理解技能可用性，缺模型/工具/存储时有明确补齐路径 | [技能规范](../60-skills-marketplace/技能规范.md)、[Chat Skill 与 Tool 运行机制](../60-skills-marketplace/Chat%20Skill与Tool运行机制.md)、[工具启用机制与演进](../60-skills-marketplace/工具启用机制与演进.md) |
 | P2 Marketplace 治理 | 市场从静态清单演进为发现、安装、授权、版本和下架闭环 | 技能发布、审核、升级、灰度和运行配置可治理 | [技能发布、上线、配置与使用流程](./技能发布上线配置使用流程.md)、[市场后端与技能运行配置方案](./市场后端与技能运行配置方案.md) |
 | P3 Knowledge / Agent Run | Chat 作为用户入口，Knowledge 承担 AgentRun、Artifact 和 provenance | 长任务、文件产物、知识库引用和同步流程可追踪 | [Chat 与 Knowledge Agent Run 集成方案](./Chat与Knowledge%20Agent%20Run集成方案.md) |
-| P4 多端能力扩展 | 桌面端按独立安全边界增加本地能力，不反向污染 Web 主链 | 本地文件、命令、系统集成按需开放并可审计 | [Tauri 桌面端打包发布说明](./Tauri桌面端迁移清单.md)、[网页版与桌面版产品定位](./网页版与桌面版产品定位.md) |
+| P4 多端能力扩展 | 桌面端按独立安全边界提供本地能力，不反向污染 Web 主链 | 本地文件、命令、MCP stdio 和系统集成按需开放并可审计 | [Tauri 桌面端打包发布说明](./Tauri桌面端迁移清单.md)、[网页版与桌面版产品定位](./网页版与桌面版产品定位.md) |
 
 ### 0.3 架构决策记录
 
 | 决策 | 当前结论 | 后续触发条件 |
 | --- | --- | --- |
 | 用户入口 | 用户主要选择 Skill，不直接选择底层 Tool / Model / Storage | 当某类底层能力需要独立购买、授权或监控时，仍通过 Skill 可用性呈现 |
-| Tool Runtime | 当前仅在 standalone 或本地 Next Node 进程启用，Tauri desktop 静态导出默认禁用 | 桌面端需要本地文件、命令或 MCP stdio 工具时，单独设计 Tauri 本地运行时 |
+| Tool Runtime | standalone 使用 Next Node；Tauri 使用独立本机 Runtime，配置和进程边界分离 | 继续完善桌面跨平台依赖诊断、权限提示和高风险工具策略 |
 | Marketplace | Marketplace 保存公开定义，不保存用户私钥、本地路径或实例状态 | 需要付费、组织权限、审核、下架、灰度时，引入后端闭环 |
 | Storage | 存储层独立治理；需要给模型访问时通过 Tool 暴露 | 知识库、文件库和 Artifact 进入统一生命周期时，补充 Knowledge / Agent Run 集成 |
 | 文档治理 | README 只保留高频入口，完整索引和合并/删除建议放入 [文档总览](./README.md) | 新增跨层能力或删除旧方案前，先更新本文档和文档总览 |
@@ -224,9 +224,9 @@ Chat 运行时配置保存“当前实例或当前用户实际怎么运行”。
 
 在 Tauri 中：
 
-- 当前工具运行时显式禁用。
-- 后续如果支持本地工具运行时，应使用 Tauri 用户数据目录。
-- 不应复用 standalone 的部署目录配置文件。
+- 工具运行时由 Rust/Tauri 原生层管理 MCP stdio 子进程。
+- 配置写入 Tauri 用户数据目录；敏感环境变量写入系统凭证存储。
+- 不复用 standalone 的部署目录配置文件，且首次启动需用户确认来源、命令和权限。
 
 在公网多用户 Web 中：
 

@@ -103,7 +103,7 @@
 
 这个处理只影响桌面导出链路，不影响 Web 开发与 Web 生产运行。
 
-当前桌面端工具运行时是显式禁用状态：`actions.export.ts` 不会读取 `data/tool_config.json`，也不会启动 stdio 工具进程。后续如果要支持本地工具运行时，应使用 Tauri 用户数据目录保存本机配置，并单独设计权限提示、命令白名单和密钥存储，不复用 standalone 的部署目录配置文件。
+桌面端工具运行时通过 `actions.export.ts` 调用 Tauri 本机 Runtime：配置保存到应用用户数据目录，MCP stdio 子进程由 Rust 管理，敏感环境变量使用系统凭证存储。首次启动展示来源、命令、依赖和权限并要求用户确认；不复用 standalone 的部署目录配置文件，不自动提权或静默安装 Node/Python/uv。
 
 ### 4. 桌面打包链路
 

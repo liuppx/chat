@@ -1,78 +1,130 @@
 import {
-  DEFAULT_TOOL_CONFIG,
   ListToolsResponse,
   ToolConfigData,
   McpRequestMessage,
   ServerConfig,
   ServerStatusResponse,
+  ToolInstallConfirmation,
 } from "./types";
+import { confirm } from "@tauri-apps/plugin-dialog";
+import { tauriInvoke } from "../tauri";
 
-function disabledError() {
-  return new Error("Tool runtime is not available in desktop export builds");
+function getCommandPreview(config: ServerConfig) {
+  return [config.command, ...config.args].join(" ");
 }
 
 export async function getClientsStatus(): Promise<
   Record<string, ServerStatusResponse>
 > {
-  return {};
+  return tauriInvoke("tool_get_status");
 }
 
 export async function getClientTools(
-  _clientId: string,
+  clientId: string,
 ): Promise<ListToolsResponse | null> {
-  return null;
+  try {
+    return await tauriInvoke("tool_get_client_tools", { serverId: clientId });
+  } catch {
+    return null;
+  }
 }
 
 export async function getAvailableClientsCount() {
-  return 0;
+  const statuses = await getClientsStatus();
+  return Object.values(statuses).filter((status) => status.status === "active")
+    .length;
 }
 
 export async function getAllTools() {
-  return [] as { clientId: string; tools: ListToolsResponse | null }[];
+  const config = await getToolConfigFromFile();
+  return Promise.all(
+    Object.keys(config.toolServers).map(async (clientId) => ({
+      clientId,
+      tools: await getClientTools(clientId),
+    })),
+  );
 }
 
 export async function initializeToolSystem(): Promise<ToolConfigData> {
-  return DEFAULT_TOOL_CONFIG;
+  return tauriInvoke("tool_initialize");
 }
 
 export async function addToolServer(
-  _clientId: string,
-  _config: ServerConfig,
+  clientId: string,
+  config: ServerConfig,
+  confirmation?: ToolInstallConfirmation,
 ): Promise<ToolConfigData> {
-  throw disabledError();
+  const details = confirmation ?? {
+    name: clientId,
+    repo: "",
+    permissions: [],
+    requirements: [],
+  };
+  const message = [
+    `Start ${details.name} on this device?`,
+    details.repo ? `Source: ${details.repo}` : "",
+    `Command: ${getCommandPreview(config)}`,
+    details.requirements.length
+      ? `Requirements:\n- ${details.requirements.join("\n- ")}`
+      : "",
+    details.permissions.length
+      ? `Permissions:\n- ${details.permissions
+          .map((permission) => permission.description || permission.id)
+          .join("\n- ")}`
+      : "",
+    "The command can access this user account and may download code. Only continue if you trust this source.",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const accepted = await confirm(message, {
+    title: "Run local MCP server",
+    kind: "warning",
+    okLabel: "Run",
+    cancelLabel: "Cancel",
+  });
+  if (!accepted)
+    throw new Error("Starting the local tool server was cancelled");
+  return tauriInvoke("tool_add_server", {
+    serverId: clientId,
+    config,
+    confirmed: true,
+  });
 }
 
 export async function pauseToolServer(
-  _clientId: string,
+  clientId: string,
 ): Promise<ToolConfigData> {
-  throw disabledError();
+  return tauriInvoke("tool_pause_server", { serverId: clientId });
 }
 
-export async function resumeToolServer(_clientId: string): Promise<void> {
-  throw disabledError();
+export async function resumeToolServer(clientId: string): Promise<void> {
+  return tauriInvoke("tool_resume_server", { serverId: clientId });
 }
 
 export async function removeToolServer(
-  _clientId: string,
+  clientId: string,
 ): Promise<ToolConfigData> {
-  throw disabledError();
+  return tauriInvoke("tool_remove_server", { serverId: clientId });
 }
 
 export async function restartAllClients(): Promise<ToolConfigData> {
-  throw disabledError();
+  return tauriInvoke("tool_restart_all");
 }
 
 export async function executeToolAction(
-  _clientId: string,
-  _request: McpRequestMessage,
+  clientId: string,
+  request: McpRequestMessage,
 ) {
-  throw disabledError();
+  return tauriInvoke("tool_execute_request", {
+    serverId: clientId,
+    request,
+  });
 }
 
 export async function getToolConfigFromFile(): Promise<ToolConfigData> {
-  return DEFAULT_TOOL_CONFIG;
+  return tauriInvoke("tool_get_config");
 }
 
 export async function isToolRuntimeEnabled(): Promise<boolean> {
-  return false;
+  return true;
 }
