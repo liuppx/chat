@@ -12,6 +12,7 @@ import {
 } from "../tools/actions";
 import {
   fetchCommunityToolPresetServers,
+  getToolInstallConfirmation,
   mergeToolPresetServers,
 } from "../tools/marketplace";
 import { fetchMarketplaceJson } from "../marketplace/sources";
@@ -25,6 +26,7 @@ import {
   stringifyToolConfigValue,
 } from "../tools/config-schema";
 import { getOfficialToolPresetServers } from "../tools/preset-servers";
+import { isDesktopAppRuntime } from "../tauri";
 import {
   ToolConfigData,
   PresetServer,
@@ -98,6 +100,7 @@ type DiscoveryConfigProperty = {
   addButtonText?: string;
   helpUrl?: string;
   helpLabel?: string;
+  sensitive?: boolean;
 };
 
 type Capability = {
@@ -990,7 +993,9 @@ export function DiscoveryPage() {
       } else if (mapping.type === "single") {
         nextUserConfig[key] = currentConfig.args[mapping.position ?? 0];
       } else if (mapping.type === "env" && mapping.key && currentConfig.env) {
-        nextUserConfig[key] = currentConfig.env[mapping.key];
+        if (!preset.configSchema?.properties[key]?.sensitive) {
+          nextUserConfig[key] = currentConfig.env[mapping.key];
+        }
       }
     });
     setToolUserConfig(nextUserConfig);
@@ -1119,7 +1124,11 @@ export function DiscoveryPage() {
           >
             <input
               aria-label={key}
-              type={isSensitiveToolConfigField(key, prop) ? "password" : "text"}
+              type={
+                prop.sensitive || isSensitiveToolConfigField(key, prop)
+                  ? "password"
+                  : "text"
+              }
               autoComplete="off"
               value={currentValue}
               placeholder={`Enter ${key}`}
@@ -1148,6 +1157,20 @@ export function DiscoveryPage() {
       const missingKeys = getMissingToolConfigKeys(
         preset.configSchema.properties,
         toolUserConfig,
+        Object.entries(preset.argsMapping ?? {})
+          .filter(([, mapping]) => mapping.type === "env" && mapping.key)
+          .filter(([key, mapping]) => {
+            if (!preset.configSchema?.properties[key]?.sensitive) return false;
+            const current = toolConfig?.toolServers[editingToolServerId];
+            return Boolean(
+              current?.secretEnvKeys?.includes(mapping.key || "") ||
+              Object.prototype.hasOwnProperty.call(
+                current?.env ?? {},
+                mapping.key || "",
+              ),
+            );
+          })
+          .map(([key]) => key),
       );
       if (missingKeys.length > 0) {
         showToast(`缺少必填工具配置：${missingKeys.join(", ")}`);
@@ -1156,6 +1179,7 @@ export function DiscoveryPage() {
 
       const args = [...preset.baseArgs];
       const env: Record<string, string> = {};
+      const secretEnvKeys = new Set<string>();
 
       Object.entries(preset.argsMapping || {}).forEach(([key, mapping]) => {
         const value = toolUserConfig[key];
@@ -1173,6 +1197,9 @@ export function DiscoveryPage() {
           if (envValue !== undefined) {
             env[mapping.key] = envValue;
           }
+          if (preset.configSchema?.properties[key]?.sensitive) {
+            secretEnvKeys.add(mapping.key);
+          }
         }
       });
 
@@ -1180,8 +1207,19 @@ export function DiscoveryPage() {
         command: preset.command,
         args,
         ...(Object.keys(env).length > 0 ? { env } : {}),
+        secretEnvKeys: Array.from(
+          new Set([
+            ...secretEnvKeys,
+            ...(toolConfig?.toolServers[editingToolServerId]?.secretEnvKeys ??
+              []),
+          ]),
+        ),
       };
-      const newConfig = await addToolServer(editingToolServerId, serverConfig);
+      const newConfig = await addToolServer(
+        editingToolServerId,
+        serverConfig,
+        getToolInstallConfirmation(preset),
+      );
       const statuses = await getClientsStatus();
       setToolConfig(newConfig);
       setToolStatuses(statuses);
@@ -1219,6 +1257,7 @@ export function DiscoveryPage() {
           const newConfig = await addToolServer(
             item.presetServer!.id,
             serverConfig,
+            getToolInstallConfirmation(item.presetServer!),
           );
           const statuses = await getClientsStatus();
           setToolConfig(newConfig);
@@ -1496,6 +1535,10 @@ export function DiscoveryPage() {
             >
               <div className={styles["tool-config-hint"]}>
                 {Locale.Discovery.ToolUserConfigHint}
+                <br />
+                {isDesktopAppRuntime()
+                  ? Locale.Discovery.RuntimeLocation.desktop
+                  : Locale.Discovery.RuntimeLocation.standalone}
               </div>
               <List>{renderToolConfigForm()}</List>
             </Modal>

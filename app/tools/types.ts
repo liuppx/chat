@@ -108,6 +108,7 @@ export interface ServerConfig {
   command: string;
   args: string[];
   env?: Record<string, string>;
+  secretEnvKeys?: string[];
   status?: "active" | "paused" | "error";
 }
 
@@ -129,6 +130,21 @@ export interface ArgsMapping {
 
   // 参数映射的 key
   key?: string;
+}
+
+export type ToolRuntime = "standalone" | "desktop";
+export type ToolPlatform = "macos" | "windows" | "linux";
+
+export interface ToolPermission {
+  id: string;
+  description: string;
+}
+
+export interface ToolInstallConfirmation {
+  name: string;
+  repo: string;
+  permissions: ToolPermission[];
+  requirements: string[];
 }
 
 export interface PresetServer {
@@ -165,6 +181,7 @@ export interface PresetServer {
         description?: string;
         required?: boolean;
         minItems?: number;
+        sensitive?: boolean;
         itemLabel?: string;
         addButtonText?: string;
         helpUrl?: string;
@@ -175,4 +192,14 @@ export interface PresetServer {
 
   // Tool Server 的参数映射
   argsMapping?: Record<string, ArgsMapping>;
+
+  runtimes?: ToolRuntime[];
+  platforms?: ToolPlatform[];
+  permissions?: ToolPermission[];
+  requirements?: string[];
+
+  release?: {
+    status?: "published" | "draft" | "removed";
+    review?: "approved" | "pending" | "rejected";
+  };
 }

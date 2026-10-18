@@ -827,7 +827,13 @@ const en: LocaleType = {
     ConfigMode: "Config mode",
     ToolUserProvided: "User-provided tool config",
     ToolUserConfigHint:
-      "Tools support both cloud and native runtimes. Web users typically use cloud-hosted tools out of the box; desktop or self-hosted environments can install, configure, and manage tools locally. This panel writes local tool runtime config, so only use it in a trusted environment.",
+      "Tool location depends on the current app. Sensitive values are not shown again; standalone settings are stored in a server file, so do not enable them on a shared multi-user instance.",
+    RuntimeLocation: {
+      desktop:
+        "Runs on this device. You approve the command before it starts; you provide credentials and pay upstream fees. It is not shared with other devices by default.",
+      standalone:
+        "Runs on the Chat service instance. Use only a private instance you control: config and processes are shared by the instance, not isolated by Chat account. The operator installs it, provides credentials, and pays upstream fees. Do not enable on a shared community service.",
+    },
     SkillSetup: {
       Title: "Skill Configuration",
       RuntimeIssues: "Needs attention",

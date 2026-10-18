@@ -13,10 +13,15 @@ import {
   McpRequestMessage,
   ServerConfig,
   ServerStatusResponse,
+  ToolInstallConfirmation,
 } from "./types";
 import fs from "fs/promises";
 import path from "path";
 import { getServerSideConfig } from "../config/server";
+import {
+  preserveEmptyToolSecrets,
+  redactToolServerConfig,
+} from "./config-schema";
 
 const logger = new ToolClientLogger("Tool Actions");
 const DEFAULT_CONFIG_PATH = path.join(process.cwd(), "data/tool_config.json");
@@ -57,7 +62,7 @@ async function syncServerStatus(
   clientId: string,
   status: ServerConfig["status"],
 ): Promise<void> {
-  const currentConfig = await getToolConfigFromFile();
+  const currentConfig = await readToolConfigFromFile();
   const serverConfig = currentConfig.toolServers[clientId];
   if (!serverConfig || serverConfig.status === status) {
     return;
@@ -79,7 +84,7 @@ async function syncServerStatus(
 export async function getClientsStatus(): Promise<
   Record<string, ServerStatusResponse>
 > {
-  const config = await getToolConfigFromFile();
+  const config = await readToolConfigFromFile();
   const result: Record<string, ServerStatusResponse> = {};
 
   for (const clientId of Object.keys(config.toolServers)) {
@@ -238,10 +243,10 @@ export async function initializeToolSystem() {
     // 检查是否已有活跃的客户端
     if (clientsMap.size > 0) {
       logger.info("Tool runtime already initialized, skipping...");
-      return;
+      return getToolConfigFromFile();
     }
 
-    const config = await getToolConfigFromFile();
+    const config = await readToolConfigFromFile();
     // 初始化所有客户端
     for (const [clientId, serverConfig] of Object.entries(config.toolServers)) {
       try {
@@ -252,7 +257,7 @@ export async function initializeToolSystem() {
         );
       }
     }
-    return config;
+    return redactToolConfig(config);
   } catch (error) {
     logger.error(`Failed to initialize tool runtime: ${error}`);
     throw error;
@@ -260,14 +265,37 @@ export async function initializeToolSystem() {
 }
 
 // 添加服务器
-export async function addToolServer(clientId: string, config: ServerConfig) {
+export async function addToolServer(
+  clientId: string,
+  config: ServerConfig,
+  _confirmation?: ToolInstallConfirmation,
+) {
   try {
-    const currentConfig = await getToolConfigFromFile();
+    const currentConfig = await readToolConfigFromFile();
     const isNewServer = !(clientId in currentConfig.toolServers);
+    const existingConfig = currentConfig.toolServers[clientId];
+    const secretEnvKeys = Array.from(
+      new Set([
+        ...(existingConfig?.secretEnvKeys ?? []),
+        ...(config.secretEnvKeys ?? []),
+      ]),
+    );
+    config.env = preserveEmptyToolSecrets(
+      config.env ?? {},
+      existingConfig?.env,
+      secretEnvKeys,
+    );
+    config.secretEnvKeys = secretEnvKeys;
 
-    // 如果是新服务器，设置默认状态为 active
-    if (isNewServer && !config.status) {
-      config.status = "active";
+    // Configuration edits replace the running client and should preserve its lifecycle state.
+    if (!config.status) {
+      config.status = existingConfig?.status ?? "active";
+    }
+
+    if (!isNewServer) {
+      const existingClient = clientsMap.get(clientId);
+      if (existingClient?.client) await removeClient(existingClient.client);
+      clientsMap.delete(clientId);
     }
 
     const newConfig = {
@@ -280,11 +308,11 @@ export async function addToolServer(clientId: string, config: ServerConfig) {
     await updateToolConfig(newConfig);
 
     // 只有新服务器或状态为 active 的服务器才初始化
-    if (isNewServer || config.status === "active") {
+    if (config.status === "active") {
       await initializeSingleClient(clientId, config);
     }
 
-    return newConfig;
+    return redactToolConfig(newConfig);
   } catch (error) {
     logger.error(`Failed to add server [${clientId}]: ${error}`);
     throw error;
@@ -294,7 +322,7 @@ export async function addToolServer(clientId: string, config: ServerConfig) {
 // 暂停服务器
 export async function pauseToolServer(clientId: string) {
   try {
-    const currentConfig = await getToolConfigFromFile();
+    const currentConfig = await readToolConfigFromFile();
     const serverConfig = currentConfig.toolServers[clientId];
     if (!serverConfig) {
       throw new Error(`Server ${clientId} not found`);
@@ -320,7 +348,7 @@ export async function pauseToolServer(clientId: string) {
     }
     clientsMap.delete(clientId);
 
-    return newConfig;
+    return redactToolConfig(newConfig);
   } catch (error) {
     logger.error(`Failed to pause server [${clientId}]: ${error}`);
     throw error;
@@ -330,7 +358,7 @@ export async function pauseToolServer(clientId: string) {
 // 恢复服务器
 export async function resumeToolServer(clientId: string): Promise<void> {
   try {
-    const currentConfig = await getToolConfigFromFile();
+    const currentConfig = await readToolConfigFromFile();
     const serverConfig = currentConfig.toolServers[clientId];
     if (!serverConfig) {
       throw new Error(`Server ${clientId} not found`);
@@ -341,7 +369,7 @@ export async function resumeToolServer(clientId: string): Promise<void> {
     try {
       await initializeSingleClient(clientId, serverConfig);
     } catch (error) {
-      const currentConfig = await getToolConfigFromFile();
+      const currentConfig = await readToolConfigFromFile();
       const serverConfig = currentConfig.toolServers[clientId];
 
       // 如果配置中存在该服务器，则更新其状态为 error
@@ -368,7 +396,7 @@ export async function resumeToolServer(clientId: string): Promise<void> {
 // 移除服务器
 export async function removeToolServer(clientId: string) {
   try {
-    const currentConfig = await getToolConfigFromFile();
+    const currentConfig = await readToolConfigFromFile();
     const { [clientId]: _, ...rest } = currentConfig.toolServers;
     const newConfig = {
       ...currentConfig,
@@ -383,7 +411,7 @@ export async function removeToolServer(clientId: string) {
     }
     clientsMap.delete(clientId);
 
-    return newConfig;
+    return redactToolConfig(newConfig);
   } catch (error) {
     logger.error(`Failed to remove server [${clientId}]: ${error}`);
     throw error;
@@ -405,11 +433,11 @@ export async function restartAllClients() {
     clientsMap.clear();
 
     // 重新初始化
-    const config = await getToolConfigFromFile();
+    const config = await readToolConfigFromFile();
     for (const [clientId, serverConfig] of Object.entries(config.toolServers)) {
       await initializeSingleClient(clientId, serverConfig);
     }
-    return config;
+    return redactToolConfig(config);
   } catch (error) {
     logger.error(`Failed to restart clients: ${error}`);
     throw error;
@@ -435,7 +463,7 @@ export async function executeToolAction(
 }
 
 // 获取工具配置文件
-export async function getToolConfigFromFile(): Promise<ToolConfigData> {
+async function readToolConfigFromFile(): Promise<ToolConfigData> {
   const configPath = getToolConfigPath();
 
   try {
@@ -453,13 +481,31 @@ export async function getToolConfigFromFile(): Promise<ToolConfigData> {
   }
 }
 
+export async function getToolConfigFromFile(): Promise<ToolConfigData> {
+  const config = await readToolConfigFromFile();
+  return redactToolConfig(config);
+}
+
+function redactToolConfig(config: ToolConfigData): ToolConfigData {
+  return {
+    toolServers: Object.fromEntries(
+      Object.entries(config.toolServers).map(([serverId, server]) => {
+        return [serverId, redactToolServerConfig(server)];
+      }),
+    ),
+  };
+}
+
 // 更新工具配置文件
 async function updateToolConfig(config: ToolConfigData): Promise<void> {
   try {
     const configPath = getToolConfigPath();
     // 确保目录存在
     await fs.mkdir(path.dirname(configPath), { recursive: true });
-    await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+    await fs.writeFile(configPath, JSON.stringify(config, null, 2), {
+      mode: 0o600,
+    });
+    await fs.chmod(configPath, 0o600);
   } catch (error) {
     throw error;
   }
