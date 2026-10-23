@@ -17,6 +17,9 @@ export type ImageModelDefinition = {
   providerName: string;
   endpointType: ImageEndpointType;
   supportsImage: true;
+  // 由 specification.endpoints["/v1/images/edits"].parameters.mask 推导：
+  // 只有声明了 mask 的模型才支持遮罩局部重绘，UI 据此决定是否展示遮罩工具
+  supportsMask: boolean;
   specification?: LLMModel["specification"];
   params: (data: any) => ImageParamSchema[];
 };
@@ -63,6 +66,9 @@ function buildRuntimeImageModelForMode(
     model.provider?.providerName || model.ownedBy || model.provider?.id || "";
   const providerId =
     model.provider?.id || providerName.trim().toLowerCase() || "router";
+  const supportsMask = Boolean(
+    model.specification?.endpoints?.["/v1/images/edits"]?.parameters?.mask,
+  );
 
   return {
     name: model.displayName || model.name,
@@ -71,6 +77,7 @@ function buildRuntimeImageModelForMode(
     providerName,
     endpointType,
     supportsImage: true,
+    supportsMask,
     specification: model.specification,
     params: (data: any) =>
       getImageEndpointSchema(endpointType).params({

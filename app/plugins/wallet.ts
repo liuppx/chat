@@ -707,23 +707,27 @@ export async function loginWithUcan(
 }
 
 export async function logoutWallet() {
+  beginAuthTransition();
   logoutInFlight = true;
   setTimeout(() => {
     logoutInFlight = false;
   }, 2000);
-  localStorage.removeItem("currentAccount");
-  localStorage.removeItem("authToken");
   try {
-    await clearUcanSession(UCAN_SESSION_ID);
-  } catch (error) {
-    console.warn("[UCAN] failed to clear session on logout", error);
+    localStorage.removeItem("currentAccount");
+    localStorage.removeItem("authToken");
+    try {
+      await clearUcanSession(UCAN_SESSION_ID);
+    } catch (error) {
+      console.warn("[UCAN] failed to clear session on logout", error);
+    }
+    clearUcanMeta();
+    clearCachedUcanSession();
+    await revokeCentralIdentitySession();
+    clearCentralUcanAuth({ emit: false });
+  } finally {
+    endAuthTransition();
+    notifySuccess("已退出");
   }
-  clearUcanMeta();
-  clearCachedUcanSession();
-  await revokeCentralIdentitySession();
-  clearCentralUcanAuth({ emit: false });
-  emitAuthChange();
-  notifySuccess("已退出");
 }
 
 /**

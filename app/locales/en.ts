@@ -249,6 +249,9 @@ const en: LocaleType = {
       Address: {
         Title: "Blockchain Address",
       },
+      Identity: {
+        Title: "Wallet Identity",
+      },
       Logout: {
         Title: "Sign out",
         SubTitle:
@@ -824,7 +827,13 @@ const en: LocaleType = {
     ConfigMode: "Config mode",
     ToolUserProvided: "User-provided tool config",
     ToolUserConfigHint:
-      "Tools support both cloud and native runtimes. Web users typically use cloud-hosted tools out of the box; desktop or self-hosted environments can install, configure, and manage tools locally. This panel writes local tool runtime config, so only use it in a trusted environment.",
+      "Tool location depends on the current app. Sensitive values are not shown again; standalone settings are stored in a server file, so do not enable them on a shared multi-user instance.",
+    RuntimeLocation: {
+      desktop:
+        "Runs on this device. You approve the command before it starts; you provide credentials and pay upstream fees. It is not shared with other devices by default.",
+      standalone:
+        "Runs on the Chat service instance. Use only a private instance you control: config and processes are shared by the instance, not isolated by Chat account. The operator installs it, provides credentials, and pays upstream fees. Do not enable on a shared community service.",
+    },
     SkillSetup: {
       Title: "Skill Configuration",
       RuntimeIssues: "Needs attention",
@@ -1203,8 +1212,14 @@ const en: LocaleType = {
     SourceType: "Image Source",
     UploadImage: "Upload Image",
     MaskImage: "Upload Mask",
-    MaskImageSubTitle:
-      "Transparent areas will be regenerated, or open the painter to brush a mask directly.",
+    MaskImageSubTitle: "Transparent areas will be regenerated.",
+    MaskRegion: "Edit Region",
+    MaskOverlayHint: "Highlighted area will be regenerated",
+    ReplaceImage: "Replace",
+    NoMaskYet: "No mask — the whole image may be edited",
+    SourceImageBroken: "Source image is no longer available — upload again",
+    MaskUnsupportedHint:
+      "This model edits by instruction only and does not support masked inpainting. Describe the region to change in the prompt.",
     DrawMask: "Paint Mask",
     ClearMask: "Clear Mask",
     SaveMask: "Save Mask",
@@ -1256,6 +1271,10 @@ const en: LocaleType = {
     Submit: "Submit",
     ParamIsRequired: (name: string) => `${name} is required`,
     StylePresets: "Style Presets",
+    StylePresetsShowAll: (n: number) => `Show all ${n}`,
+    StylePresetsShowLess: "Show less",
+    StylePresetsSelected: (n: number) => `${n} selected`,
+    AdvancedParams: "Advanced",
     SeedRandom: "Randomize",
     Styles: {
       D3Model: "3d-model",
@@ -1295,6 +1314,7 @@ const en: LocaleType = {
     Actions: {
       Params: "See Params",
       Copy: "Copy Prompt",
+      Download: "Download",
       Delete: "Delete",
       Retry: "Retry",
       EditAgain: "Continue Editing",
@@ -1302,6 +1322,8 @@ const en: LocaleType = {
       History: "History",
     },
     EmptyRecord: "No images yet",
+    EmptyHint:
+      "Pick a model and describe your image on the left, then hit Submit to start.",
     Status: {
       Name: "Status",
       Success: "Success",

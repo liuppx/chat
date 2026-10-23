@@ -2,7 +2,36 @@ export type ToolConfigPropertyLike = {
   type: string;
   required?: boolean;
   minItems?: number;
+  sensitive?: boolean;
 };
+
+export function redactToolServerConfig<
+  T extends {
+    env?: Record<string, string>;
+    secretEnvKeys?: string[];
+  },
+>(server: T): T {
+  const env = { ...(server.env ?? {}) };
+  for (const key of server.secretEnvKeys ?? []) delete env[key];
+  return { ...server, env };
+}
+
+export function preserveEmptyToolSecrets(
+  env: Record<string, string>,
+  existingEnv: Record<string, string> | undefined,
+  secretEnvKeys: string[],
+) {
+  const nextEnv = { ...env };
+  for (const key of secretEnvKeys) {
+    if (
+      (nextEnv[key] === undefined || nextEnv[key] === "") &&
+      existingEnv?.[key] !== undefined
+    ) {
+      nextEnv[key] = existingEnv[key];
+    }
+  }
+  return nextEnv;
+}
 
 export function readToolConfigBoolean(value: unknown) {
   if (typeof value === "boolean") return value;
@@ -22,9 +51,11 @@ export function stringifyToolConfigValue(value: unknown) {
 export function getMissingToolConfigKeys(
   properties: Record<string, ToolConfigPropertyLike>,
   values: Record<string, unknown>,
+  preservedKeys: string[] = [],
 ) {
   return Object.entries(properties)
     .filter(([, property]) => property.required)
+    .filter(([key]) => !preservedKeys.includes(key))
     .filter(([key, property]) => {
       const value = values[key];
 

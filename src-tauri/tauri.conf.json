@@ -44,7 +44,7 @@
   "productName": "Chat",
   "mainBinaryName": "chat",
   "version": "0.0.31",
-  "identifier": "com.yida.chatgpt.next.web",
+  "identifier": "com.yeying.chat",
   "plugins": {
     "updater": {
       "windows": {

@@ -4,13 +4,20 @@ import {
 } from "../marketplace/sources";
 import { getLang } from "../locales";
 import { resolveLocalizedText, type LocalizedText } from "../skills";
-import { PresetServer } from "./types";
+import { isDesktopAppRuntime } from "../tauri";
+import { PresetServer, ToolInstallConfirmation } from "./types";
+import {
+  filterToolPresetServersForRuntime,
+  getCurrentToolPlatform,
+} from "./runtime";
+import type { ToolPlatform, ToolRuntime } from "./types";
 
 type MarketplaceConfigProperty = {
   type: string;
   description?: LocalizedText;
   required?: boolean;
   minItems?: number;
+  sensitive?: boolean;
   itemLabel?: LocalizedText;
   addButtonText?: LocalizedText;
   helpUrl?: string;
@@ -32,6 +39,10 @@ type MarketplaceToolServer = Omit<
     status?: "published" | "draft" | "removed";
     review?: "approved" | "pending" | "rejected";
   };
+  runtimes?: ToolRuntime[];
+  platforms?: ToolPlatform[];
+  permissions?: { id: string; description: LocalizedText }[];
+  requirements?: LocalizedText[];
 };
 
 function isValidPresetServer(
@@ -80,6 +91,15 @@ function normalizeToolServer(server: MarketplaceToolServer): PresetServer {
     name: resolveLocalizedText(server.name, lang, server.id),
     description: resolveLocalizedText(server.description, lang),
     configSchema: normalizeToolConfigSchema(server.configSchema, lang),
+    runtimes: server.runtimes ?? ["standalone"],
+    platforms: server.platforms ?? ["macos", "windows", "linux"],
+    permissions: (server.permissions ?? []).map((permission) => ({
+      id: permission.id,
+      description: resolveLocalizedText(permission.description, lang),
+    })),
+    requirements: (server.requirements ?? []).map((requirement) =>
+      resolveLocalizedText(requirement, lang),
+    ),
   };
 }
 
@@ -91,6 +111,7 @@ function filterMarketplaceToolServers(servers: MarketplaceToolServer[]) {
       if (server.release?.status && server.release.status !== "published") {
         return false;
       }
+      if (server.release?.review !== "approved") return false;
       return isValidPresetServer(server);
     })
     .map(normalizeToolServer);
@@ -117,5 +138,21 @@ export function mergeToolPresetServers(
   const merged = new Map<string, PresetServer>();
   communityServers.forEach((server) => merged.set(server.id, server));
   officialServers.forEach((server) => merged.set(server.id, server));
-  return Array.from(merged.values());
+  const runtime: ToolRuntime = isDesktopAppRuntime() ? "desktop" : "standalone";
+  return filterToolPresetServersForRuntime(
+    Array.from(merged.values()),
+    runtime,
+    getCurrentToolPlatform(),
+  );
+}
+
+export function getToolInstallConfirmation(
+  preset: PresetServer,
+): ToolInstallConfirmation {
+  return {
+    name: preset.name,
+    repo: preset.repo,
+    permissions: preset.permissions ?? [],
+    requirements: preset.requirements ?? [],
+  };
 }

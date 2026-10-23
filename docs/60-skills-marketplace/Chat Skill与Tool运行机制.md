@@ -17,13 +17,13 @@ Chat 支持 Skill，也支持 Tool，但两者不是同一个层次：
 | Skill | 用户选择的任务入口和会话配置，包含说明、模型、工具依赖和界面配置 | 否 |
 | Tool | 模型可调用的外部能力，例如搜索、网页抓取、文件、Git | 否 |
 | Tool Server | 承载 Tool 的运行进程或服务，当前主要通过 MCP 协议连接 | 是运行能力 |
-| Tool Runtime | Chat 用来启动、连接、列出和调用 Tool Server 的服务端运行层 | 是运行环境 |
+| Tool Runtime | Chat 用来启动、连接、列出和调用 Tool Server 的运行层；standalone 在服务端，desktop 在本机 | 是运行环境 |
 
 当前实现里：
 
 - Skill 定义、安装和会话启动在 Web / standalone / Tauri desktop 都可用。
-- Tool Runtime 只在 `standalone` 或 `npm run dev` 这种有 Next Node 进程的模式下可用。
-- Tauri desktop 当前走静态导出，工具运行时被显式禁用，不读取 `data/tool_config.json`，也不会启动本机 MCP/stdio 工具进程。
+- standalone / `npm run dev` 使用 Next Node Tool Runtime；Tauri desktop 通过独立的 Rust/Tauri Tool Runtime 启动本机 MCP/stdio 进程。
+- 两端共用 Marketplace 定义，但配置、凭证和进程隔离；standalone 能力只适用于个人控制的私有实例，不提供账户级隔离。
 - Skill 可以声明需要哪些 Tool Server；只有当前运行环境真的启用了这些 Tool Server，技能才会进入可用状态。
 
 ## 2. 大图
@@ -168,7 +168,7 @@ Actions --> Discovery : 返回最新配置和状态
 @enduml
 ```
 
-因此，Tool 安装不是安装到用户账户，而是安装到当前 Chat 运行实例。
+因此，Tool 安装不是安装到 Chat 用户账户，而是安装到当前 standalone 实例或当前桌面设备。
 
 这点对 Web 和 desktop 的判断很关键：
 
@@ -176,14 +176,14 @@ Actions --> Discovery : 返回最新配置和状态
 | --- | --- | --- |
 | `npm run dev` | 当前本地开发实例 | 开发机上的 Next Node 进程启动外部命令 |
 | standalone 单用户自托管 | 当前部署实例 | 部署服务器或本机服务进程 |
-| 多人访问的 Web 服务 | 当前服务端实例 | Web 服务端，不是访问者电脑 |
-| Tauri desktop 当前版本 | 不使用 standalone 工具配置 | 不启动本地 Tool Runtime |
+| 多人共享的 Web 服务 | 不支持个人动态安装；须由部署方另行建设隔离治理 | 不能按访问者账户隔离 |
+| Tauri desktop | 当前设备的本机用户配置 | 当前设备的 MCP 子进程 |
 
 ## 5. Tool 是怎么起作用的
 
 Tool 只有在三个条件同时满足时才会进入对话：
 
-1. 服务端启用了 Tool Runtime：`ENABLE_TOOLS=1` 或 `ENABLE_TOOLS=true`。
+1. standalone 服务端启用了 Tool Runtime：`ENABLE_TOOLS=1` 或 `ENABLE_TOOLS=true`；desktop 已通过 Tauri Runtime 启用。
 2. 当前 Skill 声明了需要的 Tool Server。
 3. `tool_config.json` 里对应 Tool Server 已配置并处于可用状态。
 
@@ -294,7 +294,7 @@ Sessions --> Clients : 运行时只调用 Skill 允许的 clientId
 | --- | --- | --- |
 | 可用 | 模型、工具、存储等依赖都满足 | 可以直接使用 |
 | 需要配置 | 缺少 API Key、目录、模型选择等用户或实例配置 | 进入配置页 |
-| 不可用 | 当前环境不支持，例如 desktop 尚无本地 Tool Runtime | 明确不可用原因 |
+| 不可用 | 当前环境不支持，例如工具未声明当前 runtime/platform | 明确不可用原因 |
 
 ## 7. standalone 和 desktop 的差异
 
@@ -322,35 +322,13 @@ TOOL_CONFIG_PATH=/path/to/tool_config.json
 
 ### 7.2 Tauri desktop
 
-当前 desktop 不支持本地 Tool Runtime：
+desktop 通过静态导出的 `actions.export.ts` 调用独立的 Tauri 本机 Tool Runtime：
 
-- Tauri 构建使用静态导出。
-- 构建时使用 `app/tools/actions.export.ts`。
-- `isToolRuntimeEnabled()` 固定返回 `false`。
-- `getAllTools()` 返回空列表。
-- `addToolServer()`、`executeToolAction()` 等会抛出不可用错误。
-
-所以 desktop 当前可以使用：
-
-- 不依赖外部 Tool Server 的 Skill。
-- 只依赖 Router 模型能力的 Skill。
-- 图片创作、实时聊天等由现有前端和 Router 支撑的工作区。
-
-desktop 当前不能直接使用：
-
-- 需要本机启动 MCP stdio 进程的 Tool。
-- 需要读写用户本机目录的 filesystem Tool。
-- 需要操作用户本机 Git 仓库的 git Tool。
-
-后续如果要支持 desktop 本地 Tool Runtime，不能简单复用 standalone 的 `data/tool_config.json`。需要单独设计：
-
-- Tauri 用户数据目录中的配置保存。
-- API Key 和本地路径的安全存储。
-- 命令白名单。
-- 文件目录授权。
-- 首次运行和高风险操作的用户确认。
-- 工具进程状态、日志和错误诊断。
-- 多平台差异。
+- Rust 层管理 MCP stdio 子进程和 JSON-RPC `initialize`、`tools/list`、`tools/call`、停止与清理。
+- 配置保存于 Tauri 用户数据目录，不复用 standalone 的 `data/tool_config.json`。
+- 敏感环境变量保存于操作系统凭证库，不进入普通配置、聊天同步或日志。
+- 首次安装显示来源、命令、依赖和权限并要求确认；缺失 Node/Python/uv 时只提示用户自行安装。
+- Marketplace manifest 的 runtime/platform/release 元数据决定工具是否展示；桌面不启动未声明兼容或未审核的工具。
 
 ## 8. 和 Node、Agent、Warehouse、Router 的关系
 
@@ -388,21 +366,20 @@ Tool --> Warehouse : 需要存储能力时应走受控接口
 
 Tool 没有起作用时，按顺序检查：
 
-1. 当前是否是 standalone 或 `npm run dev`，不是 Tauri 静态导出。
-2. 服务进程是否设置了 `ENABLE_TOOLS=1` 或 `ENABLE_TOOLS=true`。
-3. `data/tool_config.json` 或 `TOOL_CONFIG_PATH` 是否存在且可读写。
-4. 工具条目是否包含正确的 `command`、`args`、`env`。
-5. 服务进程是否有权限启动该命令，例如 `npx`、`uvx`、`mcp-server-fetch`。
-6. 工具状态是否为 `active`，不是 `paused`、`error` 或 `undefined`。
-7. 当前会话绑定的 Skill 是否声明了对应 `tools.toolServers`。
-8. 通用问答或普通会话不会自动注入 Tool。
-9. 模型输出的 `json:mcp:<clientId>` 是否匹配 Skill 允许的 Tool Server ID。
-10. 如果是 desktop，当前版本预期就是不执行本地 Tool Runtime。
+1. standalone 是否设置了 `ENABLE_TOOLS=1` 或 `ENABLE_TOOLS=true`；desktop 是否正常载入 Tauri Runtime。
+2. `data/tool_config.json` 或 `TOOL_CONFIG_PATH` 是否存在且可读写；desktop 则检查应用用户数据目录。
+3. 工具条目是否包含正确的 `command`、`args`、`env`。
+4. 服务进程或桌面用户是否有权限启动该命令，例如 `npx`、`uvx`、`mcp-server-fetch`。
+5. 工具状态是否为 `active`，不是 `paused`、`error` 或 `undefined`。
+6. 当前会话绑定的 Skill 是否声明了对应 `tools.toolServers`。
+7. 通用问答或普通会话不会自动注入 Tool。
+8. 模型输出的 `json:mcp:<clientId>` 是否匹配 Skill 允许的 Tool Server ID。
+9. 检查当前工具是否声明并满足 runtime/platform、发布审核和依赖要求。
 
 ## 10. 当前实现限制
 
-- Tool Runtime 是实例级能力，不是账户级能力。
-- 多人 Web 部署中，不能让普通用户通过页面配置任意服务端命令。
+- standalone Tool Runtime 是实例级能力，不是账户级能力，只用于个人控制的私有实例；多人共享 Web 部署不支持个人动态安装。
+- standalone 敏感环境变量保存在权限为 `0600` 的实例配置文件中，接口返回时会脱敏；该文件不是加密凭证库。
 - 当前主要支持 stdio Tool Server；远程 HTTP/SSE Tool Server 需要继续产品化和安全设计。
 - 工具调用目前通过 `json:mcp` 文本块桥接，不等同于模型厂商原生 tool calling 的完整能力。
-- desktop 本地 Tool Runtime 需要单独方案，不应直接迁移 standalone 的配置文件和权限模型。
+- desktop 本地 Tool Runtime 使用应用用户数据目录和操作系统凭证存储，不复用 standalone 配置文件和进程。

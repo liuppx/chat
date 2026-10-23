@@ -32,7 +32,25 @@
   cursor: pointer;
 }
 
+.account-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  cursor: pointer;
+}
+
 .wallet-address:hover,
-.wallet-address:focus-visible {
+.wallet-address:focus-visible,
+.account-name:hover,
+.account-name:focus-visible {
   text-decoration: underline;
 }

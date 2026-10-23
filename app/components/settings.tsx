@@ -42,7 +42,7 @@ import { SearchService, usePromptStore } from "../store/prompt";
 import { ErrorBoundary } from "./error";
 import { InputRange } from "./input-range";
 import { useNavigate } from "react-router-dom";
-import { Avatar, AvatarPicker, WalletAccount } from "./emoji";
+import { Avatar, AvatarPicker, IdentityAccount, WalletAccount } from "./emoji";
 import { getClientConfig } from "../config/client";
 import { nanoid } from "nanoid";
 import { TTSConfigList } from "./tts-config";
@@ -52,6 +52,7 @@ import {
   logoutWallet,
   UCAN_AUTH_EVENT,
 } from "../plugins/wallet";
+import { getCentralIdentityOwner } from "../plugins/central-ucan";
 
 function EditPromptModal(props: { id: string; onClose: () => void }) {
   const promptStore = usePromptStore();
@@ -314,6 +315,7 @@ export function Settings() {
   const customCount = promptStore.getUserPrompts().length ?? 0;
   const [shouldShowPromptModal, setShowPromptModal] = useState(false);
   const walletAddress = getCurrentAccount() || undefined;
+  const identityDid = getCentralIdentityOwner() || undefined;
 
   useEffect(() => {
     checkUpdate();
@@ -388,6 +390,11 @@ export function Settings() {
             {walletAddress && (
               <ListItem title={Locale.Settings.Account.Address.Title}>
                 <WalletAccount address={walletAddress} title={walletAddress} />
+              </ListItem>
+            )}
+            {identityDid && (
+              <ListItem title={Locale.Settings.Account.Identity.Title}>
+                <IdentityAccount did={identityDid} title={identityDid} />
               </ListItem>
             )}
             <ListItem

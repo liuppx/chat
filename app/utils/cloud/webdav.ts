@@ -16,7 +16,10 @@ import {
   createWebDavClient as createSdkWebDavClient,
 } from "@yeying-community/web3-bs";
 import { ensureLocalUcanSession } from "@/app/plugins/ucan-session";
-import { invalidateUcanAuthorization } from "@/app/plugins/wallet";
+import {
+  invalidateUcanAuthorization,
+  isUcanAuthTransitioning,
+} from "@/app/plugins/wallet";
 import {
   getCentralUcanAuthorizationHeaderForAudience,
   getCentralIdentityOwner,
@@ -564,6 +567,9 @@ function createWebdavProxyFetcher(endpoint: string) {
 }
 
 async function getUcanWebDavClient(store: SyncStore) {
+  if (isUcanAuthTransitioning()) {
+    throw new Error("UCAN auth transition in progress");
+  }
   const envBaseUrl = getEnvWebdavBaseUrl();
   const envPrefix = getEnvWebdavPrefix();
   if (process.env.NODE_ENV === "development") {
@@ -948,6 +954,7 @@ function createUcanWebDavClient(store: SyncStore) {
     },
 
     async releaseLock(key: string, owner: string) {
+      if (isUcanAuthTransitioning()) return;
       const { filePath } = await getUcanWebDavClient(store);
       const lockDirPath = resolveUcanLockDirPath(filePath, key);
       const lockMetaPath = resolveUcanLockMetaPath(filePath, key);

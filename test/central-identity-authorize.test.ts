@@ -6,6 +6,7 @@ import {
   exchangeCentralAuthorizeCode,
   getCentralIdentityDid,
   getCentralIdentityOwner,
+  getCentralIdentityUsername,
   getCentralWalletAddress,
   getCentralUcanAuthorizationHeaderForAudience,
   isCentralUcanAuthorized,
@@ -219,6 +220,50 @@ describe("central wallet identity authorization", () => {
     expect(getCentralIdentityOwner()).toBe("did:yeying:wid_did_only");
     expect(localStorage.getItem("currentAccount")).toBeNull();
     expect(isCentralUcanAuthorized()).toBe(true);
+  });
+
+  test("stores the verified username from the identity credential", () => {
+    window.__CHAT_RUNTIME_CONFIG__ = {
+      centralUcanAuthBaseUrl: "https://node.example",
+      chatApplicationUid: "chat",
+    } as any;
+    const toBase64Url = (value: unknown) =>
+      btoa(JSON.stringify(value))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/g, "");
+    const credential = `${toBase64Url({ alg: "EdDSA", typ: "JWT" })}.${toBase64Url({
+      vc: {
+        credentialSubject: {
+          id: "did:yeying:wid_username",
+          username: "alice",
+          usernameQualified: "alice@node.example",
+        },
+      },
+    })}.signature`;
+
+    applyCentralAuthorizeExchange({
+      requestId: "iar_username",
+      appId: "chat",
+      redirectUri: "https://chat.example/callback",
+      did: "did:yeying:wid_username",
+      walletAddress: "0x1111111111111111111111111111111111111111",
+      scopes: ["identity.basic", "identity.username"],
+      credentials: [
+        {
+          type: "UsernameCredential",
+          credentialId: "username-1",
+          credential,
+        },
+      ],
+      ucanSession: {
+        sessionToken: "identity-session-username",
+        expiresAt: Date.now() + 60_000,
+      },
+    });
+
+    expect(getCentralIdentityUsername()).toBe("alice");
+    expect(localStorage.getItem("centralIdentityUsername")).toBe("alice");
   });
 
   test("renews an expired issue session with the identity refresh token", async () => {

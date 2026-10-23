@@ -15,9 +15,9 @@ import {
   isValidUcanAuthorization,
   UCAN_AUTH_EVENT,
 } from "../plugins/wallet";
+import { getCentralIdentityUsername } from "../plugins/central-ucan";
 import { useAppConfig, useChatStore } from "../store";
-import { Avatar } from "./emoji";
-import { WalletAccount } from "./emoji";
+import { Avatar, IdentityUsername, WalletAccount } from "./emoji";
 import {
   DEFAULT_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
@@ -245,6 +245,8 @@ export function SideBar(props: { className?: string }) {
   useHotKey();
   const { onDragStart, shouldNarrow } = useDragSideBar();
   const show = useWalletAccount();
+  const walletAddress = getCurrentAccount();
+  const username = show ? getCentralIdentityUsername() : "";
 
   const navigate = useNavigate();
   const config = useAppConfig();
@@ -261,16 +263,17 @@ export function SideBar(props: { className?: string }) {
           show ? (
             <Avatar
               avatar={config.avatar}
-              address={getCurrentAccount() || undefined}
+              address={walletAddress || undefined}
             />
           ) : undefined
         }
         title={
           show ? (
-            <WalletAccount
-              address={getCurrentAccount()}
-              title={getCurrentAccount()}
-            />
+            username ? (
+              <IdentityUsername username={username} />
+            ) : (
+              <WalletAccount address={walletAddress} title={walletAddress} />
+            )
           ) : undefined
         }
         subTitle={show ? "" : undefined}

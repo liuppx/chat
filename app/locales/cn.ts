@@ -239,6 +239,9 @@ const cn = {
       Address: {
         Title: "区块链地址",
       },
+      Identity: {
+        Title: "钱包身份",
+      },
       Logout: {
         Title: "退出登录",
         SubTitle: "断开当前钱包账号，并清除本地授权会话。",
@@ -804,7 +807,13 @@ const cn = {
     ConfigMode: "配置模式",
     ToolUserProvided: "用户自带工具配置",
     ToolUserConfigHint:
-      "工具支持 cloud / native 两种运行方式。Web 版普通用户通常直接使用云端能力；桌面版或自托管环境可在本地安装、配置和管理。当前这个配置面板写入的是本地工具运行配置，请只在可信环境中使用。",
+      "工具运行位置取决于当前版本。敏感配置不会回显；standalone 配置保存在服务端文件中，请勿在多人共享实例上启用。",
+    RuntimeLocation: {
+      desktop:
+        "工具将在当前设备运行。启动前需要你确认命令；凭证和上游服务费用由你承担，默认不与其他设备共享。",
+      standalone:
+        "工具将在 Chat 服务实例运行。仅适用于你控制的个人私有实例：配置和进程按整个实例共享，不按 Chat 账户隔离。实例部署者负责安装、凭证和上游费用；不要在社区多人共享服务中启用。",
+    },
     SkillSetup: {
       Title: "技能配置",
       RuntimeIssues: "需要处理",
@@ -1171,7 +1180,14 @@ const cn = {
     SourceType: "图片来源",
     UploadImage: "上传图片",
     MaskImage: "上传遮罩",
-    MaskImageSubTitle: "透明区域会被重新生成；也可以直接打开画笔涂抹生成遮罩。",
+    MaskImageSubTitle: "透明区域会被重新生成。",
+    MaskRegion: "编辑区域",
+    MaskOverlayHint: "高亮区域将被重新生成",
+    ReplaceImage: "更换",
+    NoMaskYet: "未设置遮罩，可能会编辑整张图片",
+    SourceImageBroken: "源图已失效，请重新上传",
+    MaskUnsupportedHint:
+      "该模型为指令式编辑，不支持局部重绘；请在画面提示中用文字描述要修改的区域",
     DrawMask: "涂抹遮罩",
     ClearMask: "清空遮罩",
     SaveMask: "保存遮罩",
@@ -1219,6 +1235,10 @@ const cn = {
     Submit: "提交生成",
     ParamIsRequired: (name: string) => `${name}不能为空`,
     StylePresets: "风格预设",
+    StylePresetsShowAll: (n: number) => `全部 ${n}`,
+    StylePresetsShowLess: "收起",
+    StylePresetsSelected: (n: number) => `已选 ${n}`,
+    AdvancedParams: "高级参数",
     SeedRandom: "随机种子",
     Styles: {
       D3Model: "3D模型",
@@ -1258,6 +1278,7 @@ const cn = {
     Actions: {
       Params: "查看参数",
       Copy: "复制提示词",
+      Download: "下载",
       Delete: "删除",
       Retry: "重试",
       EditAgain: "继续编辑",
@@ -1265,6 +1286,7 @@ const cn = {
       History: "查看历史",
     },
     EmptyRecord: "暂无绘画记录",
+    EmptyHint: "在左侧选择模型、输入画面提示，点击「提交生成」开始创作",
     Status: {
       Name: "状态",
       Success: "成功",

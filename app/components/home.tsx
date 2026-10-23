@@ -647,8 +647,17 @@ function useAuthenticatedBootstrap(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     const onAuthChange = () => {
-      loadModels().catch((error) => {
-        console.warn("[Models] reload after auth failed", error);
+      if (
+        isUcanAuthTransitioning() ||
+        getAccountWorkspaceStatus() !== "ready"
+      ) {
+        return;
+      }
+      void isValidUcanAuthorization().then((authorized) => {
+        if (!authorized || isUcanAuthTransitioning()) return;
+        loadModels().catch((error) => {
+          console.warn("[Models] reload after auth failed", error);
+        });
       });
     };
     window.addEventListener(UCAN_AUTH_EVENT, onAuthChange);

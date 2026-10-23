@@ -231,3 +231,33 @@ export function WalletAccount(props: { address?: string; title?: string }) {
     </div>
   );
 }
+
+export function IdentityAccount(props: { did?: string; title?: string }) {
+  return <WalletAccount address={props.did} title={props.title || props.did} />;
+}
+
+export function IdentityUsername(props: { username?: string; title?: string }) {
+  const username = (props.username || "").trim();
+  const copyToClipboard = async () => {
+    if (!username) return;
+    try {
+      await navigator.clipboard.writeText(username);
+      notifySuccess("已复制");
+    } catch (err) {
+      console.error("复制失败:", err);
+      notifyError("复制失败");
+    }
+  };
+
+  return (
+    <div className={styles["wallet-account"]} title={props.title || username}>
+      <button
+        onClick={copyToClipboard}
+        className={styles["account-name"]}
+        type="button"
+      >
+        {username}
+      </button>
+    </div>
+  );
+}

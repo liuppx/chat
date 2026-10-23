@@ -18,6 +18,7 @@ import {
   getToolConfigFromFile,
   isToolRuntimeEnabled,
   pauseToolServer,
+  removeToolServer,
   restartAllClients,
   resumeToolServer,
 } from "../tools/actions";
@@ -30,6 +31,7 @@ import {
 } from "../tools/types";
 import {
   fetchCommunityToolPresetServers,
+  getToolInstallConfirmation,
   mergeToolPresetServers,
 } from "../tools/marketplace";
 import {
@@ -43,12 +45,14 @@ import StopIcon from "../icons/pause.svg";
 import { Path } from "../constant";
 import Locale, { getLang } from "../locales";
 import { getOfficialToolPresetServers } from "../tools/preset-servers";
+import { isDesktopAppRuntime } from "../tauri";
 
 interface ConfigProperty {
   type: string;
   description?: string;
   required?: boolean;
   minItems?: number;
+  sensitive?: boolean;
   itemLabel?: string;
   addButtonText?: string;
   helpUrl?: string;
@@ -184,7 +188,9 @@ export function ToolMarketPage() {
             currentConfig.env
           ) {
             // For env types, get values from environment variables
-            userConfig[key] = currentConfig.env[mapping.key];
+            if (!preset.configSchema?.properties[key]?.sensitive) {
+              userConfig[key] = currentConfig.env[mapping.key];
+            }
           }
         });
         setUserConfig(userConfig);
@@ -208,16 +214,33 @@ export function ToolMarketPage() {
     const preset = presetServers.find((s) => s.id === editingServerId);
     if (!preset || !preset.configSchema || !editingServerId) return;
 
+    const savingServerId = editingServerId;
+    const currentServerConfig = config?.toolServers[savingServerId];
+    const preservedConfigKeys = Object.entries(preset.argsMapping ?? {})
+      .filter(([, mapping]) => mapping.type === "env")
+      .filter(([key]) =>
+        Boolean(preset.configSchema?.properties[key]?.sensitive),
+      )
+      .filter(
+        ([, mapping]) =>
+          Boolean(mapping.key) &&
+          (currentServerConfig?.secretEnvKeys?.includes(mapping.key || "") ||
+            Object.prototype.hasOwnProperty.call(
+              currentServerConfig?.env ?? {},
+              mapping.key || "",
+            )),
+      )
+      .map(([key]) => key);
     const missingKeys = getMissingToolConfigKeys(
       preset.configSchema.properties,
       userConfig,
+      preservedConfigKeys,
     );
     if (missingKeys.length > 0) {
       showToast(`缺少必填工具配置：${missingKeys.join(", ")}`);
       return;
     }
 
-    const savingServerId = editingServerId;
     setEditingServerId(undefined);
 
     try {
@@ -225,6 +248,7 @@ export function ToolMarketPage() {
       // 构建服务器配置
       const args = [...preset.baseArgs];
       const env: Record<string, string> = {};
+      const secretEnvKeys = new Set<string>();
 
       Object.entries(preset.argsMapping || {}).forEach(([key, mapping]) => {
         const value = userConfig[key];
@@ -241,6 +265,9 @@ export function ToolMarketPage() {
           if (envValue !== undefined) {
             env[mapping.key] = envValue;
           }
+          if (preset.configSchema?.properties[key]?.sensitive) {
+            secretEnvKeys.add(mapping.key);
+          }
         }
       });
 
@@ -248,9 +275,19 @@ export function ToolMarketPage() {
         command: preset.command,
         args,
         ...(Object.keys(env).length > 0 ? { env } : {}),
+        secretEnvKeys: Array.from(
+          new Set([
+            ...secretEnvKeys,
+            ...(currentServerConfig?.secretEnvKeys ?? []),
+          ]),
+        ),
       };
 
-      const newConfig = await addToolServer(savingServerId, serverConfig);
+      const newConfig = await addToolServer(
+        savingServerId,
+        serverConfig,
+        getToolInstallConfirmation(preset),
+      );
       setConfig(newConfig);
       showToast("Server configuration updated successfully");
     } catch (error) {
@@ -300,7 +337,11 @@ export function ToolMarketPage() {
           command: preset.command,
           args: [...preset.baseArgs],
         };
-        const newConfig = await addToolServer(preset.id, serverConfig);
+        const newConfig = await addToolServer(
+          preset.id,
+          serverConfig,
+          getToolInstallConfirmation(preset),
+        );
         setConfig(newConfig);
 
         // 更新状态
@@ -326,6 +367,22 @@ export function ToolMarketPage() {
     } catch (error) {
       showToast("Failed to stop server");
       console.error(error);
+    } finally {
+      updateLoadingState(id, null);
+    }
+  };
+
+  const removeServer = async (id: string) => {
+    try {
+      updateLoadingState(id, "Removing server...");
+      const newConfig = await removeToolServer(id);
+      setConfig(newConfig);
+      setClientStatuses(await getClientsStatus());
+      showToast("Server removed successfully");
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "Failed to remove server",
+      );
     } finally {
       updateLoadingState(id, null);
     }
@@ -469,9 +526,9 @@ export function ToolMarketPage() {
             >
               <input
                 aria-label={key}
-                type="text"
                 value={currentValue}
                 placeholder={`Enter ${key}`}
+                type={prop.sensitive ? "password" : "text"}
                 onChange={(e) => {
                   setUserConfig({ ...userConfig, [key]: e.target.value });
                 }}
@@ -662,12 +719,12 @@ export function ToolMarketPage() {
                         onClick={() => restartServer(server.id)}
                         disabled={isLoading}
                       />
-                      {/* <IconButton
+                      <IconButton
                         icon={<DeleteIcon />}
                         text="Remove"
-                        onClick={() => removeServer(server.id)}
+                        onClick={() => void removeServer(server.id)}
                         disabled={isLoading}
-                      /> */}
+                      />
                     </>
                   ) : (
                     <>
@@ -687,6 +744,12 @@ export function ToolMarketPage() {
                         icon={<StopIcon />}
                         text="Stop"
                         onClick={() => pauseServer(server.id)}
+                        disabled={isLoading}
+                      />
+                      <IconButton
+                        icon={<DeleteIcon />}
+                        text="Remove"
+                        onClick={() => void removeServer(server.id)}
                         disabled={isLoading}
                       />
                     </>
@@ -723,6 +786,11 @@ export function ToolMarketPage() {
               {currentLang === "cn"
                 ? `已配置 ${Object.keys(config?.toolServers ?? {}).length} 个工具`
                 : `${Object.keys(config?.toolServers ?? {}).length} tools configured`}
+            </div>
+            <div className="window-header-sub-title">
+              {isDesktopAppRuntime()
+                ? Locale.Discovery.RuntimeLocation.desktop
+                : Locale.Discovery.RuntimeLocation.standalone}
             </div>
           </div>
 

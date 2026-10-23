@@ -30,6 +30,7 @@ tauri-plugin-opener = "2.5.5"
 tauri-plugin-fs = "2.5.1"
 tauri-plugin-clipboard-manager = "2.3.2"
 tauri-plugin-single-instance = { version = "2.4.4" }
+keyring = { version = "3.6.3", default-features = false, features = ["apple-native", "windows-native", "linux-native-sync-persistent", "crypto-rust"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

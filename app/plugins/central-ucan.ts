@@ -23,6 +23,7 @@ const CENTRAL_REFRESH_TOKEN_KEY = "centralIdentityRefreshToken";
 const CENTRAL_REFRESH_EXPIRES_AT_KEY = "centralIdentityRefreshExpiresAt";
 const CENTRAL_SUBJECT_KEY = "centralAuthSubject";
 const CENTRAL_IDENTITY_DID_KEY = "centralIdentityDid";
+const CENTRAL_IDENTITY_USERNAME_KEY = "centralIdentityUsername";
 const CENTRAL_WALLET_ADDRESS_KEY = "centralWalletAddress";
 const CENTRAL_IDENTITY_CREDENTIALS_KEY = "centralIdentityCredentials";
 const CENTRAL_AUTHORIZE_SESSION_PREFIX = "centralIdentityAuthorizeSession:";
@@ -50,6 +51,7 @@ type DecodedJwtPayload = {
   aud?: string;
   cap?: unknown;
   iat?: number;
+  vc?: unknown;
 };
 
 type CentralUcanTokenRecord = {
@@ -136,6 +138,11 @@ export type CentralAuthorizeExchangeResult = {
   };
 };
 
+type StoredIdentityCredential = {
+  type?: string;
+  credential?: string;
+};
+
 function resolveCentralRedirectUri(): string {
   if (isDesktopAppRuntime()) return "";
   const configured = getClientConfig()?.centralUcanRedirectUri?.trim();
@@ -219,6 +226,29 @@ function decodeJwtPayload(token: string): DecodedJwtPayload | null {
   } catch {
     return null;
   }
+}
+
+function extractUsernameFromCredentials(
+  credentials: StoredIdentityCredential[] | undefined,
+): string {
+  const credential = credentials?.find(
+    (item) => item?.type === "UsernameCredential",
+  );
+  const token = String(credential?.credential || "").trim();
+  if (!token) return "";
+
+  const payload = decodeJwtPayload(token);
+  const verifiableCredential = payload?.vc;
+  if (!verifiableCredential || typeof verifiableCredential !== "object") {
+    return "";
+  }
+  const subject = (verifiableCredential as { credentialSubject?: unknown })
+    .credentialSubject;
+  if (!subject || typeof subject !== "object") return "";
+  const username = String(
+    (subject as { username?: unknown }).username || "",
+  ).trim();
+  return username;
 }
 
 function encodeBase64Url(bytes: Uint8Array): string {
@@ -941,6 +971,7 @@ export function clearCentralUcanAuth(options?: {
     localStorage.removeItem(CENTRAL_ACCESS_EXPIRES_AT_KEY);
     localStorage.removeItem(CENTRAL_SUBJECT_KEY);
     localStorage.removeItem(CENTRAL_IDENTITY_DID_KEY);
+    localStorage.removeItem(CENTRAL_IDENTITY_USERNAME_KEY);
     localStorage.removeItem(CENTRAL_WALLET_ADDRESS_KEY);
     localStorage.removeItem(CENTRAL_IDENTITY_CREDENTIALS_KEY);
     clearCentralRefreshToken();
@@ -983,6 +1014,27 @@ export function getCentralIdentityOwner(): string {
 export function getCentralIdentityDid(): string {
   if (typeof localStorage === "undefined") return "";
   return (localStorage.getItem(CENTRAL_IDENTITY_DID_KEY) || "").trim();
+}
+
+export function getCentralIdentityUsername(): string {
+  if (typeof localStorage === "undefined") return "";
+  const stored = (
+    localStorage.getItem(CENTRAL_IDENTITY_USERNAME_KEY) || ""
+  ).trim();
+  if (stored) return stored;
+
+  try {
+    const raw = localStorage.getItem(CENTRAL_IDENTITY_CREDENTIALS_KEY);
+    if (!raw) return "";
+    const credentials = JSON.parse(raw) as StoredIdentityCredential[];
+    const username = extractUsernameFromCredentials(credentials);
+    if (username) {
+      localStorage.setItem(CENTRAL_IDENTITY_USERNAME_KEY, username);
+    }
+    return username;
+  } catch {
+    return "";
+  }
 }
 
 export function getCentralWalletAddress(): string {
@@ -1329,6 +1381,15 @@ export function applyCentralAuthorizeExchange(
         CENTRAL_IDENTITY_CREDENTIALS_KEY,
         JSON.stringify(result.credentials),
       );
+      const username = extractUsernameFromCredentials(result.credentials);
+      if (username) {
+        localStorage.setItem(CENTRAL_IDENTITY_USERNAME_KEY, username);
+      } else {
+        localStorage.removeItem(CENTRAL_IDENTITY_USERNAME_KEY);
+      }
+    } else {
+      localStorage.removeItem(CENTRAL_IDENTITY_CREDENTIALS_KEY);
+      localStorage.removeItem(CENTRAL_IDENTITY_USERNAME_KEY);
     }
     const sessionToken = String(result.ucanSession?.sessionToken || "").trim();
     if (sessionToken) {

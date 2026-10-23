@@ -32,7 +32,10 @@ import {
   isCentralUcanAuthorized,
 } from "../plugins/central-ucan";
 import { getUcanRootCapsKey, getWebdavAudience } from "../plugins/ucan";
-import { isValidUcanAuthorization } from "../plugins/wallet";
+import {
+  isUcanAuthTransitioning,
+  isValidUcanAuthorization,
+} from "../plugins/wallet";
 
 type ImageUrlPart = {
   type?: string;
@@ -519,6 +522,7 @@ export const useSyncStore = createPersistStore(
           );
           set({ lastSyncTime: Date.now(), lastProvider: provider });
         } catch (e) {
+          if (isUcanAuthTransitioning()) return;
           console.error("[Sync] failed to get remote state", {
             provider,
             authType:

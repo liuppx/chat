@@ -8,6 +8,8 @@ ACTION="${1:-start}"
 PID_FILE="${ROOT_DIR}/.chat.pid"
 LOG_FILE="${ROOT_DIR}/server.log"
 SERVER_ENTRY="${ROOT_DIR}/server.js"
+STOP_TIMEOUT_SECONDS="${STOP_TIMEOUT_SECONDS:-30}"
+FORCE_STOP_TIMEOUT_SECONDS="${FORCE_STOP_TIMEOUT_SECONDS:-5}"
 
 require_node() {
   if ! command -v node >/dev/null 2>&1; then
@@ -36,10 +38,12 @@ is_running() {
   if [ -z "${pid}" ]; then
     return 1
   fi
-  if ps -p "${pid}" >/dev/null 2>&1; then
-    return 0
-  fi
-  return 1
+  ps -p "${pid}" -o stat= 2>/dev/null | grep -qv '^Z'
+}
+
+validate_stop_timeouts() {
+  [[ "${STOP_TIMEOUT_SECONDS}" =~ ^[0-9]+$ ]] || { echo "Invalid STOP_TIMEOUT_SECONDS: ${STOP_TIMEOUT_SECONDS}" >&2; exit 1; }
+  [[ "${FORCE_STOP_TIMEOUT_SECONDS}" =~ ^[0-9]+$ ]] || { echo "Invalid FORCE_STOP_TIMEOUT_SECONDS: ${FORCE_STOP_TIMEOUT_SECONDS}" >&2; exit 1; }
 }
 
 find_pid() {
@@ -81,6 +85,7 @@ start_server() {
 }
 
 stop_server() {
+  validate_stop_timeouts
   local pid
   pid="$(find_pid)"
   if ! is_running "${pid}"; then
@@ -89,17 +94,31 @@ stop_server() {
     return 0
   fi
 
-  kill "${pid}" >/dev/null 2>&1 || true
-  for _ in {1..20}; do
+  kill -TERM "${pid}" >/dev/null 2>&1 || true
+  for (( waited = 0; waited < STOP_TIMEOUT_SECONDS; waited++ )); do
     if ! is_running "${pid}"; then
       rm -f "${PID_FILE}"
       echo "Stopped"
       return 0
     fi
-    sleep 0.5
+    sleep 1
   done
 
-  kill -9 "${pid}" >/dev/null 2>&1 || true
+  echo "Graceful stop timed out after ${STOP_TIMEOUT_SECONDS}s; sending SIGKILL" >&2
+  kill -KILL "${pid}" >/dev/null 2>&1 || true
+  for (( waited = 0; waited < FORCE_STOP_TIMEOUT_SECONDS; waited++ )); do
+    if ! is_running "${pid}"; then
+      rm -f "${PID_FILE}"
+      echo "Stopped (forced)"
+      return 0
+    fi
+    sleep 1
+  done
+
+  if is_running "${pid}"; then
+    echo "Error: chat process ${pid} did not exit after SIGKILL" >&2
+    return 1
+  fi
   rm -f "${PID_FILE}"
   echo "Stopped (forced)"
 }
@@ -112,7 +131,9 @@ case "${ACTION}" in
     stop_server
     ;;
   restart)
-    stop_server
+    if ! stop_server; then
+      exit 1
+    fi
     start_server
     ;;
   *)
