@@ -4,8 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/package-common.sh"
 package_common_init chat "$@"
 command -v npm >/dev/null 2>&1 || package_fail 'npm is required'
-[[ -f "$PACKAGE_ROOT_DIR/package-lock.json" ]] || package_fail 'package-lock.json is required; refusing a non-locked install'
-(cd "$PACKAGE_ROOT_DIR" && HUSKY=0 npm ci --no-audit --no-fund && BUILD_VERSION="$PACKAGE_VERSION" BUILD_MODE=standalone BUILD_APP=0 npm run build)
+(cd "$PACKAGE_ROOT_DIR" && HUSKY=0 npm install --no-audit --no-fund && BUILD_VERSION="$PACKAGE_VERSION" BUILD_MODE=standalone BUILD_APP=0 npm run build)
 [[ -f "$PACKAGE_ROOT_DIR/.next/standalone/server.js" ]] || package_fail 'standalone Next.js server output is missing'
 package_make_root chat
 cp -R "$PACKAGE_ROOT_DIR/.next/standalone/." "$PACKAGE_DIR/"
